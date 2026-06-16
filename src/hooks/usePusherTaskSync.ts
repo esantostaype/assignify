@@ -31,11 +31,17 @@ export const usePusherTaskSync = () => {
     const channel = pusher.subscribe(taskKeys.all[0]) // 'tasks'
 
     channel.bind('task-updated', (payload: TaskUpdatePayload) => {
-      // El kanban lee en vivo desde ClickUp → basta con re-pedir la query.
-      queryClient.invalidateQueries({ queryKey: taskKeys.clickup() })
-      if (payload?.name) {
-        toast.info(`Tarea "${payload.name}" actualizada`)
+      // ClickUp no envía el nombre en el webhook; intentamos sacarlo de la caché.
+      let nombre = payload?.name
+      if (!nombre && payload?.taskId) {
+        const data = queryClient.getQueryData<{
+          clickupTasks?: Array<{ clickupId: string; name: string }>
+        }>(taskKeys.clickup())
+        nombre = data?.clickupTasks?.find((t) => t.clickupId === payload.taskId)?.name
       }
+      // El kanban lee en vivo desde ClickUp → re-pedir la query para repintar.
+      queryClient.invalidateQueries({ queryKey: taskKeys.clickup() })
+      toast.info(nombre ? `Tarea "${nombre}" actualizada` : 'Tablero de tareas actualizado')
     })
 
     return () => {
