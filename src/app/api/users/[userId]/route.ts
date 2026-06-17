@@ -1,18 +1,72 @@
 // src/app/api/users/[userId]/route.ts
-// PATCH para actualizar campos editables del usuario (por ahora: el nivel).
+// CRUD del recurso usuario:
+//   - GET   → detalle completo (roles + vacaciones)
+//   - PATCH → actualizar campos editables (por ahora: el nivel)
 import { NextResponse } from 'next/server'
 import { db } from '@/db'
-import { user } from '@/db/schema'
-import { eq } from 'drizzle-orm'
+import { user, userVacation } from '@/db/schema'
+import { eq, asc } from 'drizzle-orm'
 import { Level } from '@/db/enums'
 import { invalidateAllCache } from '@/utils/cache'
 
-// Escribe en la DB en vivo: nunca pre-renderizar/cachear en build.
+// Lee/escribe datos en vivo de la DB: nunca pre-renderizar/cachear en build.
 export const dynamic = 'force-dynamic'
 
 interface RouteParams {
   params: {
     userId: string
+  }
+}
+
+/**
+ * GET /api/users/[userId]
+ * Detalle completo del usuario (roles + vacaciones).
+ *
+ * Usa la API relacional de Drizzle. Antes se ensamblaba a mano porque, con el
+ * cliente libSQL reutilizado, la query relacional devolvía datos obsoletos;
+ * ahora las lecturas son frescas (no-store en `@/db`), así que `findFirst` con
+ * `with` es seguro. Mantiene la MISMA forma de respuesta: user con
+ * roles[{id,userId,typeId,brandId,isPrimary,type{id,name},brand{id,name}}] y
+ * vacations[].
+ */
+export async function GET(req: Request, { params }: RouteParams) {
+  try {
+    const { userId } = params
+
+    if (!userId) {
+      return NextResponse.json({ error: 'User ID is required' }, { status: 400 })
+    }
+
+    const result = await db.query.user.findFirst({
+      where: eq(user.id, userId),
+      with: {
+        roles: {
+          with: {
+            type: { columns: { id: true, name: true } },
+            brand: { columns: { id: true, name: true } },
+          },
+        },
+        vacations: {
+          orderBy: asc(userVacation.startDate),
+        },
+      },
+    })
+
+    if (!result) {
+      return NextResponse.json({ error: 'User not found' }, { status: 404 })
+    }
+
+    return NextResponse.json(result)
+  } catch (error) {
+    console.error('Error loading user details:', error)
+
+    return NextResponse.json(
+      {
+        error: 'Internal server error loading user details',
+        details: error instanceof Error ? error.message : 'Unknown error',
+      },
+      { status: 500 }
+    )
   }
 }
 

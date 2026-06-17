@@ -1,4 +1,4 @@
-// src/app/api/users/roles/route.ts
+// src/app/api/users/[userId]/roles/route.ts
 import { NextResponse } from 'next/server';
 import { db } from '@/db';
 import { user, taskType, brand, userRole } from '@/db/schema';
@@ -7,8 +7,13 @@ import { eq, and, isNull } from 'drizzle-orm';
 // Lee/escribe datos en vivo de la DB: nunca pre-renderizar/cachear en build.
 export const dynamic = 'force-dynamic';
 
+interface RouteParams {
+  params: {
+    userId: string;
+  };
+}
+
 interface CreateRoleRequest {
-  userId: string;
   typeId: number;
   brandId?: string | null;
   // Cargo primario (true) vs secundario (false). Opcional; por defecto secundario.
@@ -16,13 +21,14 @@ interface CreateRoleRequest {
 }
 
 /**
- * POST /api/users/roles
- * Agrega un nuevo rol a un usuario
+ * POST /api/users/[userId]/roles
+ * Agrega un nuevo rol a un usuario (userId viene de la ruta).
  */
-export async function POST(req: Request) {
+export async function POST(req: Request, { params }: RouteParams) {
   try {
+    const { userId } = params;
     const body: CreateRoleRequest = await req.json();
-    const { userId, typeId, brandId, isPrimary } = body;
+    const { typeId, brandId, isPrimary } = body;
 
     // Validar campos requeridos
     if (!userId || !typeId) {

@@ -1,4 +1,4 @@
-// src/app/api/users/roles/[roleId]/route.ts
+// src/app/api/users/[userId]/roles/[roleId]/route.ts
 import { NextResponse } from 'next/server';
 import { db } from '@/db';
 import { userRole } from '@/db/schema';
@@ -14,12 +14,13 @@ export const dynamic = 'force-dynamic';
 
 interface RouteParams {
   params: {
+    userId: string;
     roleId: string;
   };
 }
 
 /**
- * DELETE /api/users/roles/[roleId]
+ * DELETE /api/users/[userId]/roles/[roleId]
  * Elimina un rol específico de un usuario
  */
 export async function DELETE(req: Request, { params }: RouteParams) {
@@ -99,7 +100,7 @@ export async function DELETE(req: Request, { params }: RouteParams) {
 }
 
 /**
- * PATCH /api/users/roles/[roleId]
+ * PATCH /api/users/[userId]/roles/[roleId]
  * Alterna (o fija) el flag `isPrimary` de un rol existente.
  * Body: { isPrimary: boolean }. Si no se envía, alterna el valor actual.
  */

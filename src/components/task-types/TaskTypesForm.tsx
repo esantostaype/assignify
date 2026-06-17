@@ -14,7 +14,6 @@ interface TaskType {
   name: string;
   description?: string;
   color?: string;
-  categories: any[];
 }
 
 // Agregar este componente dentro del archivo, antes del componente principal:
@@ -22,9 +21,6 @@ const TaskTypeSkeleton: React.FC = () => (
   <tr className="border-t border-(--color-border-default) animate-pulse">
     <td className="p-2 first:pl-4 last:pr-4">
       <div className="h-3 bg-(--color-surface-hover) rounded w-32"></div>
-    </td>
-    <td className="p-2 first:pl-4 last:pr-4">
-      <div className="h-3 bg-(--color-surface-hover) rounded w-20"></div>
     </td>
     <td className="p-2 first:pl-4 last:pr-4">
       <div className="size-8 bg-(--color-surface-hover) rounded"></div>
@@ -146,12 +142,8 @@ export const TaskTypesForm: React.FC = () => {
   };
 
   // Description copy reflects whether the type has dependent categories.
-  const deleteDescription = (type: TaskType) => {
-    const categoriesCount = type.categories?.length || 0;
-    return categoriesCount > 0
-      ? `Are you sure you want to delete the task type "${type.name}"? This will also delete ${categoriesCount} categories and may affect existing tasks.`
-      : `Are you sure you want to delete the task type "${type.name}"? This action cannot be undone.`;
-  };
+  const deleteDescription = (type: TaskType) => `Are you sure you want to delete the task type "${type.name}"? This action cannot be undone.`
+  
 
   // Handle key press
   const handleKeyPress = (e: React.KeyboardEvent) => {
@@ -178,9 +170,6 @@ export const TaskTypesForm: React.FC = () => {
                 <tr>
                   <th className="p-2 first:pl-4 last:pr-4 text-left text-sm font-medium text-gray-300">
                     <span>Name</span>
-                  </th>
-                  <th className="p-2 first:pl-4 last:pr-4 text-left text-sm font-medium text-gray-300">
-                    <span>Categories</span>
                   </th>
                   <th className="p-2 first:pl-4 last:pr-4 text-left text-sm font-medium text-gray-300 w-[5rem]">
                     <span>Actions</span>
@@ -217,13 +206,6 @@ export const TaskTypesForm: React.FC = () => {
                             {type.name}
                           </span>
                         )}
-                      </td>
-                      <td className="p-2 first:pl-4 last:pr-4">
-                        <div>
-                          <span className="text-sm text-(--color-text-muted)">
-                            {type.categories?.length || 0} categories
-                          </span>
-                        </div>
                       </td>
                       <td className="p-2 first:pl-4 last:pr-4">
                         <div>

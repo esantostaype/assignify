@@ -98,7 +98,7 @@ export const useUserDetails = (userId: string, enabled = true) => {
   return useQuery({
     queryKey: userKeys.details(userId),
     queryFn: async (): Promise<DetailedUser> => {
-      const { data } = await axios.get(`/api/users/${userId}/details`)
+      const { data } = await axios.get(`/api/users/${userId}`)
       return data
     },
     enabled: enabled && !!userId,
@@ -160,7 +160,8 @@ export const useAddUserRole = (options?: {
 
   return useMutation({
     mutationFn: async (payload: { userId: string; typeId: number; brandId?: string | null; isPrimary?: boolean }) => {
-      const { data } = await axios.post('/api/users/roles', payload)
+      const { userId, ...body } = payload
+      const { data } = await axios.post(`/api/users/${userId}/roles`, body)
       return data
     },
     onSuccess: (_, variables) => {
@@ -192,7 +193,7 @@ export const useDeleteUserRole = (userId: string, options?: {
   
   return useMutation({
     mutationFn: async (roleId: number) => {
-      await axios.delete(`/api/users/roles/${roleId}`)
+      await axios.delete(`/api/users/${userId}/roles/${roleId}`)
       return { roleId, userId }
     },
     onSuccess: (data) => {
@@ -224,7 +225,7 @@ export const useToggleUserRolePrimary = (userId: string, options?: {
 
   return useMutation({
     mutationFn: async (payload: { roleId: number; isPrimary: boolean }) => {
-      const { data } = await axios.patch(`/api/users/roles/${payload.roleId}`, {
+      const { data } = await axios.patch(`/api/users/${userId}/roles/${payload.roleId}`, {
         isPrimary: payload.isPrimary,
       })
       return data
@@ -265,7 +266,8 @@ export const useAddUserVacation = (options?: {
   
   return useMutation({
     mutationFn: async (payload: { userId: string; startDate: string; endDate: string }) => {
-      const { data } = await axios.post('/api/users/vacations', payload)
+      const { userId, ...body } = payload
+      const { data } = await axios.post(`/api/users/${userId}/vacations`, body)
       return data
     },
     onSuccess: (_, variables) => {
@@ -294,7 +296,7 @@ export const useDeleteUserVacation = (userId: string, options?: {
   
   return useMutation({
     mutationFn: async (vacationId: number) => {
-      await axios.delete(`/api/users/vacations/${vacationId}`)
+      await axios.delete(`/api/users/${userId}/vacations/${vacationId}`)
       return { vacationId, userId }
     },
     onSuccess: (data) => {

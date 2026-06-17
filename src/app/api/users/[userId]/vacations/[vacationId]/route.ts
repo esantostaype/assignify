@@ -1,4 +1,4 @@
-// src/app/api/users/vacations/[vacationId]/route.ts
+// src/app/api/users/[userId]/vacations/[vacationId]/route.ts
 import { NextResponse } from 'next/server';
 import { db } from '@/db';
 import { userVacation } from '@/db/schema';
@@ -9,12 +9,13 @@ export const dynamic = 'force-dynamic';
 
 interface RouteParams {
   params: {
+    userId: string;
     vacationId: string;
   };
 }
 
 /**
- * DELETE /api/users/vacations/[vacationId]
+ * DELETE /api/users/[userId]/vacations/[vacationId]
  * Elimina un período de vacaciones específico de un usuario
  */
 export async function DELETE(req: Request, { params }: RouteParams) {

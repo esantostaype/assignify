@@ -1,4 +1,4 @@
-// src/app/api/users/vacations/route.ts
+// src/app/api/users/[userId]/vacations/route.ts
 import { NextResponse } from 'next/server';
 import { db } from '@/db';
 import { user, userVacation } from '@/db/schema';
@@ -7,8 +7,13 @@ import { eq, and, or, lte, gte } from 'drizzle-orm';
 // Lee/escribe datos en vivo de la DB: nunca pre-renderizar/cachear en build.
 export const dynamic = 'force-dynamic';
 
+interface RouteParams {
+  params: {
+    userId: string;
+  };
+}
+
 interface CreateVacationRequest {
-  userId: string;
   startDate: string;
   endDate: string;
 }
@@ -24,13 +29,14 @@ function parseCalendarDate(s: string): Date {
 }
 
 /**
- * POST /api/users/vacations
- * Agrega un nuevo período de vacaciones a un usuario
+ * POST /api/users/[userId]/vacations
+ * Agrega un nuevo período de vacaciones a un usuario (userId viene de la ruta).
  */
-export async function POST(req: Request) {
+export async function POST(req: Request, { params }: RouteParams) {
   try {
+    const { userId } = params;
     const body: CreateVacationRequest = await req.json();
-    const { userId, startDate, endDate } = body;
+    const { startDate, endDate } = body;
 
     // Validar campos requeridos
     if (!userId || !startDate || !endDate) {
