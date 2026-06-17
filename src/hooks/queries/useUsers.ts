@@ -30,11 +30,14 @@ interface UserSyncResponse {
   teams: any[]
 }
 
+type UserLevel = 'JUNIOR' | 'MID' | 'SENIOR'
+
 interface DetailedUser {
   id: string
   name: string
   email: string
   active: boolean
+  level: UserLevel
   roles: Array<{
     id: number
     userId: string
@@ -252,6 +255,33 @@ export const useDeleteUserVacation = (userId: string, options?: {
       queryClient.invalidateQueries({ queryKey: ['vacation-aware'] })
       
       console.log('🏖️ Cache invalidated after vacation deletion - vacation-aware logic will recalculate')
+      options?.onSuccess?.()
+    },
+    onError: options?.onError,
+  })
+}
+
+// Actualiza el nivel del diseñador (Junior/Mid/Senior). Afecta la asignación automática.
+export const useUpdateUserLevel = (userId: string, options?: {
+  onSuccess?: () => void
+  onError?: () => void
+}) => {
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: async (level: UserLevel) => {
+      const { data } = await axios.patch(`/api/users/${userId}`, { level })
+      return data
+    },
+    onSuccess: () => {
+      // Refrescar los detalles del usuario y los caches del motor de asignación.
+      queryClient.invalidateQueries({ queryKey: userKeys.details(userId) })
+      queryClient.invalidateQueries({ queryKey: ['task-suggestion'] })
+      queryClient.invalidateQueries({ queryKey: ['user-slots'] })
+      queryClient.invalidateQueries({ queryKey: ['best-user-selection'] })
+      queryClient.invalidateQueries({ queryKey: ['task-data'] })
+
+      console.log('🔄 Cache invalidated after level update - task suggestions will be recalculated')
       options?.onSuccess?.()
     },
     onError: options?.onError,

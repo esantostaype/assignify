@@ -1,0 +1,8 @@
+{
+  "crons": [
+    {
+      "path": "/api/cron/complete-stale-approvals",
+      "schedule": "0 13 * * *"
+    }
+  ]
+}

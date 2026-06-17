@@ -1,6 +1,6 @@
 // src/app/api/tasks/suggestion/simple/route.ts
 import { NextResponse } from 'next/server';
-import { Priority } from '@/db/enums';
+import { Priority, Level } from '@/db/enums';
 import { getBestUserWithCache } from '@/services/task-assignment.service';
 import { db } from '@/db';
 import { brand as brandTable } from '@/db/schema';
@@ -19,6 +19,12 @@ export async function GET(req: Request) {
     const priority: Priority = (['LOW', 'NORMAL', 'HIGH', 'URGENT'].includes(priorityParam)
       ? priorityParam
       : 'NORMAL') as Priority;
+
+    // Nivel solicitado (opcional; default MID). Solo decide el diseñador, no se persiste.
+    const levelParam = (searchParams.get('level') || 'MID').toUpperCase();
+    const level: Level = (['JUNIOR', 'MID', 'SENIOR'].includes(levelParam)
+      ? levelParam
+      : 'MID') as Level;
 
     // ✅ VALIDACIÓN SOLO DE PARÁMETROS ESENCIALES
     if (!typeId || typeId <= 0) {
@@ -40,6 +46,7 @@ export async function GET(req: Request) {
     console.log(`   - Type ID: ${typeId}`);
     console.log(`   - Duration Days: ${durationDays}`);
     console.log(`   - Brand ID: ${brandId || 'global (all brands)'}`);
+    console.log(`   - Level: ${level}`);
 
     // ✅ LÓGICA FLEXIBLE: Usar brandId si está disponible, sino buscar globalmente
     let bestSlot;
@@ -51,7 +58,8 @@ export async function GET(req: Request) {
         typeId,
         brandId,
         priority,
-        durationDays
+        durationDays,
+        level
       );
     } else {
       // ✅ FALLBACK: Buscar en todos los brands activos
@@ -73,7 +81,8 @@ export async function GET(req: Request) {
           typeId,
           brand.id,
           priority,
-          durationDays
+          durationDays,
+          level
         );
 
         if (candidateSlot) {
@@ -110,12 +119,14 @@ export async function GET(req: Request) {
         currentLoad: bestSlot.cargaTotal,
         isSpecialist: bestSlot.isSpecialist,
         availableFrom: bestSlot.availableDate.toISOString(),
-        totalAssignedDurationDays: bestSlot.totalAssignedDurationDays
+        totalAssignedDurationDays: bestSlot.totalAssignedDurationDays,
+        level: bestSlot.level
       },
       metadata: {
         typeId: typeId,
         durationDays: durationDays,
         brandId: brandId || 'global',
+        requestedLevel: level,
         generatedAt: new Date().toISOString(),
         algorithm: 'duration-balanced-assignment-flexible'
       }

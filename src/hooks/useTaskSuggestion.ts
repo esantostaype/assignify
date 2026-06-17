@@ -10,7 +10,8 @@ export const useTaskSuggestion = (
   durationDays: string,
   brandId?: string,
   priority?: string,
-  triggerSuggestion?: number
+  triggerSuggestion?: number,
+  level?: string
 ) => {
   const [suggestedAssignment, setSuggestedAssignment] = useState<SuggestedAssignment | null>(null)
   const [fetchingSuggestion, setFetchingSuggestion] = useState(false)
@@ -29,7 +30,7 @@ export const useTaskSuggestion = (
 
   // ✅ NUEVO: Función para crear clave de parámetros para detectar cambios
   const createParamsKey = (typeId: number | undefined, durationDays: string, brandId?: string) => {
-    return `${typeId || 'none'}-${durationDays || 'none'}-${brandId || 'global'}-${priority || 'NORMAL'}`
+    return `${typeId || 'none'}-${durationDays || 'none'}-${brandId || 'global'}-${priority || 'NORMAL'}-${level || 'MID'}`
   }
 
   // ✅ MEJORADO: Función de obtención de sugerencias con debouncing
@@ -69,7 +70,8 @@ export const useTaskSuggestion = (
         const params: Record<string, string | number> = {
           typeId: typeId ?? 0,
           durationDays: duration,
-          priority: priority || 'NORMAL'
+          priority: priority || 'NORMAL',
+          level: level || 'MID'
         }
 
         if (brandId) {
@@ -154,7 +156,7 @@ export const useTaskSuggestion = (
         clearTimeout(debounceTimeout.current)
       }
     }
-  }, [typeId, durationDays, brandId, priority, triggerSuggestion])
+  }, [typeId, durationDays, brandId, priority, triggerSuggestion, level])
 
   // ✅ NUEVO: Función para forzar re-cálculo inmediato
   const forceSuggestionUpdate = () => {

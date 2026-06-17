@@ -34,6 +34,7 @@ export interface ActiveClickUpTask {
   list: { id: string; name: string }
   space: { id: string; name: string }
   url: string
+  tags: string[]
 }
 
 async function cu(path: string): Promise<any> {
@@ -45,6 +46,15 @@ async function cu(path: string): Promise<any> {
 
 // Una tarea entra si está activa (no completada), mapea a un estado válido y tiene fechas.
 function isSyncableTask(t: any): boolean {
+  // Tareas "Ongoing" (continuas, sin fecha fija): se marcan con el tag `ongoing`
+  // en ClickUp. No son asignables (deadline lejano/cambiante), así que las
+  // excluimos para que ni el motor de asignación, ni el panel de carga, ni el
+  // kanban las consideren.
+  const isOngoing = (t.tags || []).some(
+    (tag: any) => (tag?.name || '').toLowerCase() === 'ongoing'
+  )
+  if (isOngoing) return false
+
   const s = t.status?.status || ''
   if (!isActiveTaskStatus(s)) return false
   const mapped = mapClickUpStatusToLocal(s)
@@ -130,6 +140,7 @@ export async function fetchActiveClickUpTasks(): Promise<ActiveClickUpTask[]> {
       list: { id: t.list?.id ?? '', name: t.list?.name ?? '' },
       space: { id: t.space?.id ?? '', name: t.space?.name ?? '' },
       url: t.url ?? '',
+      tags: (t.tags || []).map((tag: any) => tag.name),
     })
   }
   return result

@@ -1,12 +1,21 @@
 // src/components/designers/UserEditModal.tsx - FIXED VERSION
 import React from 'react'
+import toast from 'react-hot-toast'
 import { UserRoleRow } from './UserRoleRow'
 import { UserVacationRow } from './UserVacationRow'
 import { AddRoleForm } from './AddRoleForm'
 import { AddVacationForm } from './AddVacationForm'
-import { Icon, PiUser, PiCalendarBlank } from '@/lib/icons'
-import { useUserDetails, useTaskTypes, useBrands } from '@/hooks/queries/useUsers'
-import { Alert } from '@/components/ui'
+import { Icon, PiUser, PiCalendarBlank, PiMedal } from '@/lib/icons'
+import { useUserDetails, useTaskTypes, useBrands, useUpdateUserLevel } from '@/hooks/queries/useUsers'
+import { Alert, Select, type SelectOption } from '@/components/ui'
+
+type UserLevel = 'JUNIOR' | 'MID' | 'SENIOR'
+
+const LEVEL_OPTIONS: SelectOption<UserLevel>[] = [
+  { value: 'JUNIOR', label: 'Junior' },
+  { value: 'MID', label: 'Mid' },
+  { value: 'SENIOR', label: 'Senior' },
+]
 
 interface UserEditModalProps {
   userId: string
@@ -47,6 +56,11 @@ export const UserEditModal: React.FC<UserEditModalProps> = ({
     isLoading: loadingBrands,
     error: brandsError
   } = useBrands()
+
+  const { mutate: updateLevel, isPending: updatingLevel } = useUpdateUserLevel(userId, {
+    onSuccess: () => toast.success('Nivel actualizado'),
+    onError: () => toast.error('Error al actualizar el nivel'),
+  })
 
   // ✅ DEBUG: Log para verificar datos
   React.useEffect(() => {
@@ -100,6 +114,30 @@ export const UserEditModal: React.FC<UserEditModalProps> = ({
 
   return (
     <div className="p-8 space-y-6">
+      {/* Designer Level Section */}
+      <div>
+        <h3 className="text-lg font-medium text-(--color-text-strong) mb-2 flex items-center gap-2">
+          <Icon icon={PiMedal} size={20} />
+          Nivel del diseñador
+        </h3>
+        <div className="max-w-[16rem]">
+          <Select<UserLevel>
+            options={LEVEL_OPTIONS}
+            value={(user?.level as UserLevel) ?? 'MID'}
+            onChange={(value) => updateLevel(value)}
+            disabled={loadingUser || updatingLevel}
+            placeholder={loadingUser ? 'Loading...' : 'Select level'}
+            size="sm"
+          />
+        </div>
+        <p className="mt-1.5 text-sm text-(--color-text-subtle)">
+          Decide el escalado de asignación automática (Jr → Mid → Sr).
+        </p>
+      </div>
+
+      {/* Divider */}
+      <div className="border-t border-(--color-border-default)" />
+
       {/* User Roles Section */}
       <div>
         <h3 className="text-lg font-medium text-(--color-text-strong) mb-2 flex items-center gap-2">

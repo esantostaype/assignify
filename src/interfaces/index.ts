@@ -1,4 +1,4 @@
-import { Priority, Status, Tier } from '@/db/enums'
+import { Priority, Status, Tier, Level } from '@/db/enums'
 
 export interface TaskType {
   id: number
@@ -25,6 +25,7 @@ export interface User {
   name: string
   email: string
   active: boolean
+  level: Level
   roles: UserRole[]
 }
 
@@ -111,7 +112,9 @@ export interface UserSlot {
   cargaTotal: number
   isSpecialist: boolean
   lastTaskDeadline?: Date
-  totalAssignedDurationDays: number 
+  totalAssignedDurationDays: number
+  /** Nivel del diseñador (Junior/Mid/Senior); usado por el escalado de asignación. */
+  level: Level
 }
 
 export interface QueueCalculationResult {
@@ -246,6 +249,8 @@ export interface FormValues {
   brandId: string
   assignedUserIds: string[]
   durationDays: string
+  // Nivel solicitado para la tarea (Jr/Mid/Sr). No se persiste: solo decide el diseñador.
+  level: string
 }
 
 // Nueva interfaz para el request de creación de categoría

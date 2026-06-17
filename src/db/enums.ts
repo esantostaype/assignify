@@ -27,3 +27,12 @@ export const Tier = {
   E: 'E',
 } as const
 export type Tier = (typeof Tier)[keyof typeof Tier]
+
+// Nivel del diseñador. Determina el escalado de asignación: una tarea solo se
+// asigna en automático a diseñadores de nivel IGUAL o SUPERIOR al solicitado.
+export const Level = {
+  JUNIOR: 'JUNIOR',
+  MID: 'MID',
+  SENIOR: 'SENIOR',
+} as const
+export type Level = (typeof Level)[keyof typeof Level]

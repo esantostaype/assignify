@@ -5,7 +5,7 @@
 import { db } from '@/db';
 import { user as userTable, userRole, userVacation } from '@/db/schema';
 import { eq, or, isNull, gte } from 'drizzle-orm';
-import { Priority, Status } from '@/db/enums';
+import { Priority, Status, Level } from '@/db/enums';
 import { UserSlot, UserWithRoles, Task, TaskTimingResult, UserVacation, VacationAwareUserSlot } from '@/interfaces';
 import { getNextAvailableStart, calculateWorkingDeadline, OCCUPYING_STATUSES } from '@/utils/task-calculation-utils';
 import { CACHE_KEYS } from '@/config';
@@ -13,6 +13,17 @@ import { getAppSettings } from '@/services/app-settings.service';
 import { getFromCache, setInCache } from '@/utils/cache';
 import { fetchActiveClickUpTasks, type ActiveClickUpTask } from '@/services/clickup-tasks.service';
 import usHolidays from '@/data/usHolidays.json'
+
+// Rango numérico de cada nivel para el escalado de asignación.
+// JUNIOR < MID < SENIOR. Una tarea solo se asigna en automático a niveles >= al pedido.
+const LEVEL_RANK: Record<Level, number> = {
+  JUNIOR: 1,
+  MID: 2,
+  SENIOR: 3,
+};
+
+// Orden de escalado, de menor a mayor.
+const LEVELS_ASCENDING: Level[] = [Level.JUNIOR, Level.MID, Level.SENIOR];
 
 // Estados de ClickUp que cuentan como trabajo pendiente (ocupan al diseñador).
 // ON_APPROVAL ya está entregado: no cuenta ni para carga ni para disponibilidad.
@@ -231,6 +242,8 @@ async function getVacationAwareUserSlots(
       cargaTotal: userTasks.length,
       isSpecialist,
       lastTaskDeadline: lastDeadline,
+      // Nivel del diseñador (Junior/Mid/Senior) leído de Turso, para el escalado.
+      level: user.level,
       upcomingVacations,
       potentialTaskStart: availableDate,
       potentialTaskEnd,
@@ -240,7 +253,7 @@ async function getVacationAwareUserSlots(
       totalAssignedDurationDays,
     });
 
-    console.log(`   ✅ ${user.name}: disponible ${availableDate.toISOString().split('T')[0]}, carga ${totalAssignedDurationDays}d, ${isSpecialist ? 'especialista' : 'generalista'}`);
+    console.log(`   ✅ ${user.name}: nivel ${user.level}, disponible ${availableDate.toISOString().split('T')[0]}, carga ${totalAssignedDurationDays}d, ${isSpecialist ? 'especialista' : 'generalista'}`);
   }
 
   console.log(`\n🚫 === USERS EXCLUDED DUE TO VACATIONS ===`);
@@ -263,77 +276,147 @@ async function getVacationAwareUserSlots(
   return eligibleSlots;
 }
 
+// Disponible antes primero (fecha ya ajustada por cola + vacaciones + festivos);
+// a igualdad de fecha, el de menor carga acumulada.
+function sortByAvailability(users: VacationAwareUserSlot[]): VacationAwareUserSlot[] {
+  return [...users].sort((a, b) => {
+    const dateDiff = a.availableDate.getTime() - b.availableDate.getTime();
+    if (dateDiff !== 0) return dateDiff;
+    return a.totalAssignedDurationDays - b.totalAssignedDurationDays;
+  });
+}
+
+/**
+ * Mejor candidato DENTRO de un mismo nivel. La regla de niveles manda; la de
+ * especialista/generalista queda como DESEMPATE dentro del nivel: si el mejor
+ * especialista se libera mucho más tarde que el mejor generalista
+ * (umbral DEADLINE_DIFFERENCE_TO_FORCE_GENERALIST), se prefiere el generalista.
+ * En caso normal gana simplemente el de antes-disponible / menos-carga.
+ */
+function pickBestInLevel(
+  slots: VacationAwareUserSlot[],
+  forceGeneralistThresholdDays: number
+): VacationAwareUserSlot | null {
+  if (slots.length === 0) return null;
+
+  const sorted = sortByAvailability(slots);
+  const bestOverall = sorted[0];
+
+  const bestSpecialist = sorted.find((s) => s.isSpecialist) ?? null;
+  const bestGeneralist = sorted.find((s) => !s.isSpecialist) ?? null;
+
+  // Desempate especialista/generalista solo si el mejor del nivel es especialista
+  // y existe un generalista que se libera bastante antes.
+  if (bestSpecialist && bestGeneralist && bestOverall.isSpecialist) {
+    const daysLater =
+      (bestSpecialist.availableDate.getTime() - bestGeneralist.availableDate.getTime()) /
+      (1000 * 60 * 60 * 24);
+    if (daysLater > forceGeneralistThresholdDays) {
+      console.log(
+        `   🔧 [${bestSpecialist.level}] especialista ${bestSpecialist.userName} libre ${daysLater.toFixed(1)}d más tarde → generalista ${bestGeneralist.userName}`
+      );
+      return bestGeneralist;
+    }
+  }
+
+  return bestOverall;
+}
+
+/**
+ * Selección con ESCALADO POR NIVEL.
+ * - Solo se consideran candidatos de nivel >= reqLevel (nunca uno inferior en automático).
+ * - Se toma el mejor candidato de cada nivel (antes-disponible / menos-carga, con el
+ *   desempate especialista/generalista interno).
+ * - Se empieza por reqLevel y se compara contra el nivel inmediatamente superior:
+ *   si el mejor del nivel actual se libera MÁS de `levelEscalationDays` días DESPUÉS
+ *   que el mejor del nivel superior, se escala al superior. Se repite hacia SENIOR.
+ */
 async function selectBestUserWithVacationLogic(
-  userSlots: VacationAwareUserSlot[]
+  userSlots: VacationAwareUserSlot[],
+  reqLevel: Level
 ): Promise<VacationAwareUserSlot | null> {
   if (userSlots.length === 0) {
     console.log(`❌ No users available - all users excluded due to vacation conflicts`);
     return null;
   }
 
-  console.log(`\n🏆 === SELECTING BEST USER FROM ${userSlots.length} ELIGIBLE USERS ===`);
+  console.log(`\n🏆 === SELECTING BEST USER (escalado por nivel, pedido: ${reqLevel}) ===`);
 
-  const specialists = userSlots.filter(slot => slot.isSpecialist);
-  const generalists = userSlots.filter(slot => !slot.isSpecialist);
+  const settings = await getAppSettings();
+  const forceGeneralistThreshold = settings.thresholds.DEADLINE_DIFFERENCE_TO_FORCE_GENERALIST;
+  const levelEscalationDays = settings.levelEscalationDays;
 
-  console.log(`   🎯 Specialists available: ${specialists.length}`);
-  console.log(`   🔧 Generalists available: ${generalists.length}`);
+  const reqRank = LEVEL_RANK[reqLevel];
 
-  // Disponible antes primero (fecha ya ajustada por cola + vacaciones + festivos);
-  // a igualdad de fecha, el de menor carga acumulada.
-  const sortUsers = (users: VacationAwareUserSlot[]) => {
-    return [...users].sort((a, b) => {
-      const dateDiff = a.availableDate.getTime() - b.availableDate.getTime();
-      if (dateDiff !== 0) return dateDiff;
-      return a.totalAssignedDurationDays - b.totalAssignedDurationDays;
-    });
-  };
+  // Solo niveles >= al pedido, de menor a mayor.
+  const candidateLevels = LEVELS_ASCENDING.filter((lvl) => LEVEL_RANK[lvl] >= reqRank);
 
-  const sortedSpecialists = sortUsers(specialists);
-  const sortedGeneralists = sortUsers(generalists);
-
-  const bestSpecialist = sortedSpecialists.length > 0 ? sortedSpecialists[0] : null;
-  const bestGeneralist = sortedGeneralists.length > 0 ? sortedGeneralists[0] : null;
-
-  if (bestSpecialist && bestGeneralist) {
-    // Si el especialista estaría disponible bastante más tarde que el generalista, usar el generalista.
-    const daysLater =
-      (bestSpecialist.availableDate.getTime() - bestGeneralist.availableDate.getTime()) / (1000 * 60 * 60 * 24);
-
-    const { DEADLINE_DIFFERENCE_TO_FORCE_GENERALIST } = (await getAppSettings()).thresholds;
-    if (daysLater > DEADLINE_DIFFERENCE_TO_FORCE_GENERALIST) {
-      console.log(`🔧 Especialista disponible ${daysLater.toFixed(1)}d más tarde → generalista ${bestGeneralist.userName}`);
-      return bestGeneralist;
+  // Mejor candidato por nivel (los niveles sin candidatos quedan en null).
+  const bestByLevel: Partial<Record<Level, VacationAwareUserSlot>> = {};
+  for (const lvl of candidateLevels) {
+    const slotsOfLevel = userSlots.filter((s) => s.level === lvl);
+    const best = pickBestInLevel(slotsOfLevel, forceGeneralistThreshold);
+    if (best) {
+      bestByLevel[lvl] = best;
+      console.log(
+        `   • Nivel ${lvl}: mejor = ${best.userName} (libre ${best.availableDate.toISOString().split('T')[0]}, carga ${best.totalAssignedDurationDays}d)`
+      );
+    } else {
+      console.log(`   • Nivel ${lvl}: sin candidatos`);
     }
-    console.log(`🎯 Especialista ${bestSpecialist.userName} (disponible ${bestSpecialist.availableDate.toISOString().split('T')[0]})`);
-    return bestSpecialist;
   }
 
-  if (bestSpecialist) {
-    console.log(`🎯 Selecting only available specialist: ${bestSpecialist.userName}`);
-    return bestSpecialist;
+  // Escalado: arrancamos en el primer nivel con candidato (>= reqLevel) y subimos.
+  let chosen: VacationAwareUserSlot | null = null;
+
+  for (const lvl of candidateLevels) {
+    const current = bestByLevel[lvl];
+    if (!current) continue; // este nivel no tiene a nadie; el bucle sigue al superior
+
+    if (!chosen) {
+      chosen = current;
+      continue;
+    }
+
+    // `chosen` es el mejor del/los niveles anteriores; `current` es el del nivel superior.
+    const daysLater =
+      (chosen.availableDate.getTime() - current.availableDate.getTime()) / (1000 * 60 * 60 * 24);
+
+    if (daysLater > levelEscalationDays) {
+      console.log(
+        `   ⬆️ ${chosen.userName} (${chosen.level}) libre ${daysLater.toFixed(1)}d más tarde que ${current.userName} (${lvl}) → escala a ${lvl}`
+      );
+      chosen = current;
+    } else {
+      console.log(
+        `   ⏹️ ${chosen.userName} (${chosen.level}) NO supera el umbral (${daysLater.toFixed(1)}d <= ${levelEscalationDays}d) vs ${lvl}: se mantiene`
+      );
+    }
   }
 
-  if (bestGeneralist) {
-    console.log(`🔧 Selecting only available generalist: ${bestGeneralist.userName}`);
-    return bestGeneralist;
+  if (chosen) {
+    console.log(
+      `🏆 Seleccionado: ${chosen.userName} (nivel ${chosen.level}, disponible ${chosen.availableDate.toISOString().split('T')[0]})`
+    );
+  } else {
+    console.log(`❌ No hay candidatos de nivel >= ${reqLevel} disponibles`);
   }
 
-  console.log(`❌ No users available for assignment`);
-  return null;
+  return chosen;
 }
 
 export async function getBestUserWithCache(
   typeId: number,
   brandId: string,
   priority: Priority,
-  durationDays?: number
+  durationDays?: number,
+  reqLevel: Level = Level.MID
 ): Promise<UserSlot | null> {
 
   console.log(`\n🎯 === GET BEST USER WITH VACATION CACHE ===`);
-  console.log(`📋 Params: typeId=${typeId}, brandId=${brandId}, priority=${priority}, duration=${durationDays}`);
+  console.log(`📋 Params: typeId=${typeId}, brandId=${brandId}, priority=${priority}, duration=${durationDays}, level=${reqLevel}`);
 
-  const cacheKey = `${CACHE_KEYS.BEST_USER_SELECTION_PREFIX}${typeId}-${brandId}-${priority}-vacation-${durationDays || 'no-duration'}`;
+  const cacheKey = `${CACHE_KEYS.BEST_USER_SELECTION_PREFIX}${typeId}-${brandId}-${priority}-vacation-${durationDays || 'no-duration'}-lvl-${reqLevel}`;
   let bestSlot = getFromCache<UserSlot | null>(cacheKey);
 
   if (bestSlot !== undefined) {
@@ -343,7 +426,7 @@ export async function getBestUserWithCache(
 
   console.log(`🏖️ Calculating vacation-aware user slots...`);
   const vacationAwareSlots = await getVacationAwareUserSlots(typeId, brandId, durationDays || 0);
-  const bestVacationSlot = await selectBestUserWithVacationLogic(vacationAwareSlots);
+  const bestVacationSlot = await selectBestUserWithVacationLogic(vacationAwareSlots, reqLevel);
 
   if (!bestVacationSlot) {
     console.log(`❌ No eligible users found after vacation filtering`);
@@ -359,7 +442,8 @@ export async function getBestUserWithCache(
     cargaTotal: bestVacationSlot.cargaTotal,
     isSpecialist: bestVacationSlot.isSpecialist,
     lastTaskDeadline: bestVacationSlot.lastTaskDeadline,
-    totalAssignedDurationDays: bestVacationSlot.totalAssignedDurationDays
+    totalAssignedDurationDays: bestVacationSlot.totalAssignedDurationDays,
+    level: bestVacationSlot.level,
   };
 
   console.log(`✅ Selected vacation-aware user: ${compatibleSlot.userName}`);

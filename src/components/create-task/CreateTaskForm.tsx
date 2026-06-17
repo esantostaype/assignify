@@ -14,6 +14,7 @@ import {
   BrandSelect,
   TierSelect,
   PrioritySelect,
+  LevelSelect,
   DurationField,
   UserAssignmentSelect,
   TaskCreatedToastContent,
@@ -59,7 +60,8 @@ const FormikSuggestionLogic: FC<FormikSuggestionLogicProps> = ({
     isSubmitting ? "" : (values.durationDays as string),
     isSubmitting ? undefined : values.brandId || undefined,
     isSubmitting ? undefined : values.priority,
-    isSubmitting ? 0 : triggerSuggestion
+    isSubmitting ? 0 : triggerSuggestion,
+    isSubmitting ? undefined : values.level
   );
 
   useEffect(() => {
@@ -136,6 +138,7 @@ export const CreateTaskForm: FC = () => {
     brandId: "",
     assignedUserIds: [],
     durationDays: "",
+    level: "MID",
   };
 
   const handleSubmit = async (values: FormValues, { resetForm }: any) => {
@@ -167,6 +170,8 @@ export const CreateTaskForm: FC = () => {
         assignedUserIds:
           values.assignedUserIds.length > 0 ? values.assignedUserIds : undefined,
         durationDays: finalDurationDays,
+        // Nivel solicitado: solo decide el diseñador en asignación automática (no se persiste).
+        level: values.level,
       };
 
       setLoading(true);
@@ -302,6 +307,17 @@ export const CreateTaskForm: FC = () => {
                 touched={touched.tierId}
                 error={errors.tierId}
                 loading={dataLoading}
+              />
+
+              <LevelSelect
+                value={values.level}
+                onChange={(value) => {
+                  setFieldValue("level", value);
+                  // Recalcular el diseñador sugerido al cambiar el nivel solicitado.
+                  setTimeout(() => setTriggerSuggestion((prev) => prev + 1), 0);
+                }}
+                touched={touched.level}
+                error={errors.level}
               />
 
               <PrioritySelect

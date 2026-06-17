@@ -10,6 +10,7 @@ import { relations } from 'drizzle-orm'
 
 export const TIER_NAMES = ['S', 'A', 'B', 'C', 'D', 'E'] as const
 export const STATUS_NAMES = ['TO_DO', 'IN_PROGRESS', 'ON_APPROVAL', 'COMPLETE'] as const
+export const LEVEL_NAMES = ['JUNIOR', 'MID', 'SENIOR'] as const
 
 const createdAt = () =>
   integer('created_at', { mode: 'timestamp_ms' }).notNull().$defaultFn(() => new Date())
@@ -32,6 +33,9 @@ export const user = sqliteTable('user', {
   name: text('name').notNull(),
   email: text('email').notNull().unique(),
   active: integer('active', { mode: 'boolean' }).notNull().default(false),
+  // Nivel del diseñador (Junior/Mid/Senior). Decide el escalado de asignación.
+  // Los users existentes toman 'MID' por defecto.
+  level: text('level', { enum: LEVEL_NAMES }).notNull().default('MID'),
   createdAt: createdAt(),
   updatedAt: updatedAt(),
 })

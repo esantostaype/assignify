@@ -8,6 +8,7 @@ import { NextResponse } from 'next/server'
 import { db } from '@/db'
 import { tierList, taskType as taskTypeTable, brand as brandTable, user as userTable, userRole } from '@/db/schema'
 import { eq, inArray, or, isNull } from 'drizzle-orm'
+import { Level } from '@/db/enums'
 import { getBestUserWithCache } from '@/services/task-assignment.service'
 import { createTaskInClickUp } from '@/services/clickup.service'
 import { TaskCreationParams, UserWithRoles, ClickUpBrand } from '@/interfaces'
@@ -46,10 +47,18 @@ export async function POST(req: Request) {
       }, { status: 400 })
     }
 
+    // Nivel solicitado (opcional; default MID). NO se persiste en la tarea:
+    // solo decide a qué diseñador escalar en la asignación AUTOMÁTICA.
+    const levelParam = String(body.level || 'MID').toUpperCase()
+    const reqLevel: Level = (['JUNIOR', 'MID', 'SENIOR'].includes(levelParam)
+      ? levelParam
+      : 'MID') as Level
+
     console.log(`🚀 === CREANDO TAREA "${name}" EN CLICKUP (motor de prioridades en vivo) ===`)
     console.log(`   - Priority: ${priority}`)
     console.log(`   - Duration: ${durationDays} días`)
     console.log(`   - Type ID: ${typeId} | Tier ID: ${tierId} | Brand ID: ${brandId}`)
+    console.log(`   - Level solicitado: ${reqLevel}`)
     console.log(`   - Users: ${assignedUserIds || 'AUTO-ASSIGNMENT'}`)
 
     // Config desde la DB (Drizzle/Turso).
@@ -103,7 +112,7 @@ export async function POST(req: Request) {
       console.log(`✅ Usuarios válidos para asignación manual: ${usersToAssign.length}`)
     } else {
       console.log('🤖 Iniciando asignación automática...')
-      const bestUser = await getBestUserWithCache(typeId, brandId, priority, durationDays)
+      const bestUser = await getBestUserWithCache(typeId, brandId, priority, durationDays, reqLevel)
 
       if (!bestUser) {
         return NextResponse.json({
