@@ -67,12 +67,11 @@ export function showBrowserNotification(title: string, body?: string): void {
   if (typeof window === 'undefined' || !('Notification' in window)) return
   if (Notification.permission !== 'granted') return
   try {
+    // Sin `tag`: cada notificación es independiente y se acumula (no se reemplazan).
     const notification = new Notification(title, {
       body,
       icon: '/images/logo.svg',
-      tag: 'assignify-task-update',
-      renotify: true,
-    } as any)
+    })
     // Al hacer clic, enfocar la pestaña de la app.
     notification.onclick = () => {
       window.focus()
