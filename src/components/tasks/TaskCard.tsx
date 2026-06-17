@@ -3,12 +3,9 @@ import {
   Icon,
   PiCalendarBlank,
   PiUser,
-  PiPencilSimple,
-  PiArrowsClockwise,
-  PiCheckSquare,
   PiTarget,
 } from "@/lib/icons";
-import { Avatar, Checkbox, IconButton } from "@/components/ui";
+import { Avatar } from "@/components/ui";
 
 interface TaskCardProps {
   task: {
@@ -43,19 +40,9 @@ interface TaskCardProps {
     existsInLocal: boolean;
     canSync: boolean;
   };
-  isSelected?: boolean;
-  onSelect?: (selected: boolean) => void;
-  onEdit?: () => void;
-  showSelection?: boolean;
 }
 
-export const TaskCard: React.FC<TaskCardProps> = ({
-  task,
-  isSelected = false,
-  onSelect,
-  onEdit,
-  showSelection = true,
-}) => {
+export const TaskCard: React.FC<TaskCardProps> = ({ task }) => {
   // ✅ NUEVA FUNCIÓN: Formatear fecha y hora
   const formatDateTime = (dateString: string) => {
     const date = new Date(dateString);
@@ -111,55 +98,9 @@ export const TaskCard: React.FC<TaskCardProps> = ({
   const dateColor = getDateColor();
 
   return (
-    <div
-      className={`
-      p-4 rounded-lg relative
-      transition-all border-2
-      flex flex-col justify-between
-      ${
-        task.existsInLocal
-          ? "bg-(--color-surface-hover) border-transparent"
-          : isSelected
-          ? "bg-primary-500/10 border-primary-500/30"
-          : "bg-primary-500/10 border-transparent hover:bg-primary-500/20"
-      }
-    `}
-    >
-      <div className="flex justify-between items-center">
-        {showSelection && !task.existsInLocal && onSelect && (
-          <Checkbox
-            checked={isSelected}
-            onChange={(event) => onSelect(event.target.checked)}
-          />
-        )}
-
-        {/* Edit button for existing tasks */}
-        {task.existsInLocal && onEdit && (
-          <IconButton
-            aria-label="Edit task"
-            size="sm"
-            variant="soft"
-            color="primary"
-            onClick={onEdit}
-          >
-            <Icon icon={PiPencilSimple} size={16} />
-          </IconButton>
-        )}
-        {task.existsInLocal ? (
-          <div className="flex items-center gap-1 text-xs uppercase text-primary-400">
-            <Icon icon={PiArrowsClockwise} size={16} />
-            Synced
-          </div>
-        ) : (
-          <div className="flex items-center gap-1 text-xs uppercase text-green-400">
-            <Icon icon={PiCheckSquare} size={16} />
-            Available
-          </div>
-        )}
-      </div>
-
+    <div className="p-4 rounded-lg relative border-2 border-transparent flex flex-col justify-between bg-primary-500/10">
       {/* Task Info */}
-      <h3 className="font-semibold leading-tight line-clamp-2 mt-4 mb-2">{task.name}</h3>
+      <h3 className="font-semibold leading-tight line-clamp-2 mb-2">{task.name}</h3>
 
       {/* Space and List */}
       <div className="text-xs text-(--color-text-muted)">

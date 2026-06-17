@@ -31,11 +31,6 @@ export const TasksSync: React.FC = () => {
     return all.filter((t) => t.name.toLowerCase().includes(search.toLowerCase()));
   }, [tasksData, search]);
 
-  const handleTaskEdit = (taskId: string) => {
-    const task = tasksData?.clickupTasks.find((t) => t.clickupId === taskId);
-    if (task?.url) window.open(task.url, "_blank");
-  };
-
   if (tasksError) {
     return (
       <div className="flex h-full items-center justify-center">
@@ -97,7 +92,7 @@ export const TasksSync: React.FC = () => {
       </div>
 
       <div className="flex flex-1 flex-col p-6">
-        <TasksList tasks={tasks} loading={loadingTasks} onTaskEdit={handleTaskEdit} />
+        <TasksList tasks={tasks} loading={loadingTasks} />
       </div>
     </div>
   );

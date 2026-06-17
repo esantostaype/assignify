@@ -40,9 +40,7 @@ export const UserCard: React.FC<UserCardProps> = ({
       p-6 rounded-lg flex flex-col items-center relative text-center gap-4
       transition-all border-2
       ${
-        user.existsInLocal
-          ? "bg-(--color-surface-hover) border-transparent"
-          : isSelected
+        isSelected
           ? "bg-primary-500/10 border-primary-500/30"
           : "bg-primary-500/10 border-transparent hover:bg-primary-500/20"
       }

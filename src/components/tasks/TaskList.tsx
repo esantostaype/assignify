@@ -37,11 +37,10 @@ interface Task {
 
 interface TasksListProps {
   tasks: Task[];
-  onTaskEdit?: (taskId: string) => void;
   loading?: boolean;
 }
 
-export const TasksList: React.FC<TasksListProps> = ({ tasks, onTaskEdit, loading = false }) => {
+export const TasksList: React.FC<TasksListProps> = ({ tasks, loading = false }) => {
   const mapStatusToColumn = (status: string): string | null => {
     const localStatus = mapClickUpStatusToLocal(status);
     if (localStatus === null) return null; // completada → excluir
@@ -118,12 +117,7 @@ export const TasksList: React.FC<TasksListProps> = ({ tasks, onTaskEdit, loading
           <div className="flex-1 space-y-4">
             {grouped[column]?.length ? (
               grouped[column].map((task) => (
-                <TaskCard
-                  key={task.clickupId}
-                  task={task}
-                  showSelection={false}
-                  onEdit={() => onTaskEdit?.(task.clickupId)}
-                />
+                <TaskCard key={task.clickupId} task={task} />
               ))
             ) : (
               <div className="text-center text-(--color-text-muted) text-sm py-8">
