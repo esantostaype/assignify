@@ -33,22 +33,29 @@ export function playNotificationSound(): void {
     if (audioCtx.state === 'suspended') audioCtx.resume().catch(() => {})
 
     const now = audioCtx.currentTime
+
+    // Ganancia maestra alta para que se escuche bien.
+    const master = audioCtx.createGain()
+    master.gain.value = 0.85
+    master.connect(audioCtx.destination)
+
+    // Campanada doble ascendente con cuerpo (triangle) y buen sustain.
     const tones = [
-      { freq: 880, at: 0 },
-      { freq: 1175, at: 0.12 },
+      { freq: 784, at: 0, dur: 0.22 },
+      { freq: 1047, at: 0.18, dur: 0.4 },
     ]
-    for (const { freq, at } of tones) {
+    for (const { freq, at, dur } of tones) {
       const osc = audioCtx.createOscillator()
       const gain = audioCtx.createGain()
       osc.connect(gain)
-      gain.connect(audioCtx.destination)
-      osc.type = 'sine'
+      gain.connect(master)
+      osc.type = 'triangle'
       osc.frequency.value = freq
       gain.gain.setValueAtTime(0.0001, now + at)
-      gain.gain.exponentialRampToValueAtTime(0.18, now + at + 0.02)
-      gain.gain.exponentialRampToValueAtTime(0.0001, now + at + 0.2)
+      gain.gain.exponentialRampToValueAtTime(0.9, now + at + 0.02)
+      gain.gain.exponentialRampToValueAtTime(0.0001, now + at + dur)
       osc.start(now + at)
-      osc.stop(now + at + 0.22)
+      osc.stop(now + at + dur + 0.05)
     }
   } catch {
     // Silencioso si el navegador bloquea el audio.
