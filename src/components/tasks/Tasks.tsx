@@ -1,20 +1,28 @@
 "use client";
 import React, { useState, useMemo } from "react";
-import { Button, IconButton, Tooltip, Input } from "@mui/joy";
-import { HugeiconsIcon } from "@hugeicons/react";
-import { RefreshIcon, TaskIcon } from "@hugeicons/core-free-icons";
+import toast from "react-hot-toast";
 import { TasksList } from "./TaskList";
-import { toast } from "react-toastify";
 import { useClickUpTasks, useRefreshTasks } from "@/hooks/queries/useTasks";
+import { Input, IconButton, Button, Tooltip, EmptyState } from "@/components/ui";
+import {
+  Icon,
+  PiArrowsClockwise,
+  PiMagnifyingGlass,
+  PiListChecks,
+  PiSun,
+  PiMoon,
+} from "@/lib/icons";
+import { useUiTheme } from "@/providers/UiThemeProvider";
 
 export const TasksSync: React.FC = () => {
   const [search, setSearch] = useState("");
+  const { theme, toggleTheme } = useUiTheme();
 
   const { data: tasksData, isLoading: loadingTasks, error: tasksError } = useClickUpTasks();
 
   const { mutate: refreshTasks, isPending: refreshing } = useRefreshTasks({
-    onSuccess: () => toast.success("Tasks refreshed"),
-    onError: () => toast.error("Error refreshing tasks"),
+    onSuccess: () => toast.success("Tareas actualizadas"),
+    onError: () => toast.error("Error al actualizar tareas"),
   });
 
   const tasks = useMemo(() => {
@@ -30,50 +38,65 @@ export const TasksSync: React.FC = () => {
 
   if (tasksError) {
     return (
-      <div className="flex flex-col h-full items-center justify-center">
-        <div className="text-center">
-          <HugeiconsIcon icon={TaskIcon} size={48} className="mx-auto mb-4 text-red-400" />
-          <h3 className="text-2xl font-medium mb-2 text-red-400">Error Loading Data</h3>
-          <p className="text-gray-400 mb-4">{tasksError.message || "Unknown error"}</p>
-          <Button
-            variant="soft"
-            color="primary"
-            onClick={() => refreshTasks()}
-            startDecorator={<HugeiconsIcon icon={RefreshIcon} size={16} />}
-          >
-            Try Again
-          </Button>
-        </div>
+      <div className="flex h-full items-center justify-center">
+        <EmptyState
+          icon={PiListChecks}
+          title="Error al cargar los datos"
+          description={tasksError.message || "Error desconocido"}
+          action={
+            <Button variant="soft" startIcon={<Icon icon={PiArrowsClockwise} />} onClick={() => refreshTasks()}>
+              Reintentar
+            </Button>
+          }
+        />
       </div>
     );
   }
 
   return (
     <div className="flex flex-col h-full">
-      <div className="sticky top-16 bg-background/70 backdrop-blur-lg z-50">
-        <div className="p-4 flex items-center justify-between border-b border-b-white/10">
-          <h1 className="flex items-center gap-2 text-2xl font-medium">
-            <HugeiconsIcon icon={TaskIcon} size={32} strokeWidth={1} />
+      <div className="sticky top-16 z-50 bg-(--color-surface-app)/70 backdrop-blur-lg">
+        <div className="flex items-center justify-between border-b border-(--color-border-default) p-4">
+          <h1 className="flex items-center gap-2 text-2xl font-medium text-(--color-text-strong)">
+            <Icon icon={PiListChecks} size={28} />
             ClickUp Tasks
           </h1>
           <div className="flex items-center gap-3">
             <Input
               size="sm"
-              placeholder="Search tasks..."
+              placeholder="Buscar tareas..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              sx={{ width: 220 }}
+              startAdornment={<Icon icon={PiMagnifyingGlass} size={16} />}
             />
-            <Tooltip title="Refresh tasks from ClickUp">
-              <IconButton size="sm" variant="soft" onClick={() => refreshTasks()} loading={refreshing}>
-                <HugeiconsIcon icon={RefreshIcon} size={16} />
+            <Tooltip content="Actualizar desde ClickUp">
+              <IconButton
+                aria-label="Actualizar"
+                variant="soft"
+                color="neutral"
+                size="sm"
+                onClick={() => refreshTasks()}
+                disabled={refreshing}
+              >
+                <Icon icon={PiArrowsClockwise} />
+              </IconButton>
+            </Tooltip>
+            <Tooltip content={theme === "dark" ? "Modo claro" : "Modo oscuro"}>
+              <IconButton
+                aria-label="Cambiar tema"
+                variant="ghost"
+                color="neutral"
+                size="sm"
+                onClick={toggleTheme}
+              >
+                <Icon icon={theme === "dark" ? PiSun : PiMoon} />
               </IconButton>
             </Tooltip>
           </div>
         </div>
       </div>
 
-      <div className="p-6 flex-1 flex flex-col">
+      <div className="flex flex-1 flex-col p-6">
         <TasksList tasks={tasks} loading={loadingTasks} onTaskEdit={handleTaskEdit} />
       </div>
     </div>

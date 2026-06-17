@@ -17,7 +17,15 @@ export default function RootLayout({
 }) {
   return (
     <ThemeProvider>
-      <html lang="en" className={inter.className}>
+      <html lang="en" data-theme="dark" suppressHydrationWarning className={inter.className}>
+        <head>
+          {/* Anti-flash: aplica el tema guardado antes del primer paint. */}
+          <script
+            dangerouslySetInnerHTML={{
+              __html: `try{var t=localStorage.getItem('assignify-theme');if(t==='light')document.documentElement.dataset.theme='light';}catch(e){}`,
+            }}
+          />
+        </head>
         <body>{children}</body>
       </html>
     </ThemeProvider>
