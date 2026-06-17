@@ -23,6 +23,7 @@ interface TaskCardProps {
       email: string;
       initials: string;
       color: string;
+      profilePicture?: string | null;
     }>;
     dueDate?: string | null;
     startDate?: string | null; // ✅ NUEVO: Agregada fecha de inicio
@@ -116,6 +117,7 @@ export const TaskCard: React.FC<TaskCardProps> = ({ task }) => {
               <Avatar
                 key={assignee.id}
                 size="xs"
+                src={assignee.profilePicture || undefined}
                 title={`${assignee.name} (${assignee.email})`}
                 style={{
                   backgroundColor: assignee.color,

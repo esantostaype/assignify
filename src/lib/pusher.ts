@@ -19,6 +19,9 @@ export interface TaskUpdatePayload {
   name?: string
   status?: string
   event?: string
+  /** Estado anterior y nuevo (de history_items) para notificar "X → Y". */
+  fromStatus?: string
+  toStatus?: string
 }
 
 /**
@@ -29,6 +32,6 @@ export async function publishTaskUpdate(payload: TaskUpdatePayload): Promise<voi
   try {
     await pusherServer.trigger(TASKS_CHANNEL, TASK_UPDATED_EVENT, payload)
   } catch (err) {
-    console.error('[pusher] No se pudo emitir task-updated:', err instanceof Error ? err.message : err)
+    console.error('[pusher] Failed to emit task-updated:', err instanceof Error ? err.message : err)
   }
 }

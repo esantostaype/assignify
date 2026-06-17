@@ -1,4 +1,4 @@
-// src/app/page.tsx - Página raíz que redirige
+// src/app/page.tsx - Root page that redirects
 'use client';
 
 import { useEffect } from 'react';
@@ -10,8 +10,7 @@ export default function HomePage() {
   const router = useRouter();
 
   useEffect(() => {
-    // Redirigir automáticamente a /tasks
-    console.log('🏠 Root page: Redirecting to /tasks...');
+    // Automatically redirect to /tasks
     router.replace('/tasks');
   }, [router]);
 
@@ -19,7 +18,7 @@ export default function HomePage() {
     <div className="min-h-screen flex flex-col items-center justify-center gap-4">
       <Spinner size={36} />
       <Typography variant="body" color="neutral-500">
-        Redirigiendo...
+        Redirecting...
       </Typography>
     </div>
   );

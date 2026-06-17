@@ -7,7 +7,7 @@ import { Button, Input, Alert } from "@/components/ui";
 import { Icon, PiDownloadSimple, PiWarning } from "@/lib/icons";
 import { useTaskDataInvalidation } from "@/hooks/useTaskData";
 import axios from "axios";
-import toast from "react-hot-toast";
+import { hotToast as toast } from "@/lib/hotToast";
 
 interface TierData {
   id: number;
@@ -67,7 +67,7 @@ export const TierListForm: React.FC = () => {
         setTiers(response.data);
       } catch (error) {
         console.error("Error loading tiers:", error);
-        toast.error("Error loading tier settings");
+        toast.error({ title: "Error loading tier settings", description: "Couldn't reach the server." });
       } finally {
         setLoadingTiers(false);
       }
@@ -115,22 +115,21 @@ export const TierListForm: React.FC = () => {
         setTiers(response.data);
         setTierChanges({});
 
-        // Invalidar cache de task data para que otros componentes se actualicen
-        console.log("🔄 Invalidating task data cache after tier changes...");
+        // Invalidate task data cache so other components refresh
         invalidateTiers();
 
-        toast.success("Tier durations updated successfully");
+        toast.success({ title: "Tier durations updated successfully", description: "Changes saved." });
       }
     } catch (error) {
       console.error("Error saving:", error);
-      toast.error("Error saving tier durations");
+      toast.error({ title: "Error saving tier durations", description: "Changes were not saved." });
     } finally {
       setSavingTiers(false);
     }
   };
 
   return (
-    <div className="p-8">
+    <>
       {!loadingTiers && hasChanges && (
         <Alert tone="warning" variant="soft" icon={null} className="mb-4">
           <div className="flex items-center gap-2">
@@ -225,6 +224,6 @@ export const TierListForm: React.FC = () => {
             : "No Changes"}
         </Button>
       </div>
-    </div>
+    </>
   );
 };

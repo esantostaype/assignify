@@ -4,12 +4,11 @@
 'use client'
 
 import React, { useState, useMemo } from 'react'
-import toast from 'react-hot-toast'
+import { hotToast as toast } from '@/lib/hotToast'
 import { DesignersHeader } from './DesignersHeader'
 import { UsersList } from './UsersList'
-import { TeamWorkload } from './TeamWorkload'
 import { UserEditModal } from './UserEditModal'
-import { useModalStore } from '@/stores/modalStore'
+import { Modal } from '@/components/ui'
 import {
   useClickUpUsers,
   useSyncUsers,
@@ -18,6 +17,7 @@ import {
   useAddUserVacation,
   useDeleteUserVacation,
 } from '@/hooks/queries/useUsers'
+import { useUsersWorkload } from '@/hooks/queries/useWorkload'
 
 export const ClickUpUsersSync: React.FC = () => {
   // State
@@ -25,15 +25,15 @@ export const ClickUpUsersSync: React.FC = () => {
   const [searchFilter, setSearchFilter] = useState('')
   const [editingUserId, setEditingUserId] = useState<string | null>(null)
 
-  // Modal store
-  const { openModal, closeModal } = useModalStore()
-
   // Queries
-  const { 
-    data: usersData, 
-    isLoading, 
-    refetch: refreshUsers 
+  const {
+    data: usersData,
+    isLoading,
+    refetch: refreshUsers
   } = useClickUpUsers()
+
+  // Carga de trabajo de los diseñadores sincronizados (se cruza por id en UsersList).
+  const { data: workload = [], isLoading: workloadLoading } = useUsersWorkload()
 
   // Mutations
   const { mutate: syncUsers, isPending: syncing } = useSyncUsers({
@@ -50,15 +50,15 @@ export const ClickUpUsersSync: React.FC = () => {
         successMessage += ` (${errors.length} errors)`
       }
 
-      toast.success(successMessage)
+      toast.success({ title: successMessage, description: 'Designers are now available.' })
 
       if (notFoundUsers && notFoundUsers.length > 0) {
-        toast(`Users not found in teams: ${notFoundUsers.join(', ')}`)
+        toast.neutral({ title: `Users not found in teams: ${notFoundUsers.join(', ')}`, description: 'They were skipped.' })
       }
 
       if (errors && errors.length > 0) {
         console.warn('Errors during sync:', errors)
-        toast('Some users had errors. Check console for details.')
+        toast.neutral({ title: 'Some users had errors. Check console for details.', description: 'The rest synced fine.' })
       }
 
       setSelectedUsers(new Set())
@@ -66,22 +66,22 @@ export const ClickUpUsersSync: React.FC = () => {
     onError: (error: any) => {
       console.error('❌ Sync error:', error)
       const message = error.response?.data?.error || error.message
-      toast.error(`Sync error: ${message}`)
+      toast.error({ title: 'Sync failed', description: message })
     },
   })
 
   const { mutate: addRole, isPending: addingRole } = useAddUserRole({
     onSuccess: () => {
-      toast.success('Role added successfully')
+      toast.success({ title: 'Role added successfully', description: 'Assigned to the designer.' })
     },
     onError: () => {
-      toast.error('Error adding role')
+      toast.error({ title: 'Error adding role', description: 'The role was not assigned.' })
     },
   })
 
   const { mutate: addVacation, isPending: addingVacation } = useAddUserVacation({
     onSuccess: () => {
-      toast.success('Vacation added successfully')
+      toast.success({ title: 'Vacation added successfully', description: 'Saved to the calendar.' })
     }
   })
 
@@ -117,7 +117,6 @@ export const ClickUpUsersSync: React.FC = () => {
     }
 
     setSelectedUsers(newSelection)
-    console.log(`${checked ? 'Selected' : 'Deselected'} user: ${userId}`)
   }
 
   const handleSelectAll = () => {
@@ -134,7 +133,7 @@ export const ClickUpUsersSync: React.FC = () => {
 
   const handleSync = () => {
     if (selectedUsers.size === 0) {
-      toast('Select at least one user to sync')
+      toast.neutral({ title: 'Select at least one user to sync', description: 'Nothing selected yet.' })
       return
     }
 
@@ -147,30 +146,6 @@ export const ClickUpUsersSync: React.FC = () => {
 
   const handleEditUser = (userId: string) => {
     setEditingUserId(userId)
-    
-    openModal({
-      title: `Edit User: ${clickupUsers.find(u => u.clickupId === userId)?.name}`,
-      content: (
-        <UserEditModalWrapper
-          userId={userId}
-          onAddRole={(typeId, brandId) => {
-            addRole({ 
-              userId, 
-              typeId, 
-              brandId: brandId || null 
-            })
-          }}
-          onAddVacation={(startDate, endDate) => {
-            addVacation({ userId, startDate, endDate })
-          }}
-          loadingStates={{
-            addingRole,
-            addingVacation,
-          }}
-        />
-      ),
-      onClose: () => setEditingUserId(null),
-    })
   }
 
   return (
@@ -189,21 +164,44 @@ export const ClickUpUsersSync: React.FC = () => {
       />
 
       <div className="p-6 flex-1 flex flex-col gap-8">
-        <section>
-          <h2 className="mb-4 text-lg font-semibold text-(--color-text-strong)">Carga del equipo</h2>
-          <TeamWorkload />
-        </section>
-        <section>
-          <h2 className="mb-4 text-lg font-semibold text-(--color-text-strong)">Diseñadores</h2>
-          <UsersList
-            users={filteredUsers}
-            selectedUsers={selectedUsers}
-            onUserSelect={handleUserSelection}
-            onUserEdit={handleEditUser}
-            loading={isLoading}
-          />
-        </section>
+        <UsersList
+          users={filteredUsers}
+          selectedUsers={selectedUsers}
+          onUserSelect={handleUserSelection}
+          onUserEdit={handleEditUser}
+          loading={isLoading}
+          workload={workload}
+          workloadLoading={workloadLoading}
+        />
       </div>
+
+      {/* Modal de edición renderizado EN VIVO con estado local (patrón de la
+          referencia): el modal forma parte del árbol de Designers y se
+          re-renderiza cuando las queries cambian, reflejando al instante
+          nivel / cargo / vacaciones tras cada mutación. */}
+      <Modal
+        open={!!editingUserId}
+        onClose={() => setEditingUserId(null)}
+        title={
+          editingUserId
+            ? `Edit User: ${clickupUsers.find((u) => u.clickupId === editingUserId)?.name ?? ''}`
+            : ''
+        }
+        size="lg"
+      >
+        {editingUserId && (
+          <UserEditModalWrapper
+            userId={editingUserId}
+            onAddRole={(typeId, brandId) =>
+              addRole({ userId: editingUserId, typeId, brandId: brandId || null })
+            }
+            onAddVacation={(startDate, endDate) =>
+              addVacation({ userId: editingUserId, startDate, endDate })
+            }
+            loadingStates={{ addingRole, addingVacation }}
+          />
+        )}
+      </Modal>
     </>
   )
 }
@@ -228,19 +226,19 @@ const UserEditModalWrapper: React.FC<UserEditModalWrapperProps> = ({
   // ✅ Create deletion mutations with proper userId context
   const { mutate: deleteRole } = useDeleteUserRole(userId, {
     onSuccess: () => {
-      toast.success('Role removed successfully')
+      toast.success({ title: 'Role removed successfully', description: 'No longer assigned.' })
     },
     onError: () => {
-      toast.error('Error removing role')
+      toast.error({ title: 'Error removing role', description: 'The role is still assigned.' })
     },
   })
 
   const { mutate: deleteVacation } = useDeleteUserVacation(userId, {
     onSuccess: () => {
-      toast.success('Vacation removed successfully')
+      toast.success({ title: 'Vacation removed successfully', description: 'Removed from the calendar.' })
     },
     onError: () => {
-      toast.error('Error removing vacation')
+      toast.error({ title: 'Error removing vacation', description: 'It is still on the calendar.' })
     },
   })
 

@@ -83,10 +83,9 @@ export const UserAssignmentSelect: React.FC<UserAssignmentSelectProps> = ({
   // Determine loading state
   const isLoading = loading || loadingEnhanced || fetchingSuggestion;
 
-  // ✅ NUEVO: Detectar cuando se limpia la selección (indicativo de cambio de categoría)
+  // Detect when the selection is cleared (signals a category change)
   useEffect(() => {
     if (values.length === 0 && !fetchingSuggestion) {
-      console.log('🔄 Detected category change - selection cleared');
       categoryChangeInProgressRef.current = true;
       lastAppliedSuggestionRef.current = null;
 
@@ -134,10 +133,7 @@ export const UserAssignmentSelect: React.FC<UserAssignmentSelectProps> = ({
       return;
     }
 
-    // ✅ APLICAR CON PROTECCIÓN CONTRA LOOPS
-    console.log(`🤖 Auto-selecting suggested user: ${suggestedUser.name}`);
-
-    // Usar requestAnimationFrame para evitar loops sincrónicos
+    // Apply with protection against sync loops
     requestAnimationFrame(() => {
       onChange([suggestedUser.id]);
       lastAppliedSuggestionRef.current = suggestedUser.id;

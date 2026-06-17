@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react'
 import axios from 'axios'
-import toast from 'react-hot-toast'
+import { hotToast as toast } from '@/lib/hotToast'
 import { SuggestedAssignment } from '@/interfaces'
 
 export const useTaskSuggestion = (
@@ -10,7 +10,8 @@ export const useTaskSuggestion = (
   durationDays: string,
   brandId?: string,
   priority?: string,
-  triggerSuggestion?: number
+  triggerSuggestion?: number,
+  level?: string
 ) => {
   const [suggestedAssignment, setSuggestedAssignment] = useState<SuggestedAssignment | null>(null)
   const [fetchingSuggestion, setFetchingSuggestion] = useState(false)
@@ -29,25 +30,15 @@ export const useTaskSuggestion = (
 
   // ✅ NUEVO: Función para crear clave de parámetros para detectar cambios
   const createParamsKey = (typeId: number | undefined, durationDays: string, brandId?: string) => {
-    return `${typeId || 'none'}-${durationDays || 'none'}-${brandId || 'global'}-${priority || 'NORMAL'}`
+    return `${typeId || 'none'}-${durationDays || 'none'}-${brandId || 'global'}-${priority || 'NORMAL'}-${level || 'MID'}`
   }
 
-  // ✅ MEJORADO: Función de obtención de sugerencias con debouncing
+  // Suggestion fetching with debouncing
   const getSuggestion = async (immediate = false) => {
     const currentParams = createParamsKey(typeId, durationDays, brandId)
 
-    console.log('🔍 useTaskSuggestion - Evaluating conditions:', {
-      typeId,
-      durationDays,
-      brandId: brandId || 'global',
-      triggerSuggestion,
-      immediate,
-      paramsChanged: currentParams !== lastParams.current
-    })
-
     // Validar parámetros
     if (!areParamsValid(typeId, durationDays)) {
-      console.log('⚠️ Invalid parameters - waiting for valid duration')
       setFetchingSuggestion(false)
       // No limpiar la sugerencia inmediatamente, esperar a que llegue una duración válida
       return
@@ -62,14 +53,14 @@ export const useTaskSuggestion = (
     }
 
     const executeSuggestion = async () => {
-      console.log(`🔄 Fetching user suggestion based on type (${typeId}) and duration (${duration})`)
       setFetchingSuggestion(true)
 
       try {
         const params: Record<string, string | number> = {
           typeId: typeId ?? 0,
           durationDays: duration,
-          priority: priority || 'NORMAL'
+          priority: priority || 'NORMAL',
+          level: level || 'MID'
         }
 
         if (brandId) {
@@ -80,47 +71,22 @@ export const useTaskSuggestion = (
           params
         })
 
-        const { suggestedUserId, userInfo } = response.data
+        const { suggestedUserId } = response.data
 
         const newSuggestion: SuggestedAssignment = {
           userId: suggestedUserId,
           durationDays: duration,
         }
 
-        // ✅ NUEVO: Detectar cambios en la sugerencia para notificar al usuario
-        const suggestionChanged = lastValidSuggestion.current &&
-          lastValidSuggestion.current.userId !== newSuggestion.userId
-
-        if (suggestionChanged) {
-          console.log(`🔄 Suggestion changed from ${lastValidSuggestion.current?.userId} to ${newSuggestion.userId}`)
-          console.log(`📊 Reason: Duration changed from ${lastValidSuggestion.current?.durationDays} to ${duration} days`)
-
-          // ✅ NUEVO: Log detallado del cambio para debugging
-          if (userInfo) {
-            console.log(`👤 New suggested user: ${userInfo.name}`)
-            console.log(`📈 Current load: ${userInfo.totalAssignedDurationDays} days`)
-            console.log(`📅 Available from: ${userInfo.availableFrom}`)
-          }
-        }
-
         setSuggestedAssignment(newSuggestion)
         lastValidSuggestion.current = newSuggestion
-
-        console.log('✅ User suggestion obtained:', {
-          userId: suggestedUserId,
-          duration: duration,
-          changed: suggestionChanged
-        })
-
       } catch (error) {
-        console.error('Error al obtener sugerencia de usuario:', error)
         setSuggestedAssignment(null)
 
         if (axios.isAxiosError(error)) {
-          if (error.response?.status === 400) {
-            console.log('Validation error, not showing toast:', error.response.data.error)
-          } else {
-            toast.error('Error al obtener sugerencia de asignación.')
+          // 400 = validation error while typing: stay quiet, no toast.
+          if (error.response?.status !== 400) {
+            toast.error({ title: 'Failed to get assignment suggestion.', description: 'No designer suggested.' })
           }
         }
       } finally {
@@ -144,7 +110,6 @@ export const useTaskSuggestion = (
     const shouldTriggerImmediate = triggerSuggestion !== undefined && triggerSuggestion > 0
 
     if (paramsChanged || shouldTriggerImmediate) {
-      console.log(`🚀 Triggering suggestion: paramsChanged=${paramsChanged}, triggerSuggestion=${shouldTriggerImmediate}`)
       getSuggestion(shouldTriggerImmediate)
     }
 
@@ -154,17 +119,16 @@ export const useTaskSuggestion = (
         clearTimeout(debounceTimeout.current)
       }
     }
-  }, [typeId, durationDays, brandId, priority, triggerSuggestion])
+  }, [typeId, durationDays, brandId, priority, triggerSuggestion, level])
 
-  // ✅ NUEVO: Función para forzar re-cálculo inmediato
+  // Force an immediate recalculation
   const forceSuggestionUpdate = () => {
-    console.log('🔄 Forcing immediate suggestion update')
     getSuggestion(true)
   }
 
   return {
     suggestedAssignment,
     fetchingSuggestion,
-    forceSuggestionUpdate // ✅ NUEVO: Exponer función para forzar update
+    forceSuggestionUpdate
   }
 }

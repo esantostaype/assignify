@@ -94,18 +94,15 @@ export const useEnhancedUsers = ({
           params.brandId = brandId;
         }
 
-        console.log('🧠 Fetching enhanced users with params:', params);
-
         const response = await axios.get<EnhancedUsersResponse>('/api/users/enhanced', {
           params
         });
 
-        console.log('✅ Enhanced users response:', response.data);
         setData(response.data);
 
       } catch (err) {
-        console.error('❌ Error fetching enhanced users:', err);
-        
+        console.error('Error fetching enhanced users:', err);
+
         if (axios.isAxiosError(err)) {
           setError(err.response?.data?.error || err.message);
         } else {

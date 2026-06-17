@@ -1,6 +1,6 @@
 "use client";
 import React, { useState, useMemo } from "react";
-import toast from "react-hot-toast";
+import { hotToast as toast } from "@/lib/hotToast";
 import { TasksList } from "./TaskList";
 import { useClickUpTasks, useRefreshTasks } from "@/hooks/queries/useTasks";
 import { Input, IconButton, Button, Tooltip, EmptyState } from "@/components/ui";
@@ -21,8 +21,8 @@ export const TasksSync: React.FC = () => {
   const { data: tasksData, isLoading: loadingTasks, error: tasksError } = useClickUpTasks();
 
   const { mutate: refreshTasks, isPending: refreshing } = useRefreshTasks({
-    onSuccess: () => toast.success("Tareas actualizadas"),
-    onError: () => toast.error("Error al actualizar tareas"),
+    onSuccess: () => toast.success({ title: "Tasks updated", description: "Synced from ClickUp." }),
+    onError: () => toast.error({ title: "Failed to update tasks", description: "Try again in a moment." }),
   });
 
   const tasks = useMemo(() => {
@@ -36,11 +36,11 @@ export const TasksSync: React.FC = () => {
       <div className="flex h-full items-center justify-center">
         <EmptyState
           icon={PiListChecks}
-          title="Error al cargar los datos"
-          description={tasksError.message || "Error desconocido"}
+          title="Failed to load data"
+          description={tasksError.message || "Unknown error"}
           action={
             <Button variant="soft" startIcon={<Icon icon={PiArrowsClockwise} />} onClick={() => refreshTasks()}>
-              Reintentar
+              Retry
             </Button>
           }
         />
@@ -52,21 +52,20 @@ export const TasksSync: React.FC = () => {
     <div className="flex flex-col h-full">
       <div className="sticky top-16 z-50 bg-(--color-surface-app)/70 backdrop-blur-lg">
         <div className="flex items-center justify-between border-b border-(--color-border-default) p-4">
-          <h1 className="flex items-center gap-2 text-2xl font-medium text-(--color-text-strong)">
-            <Icon icon={PiListChecks} size={28} />
-            ClickUp Tasks
+          <h1 className="flex items-center gap-2 text-xl text-(--color-text-strong)">
+            Tasks
           </h1>
           <div className="flex items-center gap-3">
             <Input
               size="sm"
-              placeholder="Buscar tareas..."
+              placeholder="Search tasks..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               startAdornment={<Icon icon={PiMagnifyingGlass} size={16} />}
             />
-            <Tooltip content="Actualizar desde ClickUp">
+            <Tooltip content="Refresh from ClickUp">
               <IconButton
-                aria-label="Actualizar"
+                aria-label="Refresh"
                 variant="soft"
                 color="neutral"
                 size="sm"
@@ -76,9 +75,9 @@ export const TasksSync: React.FC = () => {
                 <Icon icon={PiArrowsClockwise} />
               </IconButton>
             </Tooltip>
-            <Tooltip content={theme === "dark" ? "Modo claro" : "Modo oscuro"}>
+            <Tooltip content={theme === "dark" ? "Light mode" : "Dark mode"}>
               <IconButton
-                aria-label="Cambiar tema"
+                aria-label="Toggle theme"
                 variant="ghost"
                 color="neutral"
                 size="sm"

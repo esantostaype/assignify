@@ -18,6 +18,11 @@ export const validationSchema = Yup.object({
     .oneOf(['LOW', 'NORMAL', 'HIGH', 'URGENT'], 'Invalid priority')
     .required('Priority is required'),
 
+  // Nivel solicitado (Jr/Mid/Sr). No se persiste: solo decide el diseñador.
+  level: Yup.string()
+    .oneOf(['JUNIOR', 'MID', 'SENIOR'], 'Invalid level')
+    .required('Level is required'),
+
   brandId: Yup.string()
     .required('Brand is required'),
 

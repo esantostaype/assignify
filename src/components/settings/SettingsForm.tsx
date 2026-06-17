@@ -12,6 +12,8 @@ import {
   Progress,
   Alert,
   Spinner,
+  FormSeparator,
+  AlertDialog,
 } from "@/components/ui";
 import {
   Icon,
@@ -20,19 +22,15 @@ import {
   PiWarning,
   PiInfo,
   PiArrowsClockwise,
-  PiClock,
-  PiSquaresFour,
-  PiBriefcase,
-  type IconComponent,
 } from "@/lib/icons";
 import {
   useSettings,
   useUpdateSettings,
   useResetSettings,
 } from "@/hooks/useSettings";
-import { useTaskDataInvalidation } from "@/hooks/useTaskData"; // ✅ NUEVO IMPORT
+import { useTaskDataInvalidation } from "@/hooks/useTaskData";
 import axios from "axios";
-import toast from "react-hot-toast";
+import { hotToast as toast } from "@/lib/hotToast";
 
 interface SettingValue {
   category: string;
@@ -56,7 +54,7 @@ export const SettingsForm: React.FC = () => {
   const updateSettingsMutation = useUpdateSettings();
   const resetSettingsMutation = useResetSettings();
 
-  // ✅ NUEVO: Hook para invalidar cache de task data
+  // Hook to invalidate task data cache
   const { invalidateTiers, invalidateAll } = useTaskDataInvalidation();
 
   const [settingValues, setSettingValues] = useState<
@@ -67,6 +65,7 @@ export const SettingsForm: React.FC = () => {
   const [tierChanges, setTierChanges] = useState<Record<number, number>>({});
   const [loadingTiers, setLoadingTiers] = useState(true);
   const [savingTiers, setSavingTiers] = useState(false);
+  const [showResetDialog, setShowResetDialog] = useState(false);
 
   // Cargar tiers
   useEffect(() => {
@@ -77,7 +76,10 @@ export const SettingsForm: React.FC = () => {
         setTiers(response.data);
       } catch (error) {
         console.error("Error loading tiers:", error);
-        toast.error("Error loading tier settings");
+        toast.error({
+          title: "Couldn't load tiers",
+          description: "Tier durations failed to load.",
+        });
       } finally {
         setLoadingTiers(false);
       }
@@ -213,36 +215,44 @@ export const SettingsForm: React.FC = () => {
         setTiers(response.data);
         setTierChanges({});
 
-        // ✅ NUEVO: Invalidar cache de task data para que otros componentes se actualicen
-        console.log('🔄 Invalidating task data cache after tier changes...');
+        // Invalidate task data cache so other components refresh
         invalidateTiers();
 
-        toast.success("Tier durations updated successfully");
+        toast.success({
+          title: "Tier durations updated",
+          description: "New durations saved.",
+        });
       }
 
       // Recargar settings
       await refetch();
     } catch (error) {
       console.error("Error saving:", error);
-      toast.error("Error saving settings");
+      toast.error({
+        title: "Couldn't save settings",
+        description: "Your changes weren't saved.",
+      });
     } finally {
       setSavingTiers(false);
     }
   };
 
-  // Handle reset to defaults
-  const handleReset = async () => {
-    if (
-      window.confirm(
-        "Are you sure you want to reset these settings to their default values?"
-      )
-    ) {
+  // Reset a valores por defecto (confirmado vía AlertDialog).
+  const doReset = async () => {
+    try {
       await resetSettingsMutation.mutateAsync();
       setTierChanges({});
-
-      // ✅ NUEVO: Invalidar todo el cache después del reset
-      console.log('🔄 Invalidating all task data cache after settings reset...');
       invalidateAll();
+      toast.success({
+        title: "Settings reset",
+        description: "Restored to default values.",
+      });
+    } catch (error) {
+      console.error("Error resetting settings:", error);
+      toast.error({
+        title: "Reset failed",
+        description: "Couldn't restore the defaults.",
+      });
     }
   };
 
@@ -283,12 +293,12 @@ export const SettingsForm: React.FC = () => {
             max={setting.maxValue}
             step={setting.key.includes("duration") ? 0.1 : 1}
             size={size}
-            className={`w-24${hasChanged ? " border-warning-500" : ""}`}
+            className={`w-full${hasChanged ? " border-warning-500" : ""}`}
           />
         );
 
       default:
-        // Para tier_info, no mostrar input
+        // For tier_info, do not render an input
         if (setting.key === 'tier_info') {
           return null;
         }
@@ -304,76 +314,39 @@ export const SettingsForm: React.FC = () => {
               )
             }
             size={size}
-            className={`w-24${hasChanged ? " border-warning-500" : ""}`}
+            className={`w-full${hasChanged ? " border-warning-500" : ""}`}
           />
         );
     }
   };
 
-  // Get setting display info
+  // Get setting display info: uses the label/description from the catalog
+  // and appends the allowed range to the tooltip when present.
   const getSettingDisplayInfo = (setting: any) => {
-    // Mapeo de keys a labels más cortos y tooltips
-    const displayMap: Record<string, { label: string; tooltip: string }> = {
-      'start_hour': {
-        label: 'Start Hour',
-        tooltip: `${setting.label}: ${setting.description} (Range: ${setting.minValue}-${setting.maxValue})`
-      },
-      'lunch_start': {
-        label: 'Lunch Start Hour',
-        tooltip: `${setting.label}: ${setting.description} (Range: ${setting.minValue}-${setting.maxValue})`
-      },
-      'lunch_end': {
-        label: 'Lunch End Hour',
-        tooltip: `${setting.label}: ${setting.description} (Range: ${setting.minValue}-${setting.maxValue}h)`
-      },
-      'end_hour': {
-        label: 'End Hour',
-        tooltip: `${setting.label}: ${setting.description} (Range: ${setting.minValue}-${setting.maxValue})`
-      },
-      'normal_before_low_threshold': {
-        label: 'Normal before Low',
-        tooltip: `${setting.label}: ${setting.description} (Range: ${setting.minValue}-${setting.maxValue})`
-      },
-      'consecutive_low_threshold': {
-        label: 'Max Low Tasks',
-        tooltip: `${setting.label}: ${setting.description} (Range: ${setting.minValue}-${setting.maxValue})`
-      },
-      'deadline_difference_threshold': {
-        label: 'Deadline Diff',
-        tooltip: `${setting.label}: ${setting.description} (Range: ${setting.minValue}-${setting.maxValue} days)`
-      }
-    };
+    const range =
+      setting.minValue !== undefined && setting.minValue !== null &&
+      setting.maxValue !== undefined && setting.maxValue !== null
+        ? ` (Range: ${setting.minValue}-${setting.maxValue})`
+        : '';
 
-    return displayMap[setting.key] || {
+    return {
       label: setting.label,
-      tooltip: setting.description || setting.label
+      tooltip: `${setting.description || setting.label}${range}`
     };
-  };
-
-  // Group icons
-  const getGroupIcon = (groupName: string): IconComponent => {
-    switch (groupName) {
-      case "work_schedule":
-        return PiClock;
-      case "task_assignment":
-        return PiBriefcase;
-      default:
-        return PiGear;
-    }
   };
 
   // Group name mapping
   const getGroupDisplayName = (groupName: string) => {
     const mapping: Record<string, string> = {
-      work_schedule: "Work Schedule",
-      task_assignment: "Task Assignment"
+      work_schedule: "Work schedule",
+      task_assignment: "Task assignment"
     };
     return mapping[groupName] || groupName;
   };
 
   if (isLoading) {
     return (
-      <div className="p-8 max-w-6xl mx-auto">
+      <div className="max-w-6xl mx-auto">
         <div className="flex items-center gap-2 mb-4">
           <Icon icon={PiGear} size={20} />
           <span className="text-lg font-medium">Loading Settings...</span>
@@ -385,7 +358,7 @@ export const SettingsForm: React.FC = () => {
 
   if (error) {
     return (
-      <div className="p-8 max-w-6xl mx-auto">
+      <div className="max-w-6xl mx-auto">
         <Alert tone="error" variant="soft" icon={null}>
           <div className="text-sm font-medium">Failed to load settings</div>
           <div className="text-xs mt-1">
@@ -398,7 +371,7 @@ export const SettingsForm: React.FC = () => {
 
   if (!settingsData?.settings) {
     return (
-      <div className="p-8 max-w-6xl mx-auto">
+      <div className="max-w-6xl mx-auto">
         <Alert tone="info" variant="soft" icon={null}>
           <span>No settings available</span>
         </Alert>
@@ -412,13 +385,11 @@ export const SettingsForm: React.FC = () => {
   );
 
   return (
-    <div className="p-8">
+    <>
 
       {/* Settings Groups */}
-      <div className="space-y-6">
+      <div className="space-y-8">
         {filteredSettings.map(([groupName, settings]) => {
-          const GroupIcon = getGroupIcon(groupName);
-
           // Excluir tier_info de los settings a mostrar
           const settingsToShow = settings.filter(s => s.key !== 'tier_info');
 
@@ -427,145 +398,85 @@ export const SettingsForm: React.FC = () => {
           }
 
           return (
-            <div key={groupName}>
-              <div className="flex items-center gap-2 mb-4">
-                <Icon
-                  icon={GroupIcon}
-                  size={20}
-                  className="text-primary-600"
-                />
-                <h2 className="text-lg font-medium">
-                  {getGroupDisplayName(groupName)}
-                </h2>
-              </div>
+            <section key={groupName} className="space-y-4">
+              <FormSeparator>{getGroupDisplayName(groupName)}</FormSeparator>
 
               {settingsToShow.length > 0 && (
-                <div className="border border-(--color-border-default) rounded-lg overflow-y-hidden overflow-x-auto">
-                  <table className="w-full">
-                    <thead className="bg-(--color-surface-hover)">
-                      <tr>
-                        {settingsToShow.map((setting) => {
-                          const { label, tooltip } = getSettingDisplayInfo(setting);
-                          const settingKey = `${setting.category}.${setting.key}`;
-                          const hasChanged = settingValues[settingKey]?.hasChanged ?? false;
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-x-6 gap-y-4">
+                  {settingsToShow.map((setting) => {
+                    const { label, tooltip } = getSettingDisplayInfo(setting);
+                    const settingKey = `${setting.category}.${setting.key}`;
+                    const hasChanged = settingValues[settingKey]?.hasChanged ?? false;
 
-                          return (
-                            <th key={settingKey} className="p-2 first:pl-4 last:pr-4 text-left text-sm font-medium text-gray-300">
-                              <div className="flex items-center gap-2">
-                                <span>{label}</span>
-                                {hasChanged && (
-                                  <div
-                                    className="w-2 h-2 bg-orange-500 rounded-full"
-                                    title="Changed"
-                                  />
-                                )}
-                                <Tooltip content={tooltip}>
-                                  <span className="inline-flex cursor-help text-(--color-text-subtle)">
-                                    <Icon
-                                      icon={PiInfo}
-                                      size={14}
-                                    />
-                                  </span>
-                                </Tooltip>
-                              </div>
-                            </th>
-                          );
-                        })}
-                      </tr>
-                    </thead>
-                    <tbody>
-                      <tr>
-                        {settingsToShow.map((setting) => {
-                          const settingKey = `${setting.category}.${setting.key}`;
-
-                          return (
-                            <td key={settingKey} className="p-2 first:pl-4 last:pr-4">
-                              <div className="py-2 w-full">
-                                {renderSettingInput(setting)}
-                              </div>
-                            </td>
-                          );
-                        })}
-                      </tr>
-                    </tbody>
-                  </table>
+                    return (
+                      <div key={settingKey} className="flex flex-col gap-1.5 min-w-0">
+                        <div className="flex items-center gap-2 text-sm font-medium text-(--color-text-muted)">
+                          <span className="truncate">{label}</span>
+                          {hasChanged && (
+                            <div
+                              className="w-2 h-2 bg-orange-500 rounded-full shrink-0"
+                              title="Changed"
+                            />
+                          )}
+                          <Tooltip content={tooltip}>
+                            <span className="inline-flex cursor-help text-(--color-text-subtle) shrink-0">
+                              <Icon icon={PiInfo} size={14} />
+                            </span>
+                          </Tooltip>
+                        </div>
+                        {renderSettingInput(setting)}
+                      </div>
+                    );
+                  })}
                 </div>
               )}
-            </div>
+            </section>
           );
         })}
 
-        {/* Tier Settings Table */}
-        <div>
-          <div className="flex items-center gap-2 mb-4">
-            <Icon
-              icon={PiSquaresFour}
-              size={20}
-              className="text-primary-600"
-            />
-            <h2 className="text-lg font-medium">Tier Durations</h2>
-          </div>
+        {/* Tier Settings */}
+        <section className="space-y-4">
+          <FormSeparator>Tier Durations</FormSeparator>
 
           {loadingTiers ? (
             <Progress />
           ) : (
-            <div className="border border-(--color-border-default) rounded-lg overflow-y-hidden overflow-x-auto">
-              <table className="w-full">
-                <thead className="bg-(--color-surface-hover)">
-                  <tr>
-                    {tiers.map((tier) => {
-                      const hasChanged = tierChanges[tier.id] !== undefined;
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
+              {tiers.map((tier) => {
+                const hasChanged = tierChanges[tier.id] !== undefined;
+                const currentDuration = tierChanges[tier.id] ?? tier.duration;
 
-                      return (
-                        <th key={tier.id} className="p-2 first:pl-4 last:pr-4 text-left text-sm font-medium text-gray-300">
-                          <div className="flex items-center gap-2">
-                            <span>Tier {tier.name}</span>
-                            {hasChanged && (
-                              <div
-                                className="w-2 h-2 bg-orange-500 rounded-full"
-                                title="Changed"
-                              />
-                            )}
-                          </div>
-                        </th>
-                      );
-                    })}
-                  </tr>
-                </thead>
-                <tbody>
-                  <tr>
-                    {tiers.map((tier) => {
-                      const hasChanged = tierChanges[tier.id] !== undefined;
-                      const currentDuration =
-                        tierChanges[tier.id] ?? tier.duration;
-
-                      return (
-                        <td key={tier.id} className="p-2 first:pl-4 last:pr-4">
-                          <div className="py-2 px-2 w-full">
-                            <Input
-                              type="number"
-                              value={currentDuration.toString()}
-                              onChange={(e) => {
-                                const value = parseFloat(e.target.value);
-                                if (!isNaN(value) && value > 0) {
-                                  handleTierDurationChange(tier.id, value);
-                                }
-                              }}
-                              min={0.1}
-                              step={0.1}
-                              size="sm"
-                              className={`w-18${hasChanged ? " border-warning-500" : ""}`}
-                            />
-                          </div>
-                        </td>
-                      );
-                    })}
-                  </tr>
-                </tbody>
-              </table>
+                return (
+                  <div key={tier.id} className="flex flex-col gap-1.5 min-w-0">
+                    <div className="flex items-center gap-2 text-sm font-medium text-(--color-text-muted)">
+                      <span className="truncate">Tier {tier.name}</span>
+                      {hasChanged && (
+                        <div
+                          className="w-2 h-2 bg-orange-500 rounded-full shrink-0"
+                          title="Changed"
+                        />
+                      )}
+                    </div>
+                    <Input
+                      type="number"
+                      value={currentDuration.toString()}
+                      onChange={(e) => {
+                        const value = parseFloat(e.target.value);
+                        if (!isNaN(value) && value > 0) {
+                          handleTierDurationChange(tier.id, value);
+                        }
+                      }}
+                      min={0.1}
+                      step={0.1}
+                      size="sm"
+                      className={`w-full${hasChanged ? " border-warning-500" : ""}`}
+                    />
+                  </div>
+                );
+              })}
             </div>
           )}
-        </div>
+        </section>
       </div>
 
       {/* Header */}
@@ -575,7 +486,7 @@ export const SettingsForm: React.FC = () => {
             aria-label="Reset settings to defaults"
             variant="outlined"
             color="error"
-            onClick={handleReset}
+            onClick={() => setShowResetDialog(true)}
             disabled={resetSettingsMutation.isPending}
           >
             {resetSettingsMutation.isPending ? (
@@ -609,12 +520,17 @@ export const SettingsForm: React.FC = () => {
         </Alert>
       )}
 
-      {/* Footer Info */}
-      <div className="mt-8 pt-4 border-t border-(--color-border-default)">
-        <p className="text-sm text-(--color-text-muted) text-center">
-          Changes will take effect immediately after saving
-        </p>
-      </div>
-    </div>
+      {/* Confirmación del reset a valores por defecto */}
+      <AlertDialog
+        open={showResetDialog}
+        onClose={() => setShowResetDialog(false)}
+        tone="warning"
+        title="Reset settings?"
+        description="This restores work schedule, task assignment and tier durations to their default values. This can't be undone."
+        confirmLabel="Reset to defaults"
+        cancelLabel="Cancel"
+        onConfirm={doReset}
+      />
+    </>
   );
 };

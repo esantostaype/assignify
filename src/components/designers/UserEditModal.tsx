@@ -1,16 +1,45 @@
 // src/components/designers/UserEditModal.tsx - FIXED VERSION
 import React from 'react'
+import axios from 'axios'
+import { hotToast as toast } from '@/lib/hotToast'
 import { UserRoleRow } from './UserRoleRow'
 import { UserVacationRow } from './UserVacationRow'
 import { AddRoleForm } from './AddRoleForm'
 import { AddVacationForm } from './AddVacationForm'
-import { Icon, PiUser, PiCalendarBlank } from '@/lib/icons'
-import { useUserDetails, useTaskTypes, useBrands } from '@/hooks/queries/useUsers'
-import { Alert } from '@/components/ui'
+import { Icon, PiUser, PiCalendarBlank, PiMedal } from '@/lib/icons'
+import { useUserDetails, useTaskTypes, useBrands, useUpdateUserLevel, useAddUserRole, useToggleUserRolePrimary } from '@/hooks/queries/useUsers'
+import { Alert, Select, type SelectOption } from '@/components/ui'
+
+type UserLevel = 'JUNIOR' | 'MID' | 'SENIOR'
+
+/**
+ * Extrae el mensaje REAL que devuelve el servidor (el endpoint responde
+ * `{ error, details? }`), p.ej. "Role already exists for this user" en un 409.
+ * Antes el toast era genérico ("Error adding role") y ocultaba la causa.
+ */
+const serverErrorMessage = (error: unknown, fallback: string): string => {
+  if (axios.isAxiosError(error)) {
+    const data = error.response?.data as { error?: string; details?: string } | undefined
+    return data?.error || data?.details || error.message || fallback
+  }
+  if (error instanceof Error) return error.message
+  return fallback
+}
+
+const LEVEL_OPTIONS: SelectOption<UserLevel>[] = [
+  { value: 'JUNIOR', label: 'Junior' },
+  { value: 'MID', label: 'Mid' },
+  { value: 'SENIOR', label: 'Senior' },
+]
 
 interface UserEditModalProps {
   userId: string
-  onAddRole: (typeId: number, brandId?: string) => void
+  /**
+   * Compatibilidad con el wrapper de Designers. El alta de rol se gestiona
+   * internamente (vía useAddUserRole) para poder enviar también `isPrimary`,
+   * así que esta prop ya no se usa directamente para crear el rol.
+   */
+  onAddRole?: (typeId: number, brandId?: string, isPrimary?: boolean) => void
   onDeleteRole: (roleId: number) => void
   onAddVacation: (startDate: string, endDate: string) => void
   onDeleteVacation: (vacationId: number) => void
@@ -24,7 +53,6 @@ interface UserEditModalProps {
 
 export const UserEditModal: React.FC<UserEditModalProps> = ({
   userId,
-  onAddRole,
   onDeleteRole,
   onAddVacation,
   onDeleteVacation,
@@ -48,19 +76,26 @@ export const UserEditModal: React.FC<UserEditModalProps> = ({
     error: brandsError
   } = useBrands()
 
-  // ✅ DEBUG: Log para verificar datos
-  React.useEffect(() => {
-    console.log('🔍 UserEditModal Debug:', {
-      userId,
-      user: user ? { id: user.id, name: user.name, rolesCount: user.roles?.length } : null,
-      taskTypes: taskTypes?.length || 0,
-      brands: brands?.length || 0,
-      loading: { user: loadingUser, types: loadingTypes, brands: loadingBrands },
-      errors: { user: userError, types: typesError, brands: brandsError }
-    })
-  }, [userId, user, taskTypes, brands, loadingUser, loadingTypes, loadingBrands, userError, typesError, brandsError])
+  const { mutate: updateLevel, isPending: updatingLevel } = useUpdateUserLevel(userId, {
+    onSuccess: () => toast.success({ title: 'Level updated', description: 'Auto-assignment recalculated.' }),
+    onError: () => toast.error({ title: 'Error updating level', description: 'The level was not changed.' }),
+  })
 
-  // ✅ Manejo mejorado de errores
+  // Alta de rol gestionada aquí para poder enviar también `isPrimary`.
+  const { mutate: addRole, isPending: addingRole } = useAddUserRole({
+    onSuccess: () => toast.success({ title: 'Role added successfully', description: 'Assigned to the designer.' }),
+    // Muestra el mensaje real del servidor (p.ej. "Role already exists for this
+    // user" en un 409) en lugar del genérico, para que los errores sean visibles.
+    onError: (error) => toast.error({ title: "Couldn't add role", description: serverErrorMessage(error, 'Error adding role') }),
+  })
+
+  // Alterna el cargo primario/secundario de un rol existente.
+  const { mutate: togglePrimary, isPending: togglingPrimary, variables: togglingVars } =
+    useToggleUserRolePrimary(userId, {
+      onSuccess: () => toast.success({ title: 'Primary role updated', description: 'Engine preference updated.' }),
+      onError: () => toast.error({ title: 'Error updating primary role', description: 'The change was not saved.' }),
+    })
+
   if (userError || typesError || brandsError) {
     return (
       <div className="p-6">
@@ -86,20 +121,35 @@ export const UserEditModal: React.FC<UserEditModalProps> = ({
     )
   }
 
-  // ✅ Verificación adicional de datos
-  if (!taskTypes || taskTypes.length === 0) {
-    console.warn('⚠️ No task types loaded')
-  }
-
-  if (!brands || brands.length === 0) {
-    console.warn('⚠️ No brands loaded')
-  }
-
   const showRoleSkeleton = loadingUser || (user && user.roles?.length === 0 && loadingUser);
   const showVacationSkeleton = loadingUser || (user && user.vacations?.length === 0 && loadingUser);
 
   return (
-    <div className="p-8 space-y-6">
+    <div className="space-y-6">
+      {/* Designer Level Section */}
+      <div>
+        <h3 className="text-lg font-medium text-(--color-text-strong) mb-2 flex items-center gap-2">
+          <Icon icon={PiMedal} size={20} />
+          Designer Level
+        </h3>
+        <div className="max-w-[16rem]">
+          <Select<UserLevel>
+            options={LEVEL_OPTIONS}
+            value={(user?.level as UserLevel) ?? 'MID'}
+            onChange={(value) => updateLevel(value)}
+            disabled={loadingUser || updatingLevel}
+            placeholder={loadingUser ? 'Loading...' : 'Select level'}
+            size="sm"
+          />
+        </div>
+        <p className="mt-1.5 text-sm text-(--color-text-subtle)">
+          Drives auto-assignment escalation (Jr → Mid → Sr).
+        </p>
+      </div>
+
+      {/* Divider */}
+      <div className="border-t border-(--color-border-default)" />
+
       {/* User Roles Section */}
       <div>
         <h3 className="text-lg font-medium text-(--color-text-strong) mb-2 flex items-center gap-2">
@@ -114,6 +164,7 @@ export const UserEditModal: React.FC<UserEditModalProps> = ({
               <tr>
                 <th className="p-2 first:pl-4 last:pr-4 text-left text-sm font-medium text-gray-300">Type</th>
                 <th className="p-2 first:pl-4 last:pr-4 text-left text-sm font-medium text-gray-300">Brand</th>
+                <th className="p-2 first:pl-4 last:pr-4 text-left text-sm font-medium text-gray-300">Primary</th>
                 <th className="p-2 first:pl-4 last:pr-4 text-left text-sm font-medium text-gray-300 w-[5rem]">Actions</th>
               </tr>
             </thead>
@@ -123,13 +174,15 @@ export const UserEditModal: React.FC<UserEditModalProps> = ({
                   key={role.id}
                   role={role}
                   onDelete={onDeleteRole}
+                  onTogglePrimary={(roleId, isPrimary) => togglePrimary({ roleId, isPrimary })}
                   deleting={loadingStates.deletingRole === role.id}
+                  togglingPrimary={togglingPrimary && togglingVars?.roleId === role.id}
                   loading={loadingUser}
                 />
               ))}
               {(showRoleSkeleton || (user && user.roles.length === 0)) && (
                 <tr>
-                  <td colSpan={3} className="px-3 py-4 text-center text-(--color-text-subtle)">
+                  <td colSpan={4} className="px-3 py-4 text-center text-(--color-text-subtle)">
                     {showRoleSkeleton ? 'Loading roles...' : 'No roles assigned'}
                   </td>
                 </tr>
@@ -142,8 +195,10 @@ export const UserEditModal: React.FC<UserEditModalProps> = ({
         <AddRoleForm
           taskTypes={taskTypes}
           brands={brands}
-          onAdd={onAddRole}
-          loading={loadingStates.addingRole}
+          onAdd={(typeId, brandId, isPrimary) =>
+            addRole({ userId, typeId, brandId: brandId || null, isPrimary })
+          }
+          loading={addingRole || loadingStates.addingRole}
           loadingTypes={loadingTypes}
           loadingBrands={loadingBrands}
         />

@@ -3,8 +3,14 @@
 
 import { NextResponse } from 'next/server';
 import axios from 'axios';
-import { prisma } from '@/utils/prisma';
+import { db } from '@/db';
+import { user, userRole } from '@/db/schema';
+import { eq } from 'drizzle-orm';
+import { getActiveClickUpTasksByUser } from '@/services/clickup-tasks.service';
 import { API_CONFIG } from '@/config';
+
+// Lee DB y consulta ClickUp en vivo: nunca pre-renderizar/cachear en build.
+export const dynamic = 'force-dynamic';
 
 const CLICKUP_TOKEN = process.env.CLICKUP_API_TOKEN;
 
@@ -50,11 +56,11 @@ export async function GET(req: Request, { params }: RouteParams) {
         }
       ),
       // Verificar si existe en la DB local
-      prisma.user.findUnique({
-        where: { id: userId },
-        include: {
+      db.query.user.findFirst({
+        where: eq(user.id, userId),
+        with: {
           roles: {
-            include: {
+            with: {
               type: true
             }
           }
@@ -170,9 +176,9 @@ export async function POST(req: Request, { params }: RouteParams) {
     console.log(`🔄 Sincronizando usuario individual ${userId}...`);
 
     // Verificar que el usuario no exista ya en la DB local
-    const existingUser = await prisma.user.findUnique({
-      where: { id: userId },
-      select: { id: true, name: true }
+    const existingUser = await db.query.user.findFirst({
+      where: eq(user.id, userId),
+      columns: { id: true, name: true }
     });
 
     if (existingUser) {
@@ -214,14 +220,15 @@ export async function POST(req: Request, { params }: RouteParams) {
     }
 
     // Crear usuario en la base de datos local
-    const newUser = await prisma.user.create({
-      data: {
+    const [newUser] = await db
+      .insert(user)
+      .values({
         id: clickupUser.id.toString(),
         name: clickupUser.username,
         email: clickupUser.email,
         active: true,
-      }
-    });
+      })
+      .returning();
 
     console.log(`✅ Usuario ${newUser.name} sincronizado exitosamente`);
 
@@ -273,11 +280,10 @@ export async function DELETE(req: Request, { params }: RouteParams) {
     console.log(`🗑️ Eliminando usuario ${userId} de la base de datos local...`);
 
     // Verificar que el usuario existe
-    const existingUser = await prisma.user.findUnique({
-      where: { id: userId },
-      include: {
-        roles: true,
-        tasks: true
+    const existingUser = await db.query.user.findFirst({
+      where: eq(user.id, userId),
+      with: {
+        roles: true
       }
     });
 
@@ -288,25 +294,23 @@ export async function DELETE(req: Request, { params }: RouteParams) {
       }, { status: 404 });
     }
 
-    // Verificar que no tenga tareas asignadas
-    if (existingUser.tasks.length > 0) {
+    // Verificar que no tenga tareas asignadas. Las tareas viven en ClickUp (no en
+    // la DB local), así que consultamos la fuente en vivo en lugar de una tabla local.
+    const assignedTasks = await getActiveClickUpTasksByUser(userId);
+    if (assignedTasks.length > 0) {
       return NextResponse.json({
         error: 'No se puede eliminar: el usuario tiene tareas asignadas',
-        taskCount: existingUser.tasks.length
+        taskCount: assignedTasks.length
       }, { status: 409 });
     }
 
     // Eliminar roles primero (si existen)
     if (existingUser.roles.length > 0) {
-      await prisma.userRole.deleteMany({
-        where: { userId: userId }
-      });
+      await db.delete(userRole).where(eq(userRole.userId, userId));
     }
 
     // Eliminar usuario
-    await prisma.user.delete({
-      where: { id: userId }
-    });
+    await db.delete(user).where(eq(user.id, userId));
 
     console.log(`✅ Usuario ${existingUser.name} eliminado exitosamente`);
 

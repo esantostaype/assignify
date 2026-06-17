@@ -1,8 +1,13 @@
 // src/app/api/tasks/suggestion/simple/route.ts
 import { NextResponse } from 'next/server';
-import { Priority } from '@prisma/client';
+import { Priority, Level } from '@/db/enums';
 import { getBestUserWithCache } from '@/services/task-assignment.service';
-import { prisma } from '@/utils/prisma';
+import { db } from '@/db';
+import { brand as brandTable } from '@/db/schema';
+import { eq } from 'drizzle-orm';
+
+// Lee DB y ClickUp en vivo, usa request.url: nunca pre-renderizar/cachear en build.
+export const dynamic = 'force-dynamic';
 
 export async function GET(req: Request) {
   try {
@@ -15,86 +20,71 @@ export async function GET(req: Request) {
       ? priorityParam
       : 'NORMAL') as Priority;
 
+    // Nivel solicitado (opcional; default MID). Solo decide el diseñador, no se persiste.
+    const levelParam = (searchParams.get('level') || 'MID').toUpperCase();
+    const level: Level = (['JUNIOR', 'MID', 'SENIOR'].includes(levelParam)
+      ? levelParam
+      : 'MID') as Level;
+
     // ✅ VALIDACIÓN SOLO DE PARÁMETROS ESENCIALES
     if (!typeId || typeId <= 0) {
-      return NextResponse.json({ 
-        error: 'typeId es requerido y debe ser un número válido mayor a 0',
+      return NextResponse.json({
+        error: 'typeId is required and must be a valid number greater than 0',
         received: typeId
       }, { status: 400 });
     }
 
     if (!durationDays || durationDays <= 0) {
-      return NextResponse.json({ 
-        error: 'durationDays es requerido y debe ser un número mayor a 0',
+      return NextResponse.json({
+        error: 'durationDays is required and must be a number greater than 0',
         received: durationDays
       }, { status: 400 });
     }
 
-    console.log(`🔍 === SUGERENCIA FLEXIBLE ===`);
-    console.log(`📋 Parámetros:`);
-    console.log(`   - Type ID: ${typeId}`);
-    console.log(`   - Duration Days: ${durationDays}`);
-    console.log(`   - Brand ID: ${brandId || 'global (all brands)'}`);
-
     // ✅ LÓGICA FLEXIBLE: Usar brandId si está disponible, sino buscar globalmente
     let bestSlot;
-    
+
     if (brandId) {
       // Con brand específico
-      console.log(`🎯 Buscando usuario para brand específico: ${brandId}`);
       bestSlot = await getBestUserWithCache(
         typeId,
         brandId,
         priority,
-        durationDays
+        durationDays,
+        level
       );
     } else {
       // ✅ FALLBACK: Buscar en todos los brands activos
-      console.log(`🌍 Buscando usuario globalmente (sin brand específico)`);
-      
-      // Obtener todos los brands activos
-      const activeBrands = await prisma.brand.findMany({
-        where: { isActive: true },
-        select: { id: true, name: true }
+      const activeBrands = await db.query.brand.findMany({
+        where: eq(brandTable.isActive, true),
+        columns: { id: true, name: true }
       });
-
-      console.log(`📊 Brands activos encontrados: ${activeBrands.length}`);
 
       // Intentar con cada brand hasta encontrar un usuario
       for (const brand of activeBrands) {
-        console.log(`   🔍 Intentando con brand: ${brand.name} (${brand.id})`);
-        
         const candidateSlot = await getBestUserWithCache(
           typeId,
           brand.id,
           priority,
-          durationDays
+          durationDays,
+          level
         );
 
         if (candidateSlot) {
           bestSlot = candidateSlot;
-          console.log(`   ✅ Usuario encontrado en brand: ${brand.name}`);
           break;
         }
       }
     }
 
     if (!bestSlot) {
-      console.log('❌ No se encontró usuario óptimo en ningún brand');
-      
-      return NextResponse.json({ 
-        error: 'No se pudo encontrar un diseñador óptimo',
-        details: brandId 
-          ? `No hay usuarios disponibles para el brand ${brandId}` 
-          : 'No hay usuarios disponibles en ningún brand activo'
+      return NextResponse.json({
+        error: 'Could not find an optimal designer',
+        details: brandId
+          ? `No available users for brand ${brandId}`
+          : 'No available users in any active brand'
       }, { status: 400 });
     }
-
-    console.log(`✅ Sugerencia generada:`);
-    console.log(`   👤 Usuario: ${bestSlot.userName} (ID: ${bestSlot.userId})`);
-    console.log(`   📊 Carga actual: ${bestSlot.cargaTotal} tareas`);
-    console.log(`   📅 Disponible desde: ${bestSlot.availableDate.toISOString()}`);
-    console.log(`   🎯 Es especialista: ${bestSlot.isSpecialist ? 'Sí' : 'No'}`);
 
     // ✅ RESPUESTA EXITOSA
     return NextResponse.json({
@@ -105,23 +95,25 @@ export async function GET(req: Request) {
         currentLoad: bestSlot.cargaTotal,
         isSpecialist: bestSlot.isSpecialist,
         availableFrom: bestSlot.availableDate.toISOString(),
-        totalAssignedDurationDays: bestSlot.totalAssignedDurationDays
+        totalAssignedDurationDays: bestSlot.totalAssignedDurationDays,
+        level: bestSlot.level
       },
       metadata: {
         typeId: typeId,
         durationDays: durationDays,
         brandId: brandId || 'global',
+        requestedLevel: level,
         generatedAt: new Date().toISOString(),
         algorithm: 'duration-balanced-assignment-flexible'
       }
     });
 
   } catch (error) {
-    console.error('❌ Error al obtener sugerencia flexible:', error);
-    
+    console.error('Failed to generate suggestion:', error);
+
     return NextResponse.json({
-      error: 'Error interno del servidor al obtener sugerencia',
-      details: error instanceof Error ? error.message : 'Error desconocido',
+      error: 'Internal server error while generating suggestion',
+      details: error instanceof Error ? error.message : 'Unknown error',
       timestamp: new Date().toISOString()
     }, { status: 500 });
   }

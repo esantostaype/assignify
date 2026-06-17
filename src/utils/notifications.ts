@@ -1,8 +1,6 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
 // src/utils/notifications.ts
-// Notificaciones nativas del navegador + sonido para eventos en tiempo real.
-
-let audioCtx: AudioContext | null = null
+// Notificaciones nativas del navegador + sonido (public/images/alert.mp3) para
+// eventos en tiempo real.
 
 /** Pide permiso de notificaciones tras el primer gesto del usuario (política de Chrome). */
 export function requestNotificationPermission(): void {
@@ -21,44 +19,22 @@ export function requestNotificationPermission(): void {
   window.addEventListener('keydown', ask, { once: true })
 }
 
+// Elemento de audio reutilizado para el sonido de alerta.
+let alertAudio: HTMLAudioElement | null = null
 
-/** Reproduce un "ding-dong" corto con Web Audio (no requiere archivos). */
+/** Reproduce el sonido de alerta (public/images/alert.mp3). */
 export function playNotificationSound(): void {
   if (typeof window === 'undefined') return
   try {
-    const Ctx = window.AudioContext || (window as any).webkitAudioContext
-    if (!Ctx) return
-    if (!audioCtx) audioCtx = new Ctx()
-    // Los navegadores suspenden el audio hasta que hay interacción del usuario.
-    if (audioCtx.state === 'suspended') audioCtx.resume().catch(() => {})
-
-    const now = audioCtx.currentTime
-
-    // Ganancia maestra alta para que se escuche bien.
-    const master = audioCtx.createGain()
-    master.gain.value = 0.85
-    master.connect(audioCtx.destination)
-
-    // Campanada doble ascendente con cuerpo (triangle) y buen sustain.
-    const tones = [
-      { freq: 784, at: 0, dur: 0.22 },
-      { freq: 1047, at: 0.18, dur: 0.4 },
-    ]
-    for (const { freq, at, dur } of tones) {
-      const osc = audioCtx.createOscillator()
-      const gain = audioCtx.createGain()
-      osc.connect(gain)
-      gain.connect(master)
-      osc.type = 'triangle'
-      osc.frequency.value = freq
-      gain.gain.setValueAtTime(0.0001, now + at)
-      gain.gain.exponentialRampToValueAtTime(0.9, now + at + 0.02)
-      gain.gain.exponentialRampToValueAtTime(0.0001, now + at + dur)
-      osc.start(now + at)
-      osc.stop(now + at + dur + 0.05)
+    if (!alertAudio) {
+      alertAudio = new Audio('/images/alert.mp3')
+      alertAudio.volume = 0.7
     }
+    alertAudio.currentTime = 0
+    // El navegador bloquea autoplay sin interacción previa; si falla, silencioso.
+    void alertAudio.play().catch(() => {})
   } catch {
-    // Silencioso si el navegador bloquea el audio.
+    // ignore
   }
 }
 

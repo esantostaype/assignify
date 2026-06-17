@@ -2,8 +2,13 @@
 
 import { NextResponse } from 'next/server';
 import axios from 'axios';
-import { prisma } from '@/utils/prisma';
+import { db } from '@/db';
+import { user } from '@/db/schema';
+import { inArray } from 'drizzle-orm';
 import { API_CONFIG } from '@/config';
+
+// Lee/escribe DB y consulta ClickUp en vivo: nunca pre-renderizar/cachear en build.
+export const dynamic = 'force-dynamic';
 
 const CLICKUP_TOKEN = process.env.CLICKUP_API_TOKEN;
 
@@ -116,8 +121,8 @@ export async function GET() {
     console.log(`👥 Usuarios únicos encontrados en ClickUp: ${uniqueUsers.length}`);
 
     // Obtener usuarios existentes en la DB local
-    const localUsers = await prisma.user.findMany({
-      select: { id: true, name: true, email: true, active: true }
+    const localUsers = await db.query.user.findMany({
+      columns: { id: true, name: true, email: true, active: true }
     });
 
     console.log(`💾 Usuarios en DB local: ${localUsers.length}`);
@@ -280,11 +285,9 @@ export async function POST(req: Request) {
     console.log(`✅ Datos obtenidos para ${usersData.length} usuarios (${notFoundUsers.length} no encontrados)`);
 
     // Verificar que los usuarios no existan ya en la DB local
-    const existingUsers = await prisma.user.findMany({
-      where: {
-        id: { in: userIds }
-      },
-      select: { id: true, name: true }
+    const existingUsers = await db.query.user.findMany({
+      where: inArray(user.id, userIds),
+      columns: { id: true, name: true }
     });
 
     if (existingUsers.length > 0) {
@@ -323,15 +326,16 @@ export async function POST(req: Request) {
 
         console.log(`   Creando usuario: ${userName} (ID: ${userId})`);
 
-        const newUser = await prisma.user.create({
-          data: {
+        const [newUser] = await db
+          .insert(user)
+          .values({
             id: userId,
             name: userName,
             email: userEmail,
             active: true,
             // Los roles se asignarán posteriormente desde la interfaz de administración
-          }
-        });
+          })
+          .returning();
 
         createdUsers.push(newUser);
         console.log(`✅ Usuario creado: ${newUser.name} (${newUser.id})`);

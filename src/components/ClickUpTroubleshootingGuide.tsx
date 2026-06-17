@@ -1,4 +1,4 @@
-// src/components/ClickUpTroubleshootingGuide.tsx - Guía de solución de problemas
+// src/components/ClickUpTroubleshootingGuide.tsx - Troubleshooting guide
 
 "use client";
 
@@ -34,39 +34,39 @@ export const ClickUpTroubleshootingGuide: React.FC<TroubleshootingGuideProps> = 
 
   const commonIssues = [
     {
-      title: "Token de ClickUp inválido",
-      description: "El token de API podría estar expirado o ser incorrecto",
+      title: "Invalid ClickUp token",
+      description: "The API token might be expired or incorrect",
       solutions: [
-        "Verifica que CLICKUP_API_TOKEN esté configurado en las variables de entorno",
-        "Genera un nuevo token en ClickUp Settings → Apps → API Token",
-        "Asegúrate de que el token tenga permisos de lectura para usuarios"
+        "Check that CLICKUP_API_TOKEN is set in the environment variables",
+        "Generate a new token in ClickUp Settings → Apps → API Token",
+        "Make sure the token has read permissions for users"
       ]
     },
     {
-      title: "Usuarios sin ID válido",
-      description: "Algunos miembros del team pueden no tener un ID asignado",
+      title: "Users without a valid ID",
+      description: "Some team members may not have an assigned ID",
       solutions: [
-        "Usuarios invitados que no han aceptado la invitación",
-        "Miembros desactivados o con estado pendiente",
-        "Problemas de sincronización temporal en ClickUp"
+        "Invited users who haven't accepted the invitation",
+        "Deactivated members or members with a pending status",
+        "Temporary sync issues in ClickUp"
       ]
     },
     {
-      title: "Permisos insuficientes",
-      description: "El token podría no tener acceso a todos los teams o usuarios",
+      title: "Insufficient permissions",
+      description: "The token might not have access to all teams or users",
       solutions: [
-        "Verifica que tengas permisos de administrador en el workspace",
-        "Asegúrate de que el token sea de nivel workspace, no de team",
-        "Algunos usuarios podrían estar en teams privados"
+        "Check that you have administrator permissions in the workspace",
+        "Make sure the token is workspace-level, not team-level",
+        "Some users might be in private teams"
       ]
     },
     {
-      title: "Problemas de conectividad",
-      description: "Problemas de red o límites de rate de la API",
+      title: "Connectivity issues",
+      description: "Network problems or API rate limits",
       solutions: [
-        "Revisa tu conexión a internet",
-        "ClickUp podría estar experimentando problemas (status.clickup.com)",
-        "Espera unos minutos antes de reintentar"
+        "Check your internet connection",
+        "ClickUp might be experiencing issues (status.clickup.com)",
+        "Wait a few minutes before retrying"
       ]
     }
   ];
@@ -80,7 +80,7 @@ export const ClickUpTroubleshootingGuide: React.FC<TroubleshootingGuideProps> = 
               <Icon icon={PiBug} size={20} className="mt-0.5 flex-shrink-0" />
               <div className="flex-1">
                 <Typography variant="h6">
-                  Error al sincronizar usuarios de ClickUp
+                  Error syncing ClickUp users
                 </Typography>
                 <Typography variant="bodySm" className="mt-1">
                   {error}
@@ -96,7 +96,7 @@ export const ClickUpTroubleshootingGuide: React.FC<TroubleshootingGuideProps> = 
                   color="error"
                   onClick={onRetryClick}
                 >
-                  Reintentar
+                  Retry
                 </Button>
               )}
 
@@ -119,7 +119,7 @@ export const ClickUpTroubleshootingGuide: React.FC<TroubleshootingGuideProps> = 
                 startIcon={<Icon icon={PiInfo} size={16} />}
                 onClick={() => setShowGuide(!showGuide)}
               >
-                {showGuide ? 'Ocultar' : 'Ver'} Guía
+                {showGuide ? 'Hide' : 'Show'} guide
               </Button>
             </div>
           </div>
@@ -130,7 +130,7 @@ export const ClickUpTroubleshootingGuide: React.FC<TroubleshootingGuideProps> = 
         <Card>
           <Typography variant="h5" className="mb-3 flex items-center gap-2">
             <Icon icon={PiShieldCheck} size={20} />
-            Guía de Solución de Problemas
+            Troubleshooting Guide
           </Typography>
 
           <div className="space-y-3">
@@ -161,13 +161,13 @@ export const ClickUpTroubleshootingGuide: React.FC<TroubleshootingGuideProps> = 
           <div className="mt-4 p-3 bg-blue-900/20 border border-blue-600 rounded-lg">
             <Typography variant="h6" className="mb-2 flex items-center gap-2 text-blue-300">
               <Icon icon={PiGear} size={16} />
-              Configuración Recomendada
+              Recommended Configuration
             </Typography>
             <div className="text-sm text-blue-200 space-y-1">
               <div>• <strong>Token Scope:</strong> Workspace-level API token</div>
-              <div>• <strong>Permisos:</strong> Admin o Owner en el workspace</div>
-              <div>• <strong>Variables de entorno:</strong> CLICKUP_API_TOKEN correctamente configurado</div>
-              <div>• <strong>Network:</strong> Conexión estable a internet</div>
+              <div>• <strong>Permissions:</strong> Admin or Owner in the workspace</div>
+              <div>• <strong>Environment variables:</strong> CLICKUP_API_TOKEN correctly configured</div>
+              <div>• <strong>Network:</strong> Stable internet connection</div>
             </div>
           </div>
         </Card>

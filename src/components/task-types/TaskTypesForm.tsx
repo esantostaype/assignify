@@ -3,19 +3,17 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 "use client";
 import React, { useState, useEffect } from "react";
-import { Button, Input, IconButton, Typography, Spinner } from "@/components/ui";
+import { Button, Input, IconButton, Typography, Spinner, DeleteConfirmDialog } from "@/components/ui";
 import { Icon, PiPlus, PiTrash } from "@/lib/icons";
 import { useTaskDataInvalidation } from "@/hooks/useTaskData";
 import axios from "axios";
-import toast from "react-hot-toast";
-import { useConfirmationStore } from "@/stores/confirmationStore";
+import { hotToast as toast } from "@/lib/hotToast";
 
 interface TaskType {
   id: number;
   name: string;
   description?: string;
   color?: string;
-  categories: any[];
 }
 
 // Agregar este componente dentro del archivo, antes del componente principal:
@@ -23,9 +21,6 @@ const TaskTypeSkeleton: React.FC = () => (
   <tr className="border-t border-(--color-border-default) animate-pulse">
     <td className="p-2 first:pl-4 last:pr-4">
       <div className="h-3 bg-(--color-surface-hover) rounded w-32"></div>
-    </td>
-    <td className="p-2 first:pl-4 last:pr-4">
-      <div className="h-3 bg-(--color-surface-hover) rounded w-20"></div>
     </td>
     <td className="p-2 first:pl-4 last:pr-4">
       <div className="size-8 bg-(--color-surface-hover) rounded"></div>
@@ -43,7 +38,7 @@ export const TaskTypesForm: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState<number | null>(null);
-  const { openConfirmation } = useConfirmationStore();
+  const [pendingDelete, setPendingDelete] = useState<TaskType | null>(null);
 
   // Cargar types
   useEffect(() => {
@@ -54,7 +49,7 @@ export const TaskTypesForm: React.FC = () => {
         setTypes(response.data);
       } catch (error) {
         console.error("Error loading types:", error);
-        toast.error("Error loading task types");
+        toast.error({ title: "Error loading task types", description: "Couldn't reach the server." });
       } finally {
         setLoading(false);
       }
@@ -94,10 +89,10 @@ export const TaskTypesForm: React.FC = () => {
       setEditingId(null);
       setEditingName("");
       invalidateAll();
-      toast.success("Task type updated successfully");
+      toast.success({ title: "Task type updated successfully", description: "Changes saved." });
     } catch (error) {
       console.error("Error updating type:", error);
-      toast.error("Error updating task type");
+      toast.error({ title: "Error updating task type", description: "Changes were not saved." });
     } finally {
       setSaving(false);
     }
@@ -116,12 +111,12 @@ export const TaskTypesForm: React.FC = () => {
       setTypes((prev) => [...prev, response.data]);
       setNewTypeName("");
       invalidateAll();
-      toast.success("Task type created successfully");
+      toast.success({ title: "Task type created successfully", description: "Added to the list." });
     } catch (error: any) {
       console.error("Error creating type:", error);
       const errorMessage =
         error.response?.data?.error || "Error creating task type";
-      toast.error(errorMessage);
+      toast.error({ title: "Couldn't create task type", description: errorMessage });
     } finally {
       setSaving(false);
     }
@@ -135,37 +130,20 @@ export const TaskTypesForm: React.FC = () => {
 
       setTypes((prev) => prev.filter((type) => type.id !== typeId));
       invalidateAll();
-      toast.success("Task type deleted successfully");
+      toast.success({ title: "Task type deleted successfully", description: "Removed from the list." });
     } catch (error: any) {
       console.error("Error deleting type:", error);
       const errorMessage =
         error.response?.data?.error || "Error deleting task type";
-      toast.error(errorMessage);
+      toast.error({ title: "Couldn't delete task type", description: errorMessage });
     } finally {
       setDeleting(null);
     }
   };
 
-  // Nueva función para confirmar eliminación:
-  const confirmDelete = (type: TaskType) => {
-    const categoriesCount = type.categories?.length || 0;
-    const hasCategories = categoriesCount > 0;
-
-    openConfirmation({
-      title: "Delete Task Type",
-      description: `Are you sure you want to delete the task type "${
-        type.name
-      }"?${
-        hasCategories
-          ? ` This will also delete ${categoriesCount} categories and may affect existing tasks.`
-          : " This action cannot be undone."
-      }`,
-      type: "danger",
-      confirmText: "Delete Task Type",
-      cancelText: "Cancel",
-      onConfirm: () => deleteType(type.id, type.name),
-    });
-  };
+  // Description copy reflects whether the type has dependent categories.
+  const deleteDescription = (type: TaskType) => `Are you sure you want to delete the task type "${type.name}"? This action cannot be undone.`
+  
 
   // Handle key press
   const handleKeyPress = (e: React.KeyboardEvent) => {
@@ -181,19 +159,17 @@ export const TaskTypesForm: React.FC = () => {
   };
 
   return (
-    <div className="p-8">
+    <>
+    <div className="space-y-6">
       {/* Existing Types Table */}
       {loading || types.length > 0 ? (
-        <div className="mb-6">
+        <div>
           <div className="border border-(--color-border-default) rounded-lg overflow-hidden">
             <table className="w-full text-sm">
               <thead className="bg-(--color-surface-hover)">
                 <tr>
                   <th className="p-2 first:pl-4 last:pr-4 text-left text-sm font-medium text-gray-300">
                     <span>Name</span>
-                  </th>
-                  <th className="p-2 first:pl-4 last:pr-4 text-left text-sm font-medium text-gray-300">
-                    <span>Categories</span>
                   </th>
                   <th className="p-2 first:pl-4 last:pr-4 text-left text-sm font-medium text-gray-300 w-[5rem]">
                     <span>Actions</span>
@@ -233,19 +209,12 @@ export const TaskTypesForm: React.FC = () => {
                       </td>
                       <td className="p-2 first:pl-4 last:pr-4">
                         <div>
-                          <span className="text-sm text-(--color-text-muted)">
-                            {type.categories?.length || 0} categories
-                          </span>
-                        </div>
-                      </td>
-                      <td className="p-2 first:pl-4 last:pr-4">
-                        <div>
                           <IconButton
                             aria-label="Delete task type"
                             size="sm"
                             color="error"
                             variant="soft"
-                            onClick={() => confirmDelete(type)}
+                            onClick={() => setPendingDelete(type)}
                             disabled={editingId === type.id || deleting === type.id}
                           >
                             {deleting === type.id ? (
@@ -291,14 +260,19 @@ export const TaskTypesForm: React.FC = () => {
           </Button>
         </div>
       </div>
-
-      {/* Instructions */}
-      <div className="mt-6 pt-4 border-t border-(--color-border-default)">
-        <p className="text-sm text-(--color-text-muted) text-center">
-          Click on a task type name to edit it • Press Enter to save • Press
-          Escape to cancel
-        </p>
-      </div>
     </div>
+
+    <DeleteConfirmDialog
+      open={!!pendingDelete}
+      onClose={() => setPendingDelete(null)}
+      onConfirm={() => {
+        if (pendingDelete) deleteType(pendingDelete.id, pendingDelete.name);
+        setPendingDelete(null);
+      }}
+      title="Delete Task Type"
+      description={pendingDelete ? deleteDescription(pendingDelete) : undefined}
+      confirmLabel="Delete Task Type"
+    />
+    </>
   );
 };

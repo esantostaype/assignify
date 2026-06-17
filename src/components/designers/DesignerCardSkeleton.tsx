@@ -1,21 +1,34 @@
 // src/components/designers/DesignerCardSkeleton.tsx
-import { Skeleton } from '@/components/ui'
+// UN único skeleton que refleja SyncedDesignerCard: cabecera (avatar + nombre /
+// puesto + botón editar), barra de carga (label + valor + barra) y línea de
+// disponibilidad con el chip de estado. Sin email (la tarjeta ya no lo muestra).
+import { Card, Skeleton } from '@/components/ui'
 
-// Refleja la forma de UserCard: avatar, nombre, estado, email, id y "Active".
 export const DesignerCardSkeleton = () => (
-  <div className="p-6 rounded-lg bg-primary-500/10 border-2 border-transparent flex flex-col items-center gap-4">
-    <Skeleton variant="circle" width={80} height={80} />
-
-    <div className="flex flex-col items-center gap-2">
-      <Skeleton variant="text" width={140} height={18} />
-      <Skeleton variant="text" width={90} />
+  <Card variant="outlined" padding="md" className="flex flex-col gap-3">
+    {/* Cabecera: avatar + nombre/puesto + botón editar */}
+    <div className="flex items-start gap-3">
+      <Skeleton variant="circle" width={44} height={44} />
+      <div className="flex flex-1 flex-col gap-1.5 pt-1">
+        <Skeleton variant="text" width="55%" />
+        <Skeleton variant="text" width="40%" />
+      </div>
+      <Skeleton variant="rect" width={32} height={32} className="rounded-md" />
     </div>
 
-    <div className="flex w-full flex-col items-center gap-2">
-      <Skeleton variant="text" width="70%" />
+    {/* Carga: label + valor + barra */}
+    <div className="flex flex-col gap-1.5">
+      <div className="flex items-center justify-between">
+        <Skeleton variant="text" width={36} />
+        <Skeleton variant="text" width={88} />
+      </div>
+      <Skeleton variant="rect" height={8} className="rounded-full" />
+    </div>
+
+    {/* Disponibilidad + chip de estado */}
+    <div className="flex items-center justify-between">
       <Skeleton variant="text" width="45%" />
+      <Skeleton variant="rect" width={56} height={22} className="rounded-full" />
     </div>
-
-    <Skeleton variant="text" width={100} />
-  </div>
+  </Card>
 )

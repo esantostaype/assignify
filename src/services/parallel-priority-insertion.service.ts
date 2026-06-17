@@ -9,10 +9,14 @@
 //   HIGH    → en cola tras la última URGENT/HIGH (en paralelo con NORMAL/LOW).
 //   NORMAL  → en cola tras la última URGENT/HIGH/NORMAL (en paralelo con LOW).
 //   LOW     → al final (en cola tras todas).
-import { prisma } from '@/utils/prisma';
-import { Priority } from '@prisma/client';
+import { db } from '@/db';
+import { user as userTable, userVacation } from '@/db/schema';
+import { eq, gte } from 'drizzle-orm';
+import { Priority } from '@/db/enums';
 import { getNextAvailableStart, calculateWorkingDeadline } from '@/utils/task-calculation-utils';
 import { UserVacation } from '@/interfaces';
+import { getActiveClickUpTasksByUser } from '@/services/clickup-tasks.service';
+import { mapClickUpPriority } from '@/utils/clickup-status-mapping-utils';
 
 // Rango de prioridad: mayor número = más prioritaria.
 const PRIORITY_RANK: Record<Priority, number> = { LOW: 1, NORMAL: 2, HIGH: 3, URGENT: 4 };
@@ -88,9 +92,9 @@ async function applyVacationLogic(
   result: ParallelInsertionResult,
   taskDurationDays: number
 ): Promise<ParallelInsertionResult> {
-  const userWithVacations = await prisma.user.findUnique({
-    where: { id: userId },
-    include: { vacations: { where: { endDate: { gte: new Date() } } } },
+  const userWithVacations = await db.query.user.findFirst({
+    where: eq(userTable.id, userId),
+    with: { vacations: { where: gte(userVacation.endDate, new Date()) } },
   });
 
   const upcomingVacations: UserVacation[] = (userWithVacations?.vacations ?? []).map((v) => ({
@@ -145,15 +149,19 @@ export async function calculateParallelPriorityInsertion(
   const now = new Date();
   const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
 
-  // Tareas activas (no completadas) del usuario que aún cuentan (deadline >= hoy).
-  const tasks = (await prisma.task.findMany({
-    where: {
-      assignees: { some: { userId } },
-      status: { notIn: ['COMPLETE'] },
-      deadline: { gte: todayStart },
-    },
-    select: { id: true, name: true, startDate: true, deadline: true, priority: true },
-  })) as TaskRow[];
+  // Tareas activas del usuario leídas EN VIVO de ClickUp (no de la DB).
+  // fetchActiveClickUpTasks ya excluye completadas; conservamos solo las que aún
+  // cuentan (deadline >= hoy) para el cálculo de carriles por prioridad.
+  const clickUpTasks = await getActiveClickUpTasksByUser(userId);
+  const tasks: TaskRow[] = clickUpTasks
+    .map((t) => ({
+      id: t.clickupId,
+      name: t.name,
+      startDate: new Date(t.startDate),
+      deadline: new Date(t.dueDate),
+      priority: mapClickUpPriority(t.priority),
+    }))
+    .filter((t) => t.deadline >= todayStart);
 
   const rank = PRIORITY_RANK[priority];
   // El "carril": tareas de prioridad IGUAL o MAYOR — la nueva se encola tras ellas.

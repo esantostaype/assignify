@@ -1,7 +1,8 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-// src/hooks/queries/useUsers.ts - FIXED VERSION
+// src/hooks/queries/useUsers.ts
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import axios from 'axios'
+import { workloadKeys } from './useWorkload'
 
 // Types
 interface ClickUpUser {
@@ -30,16 +31,21 @@ interface UserSyncResponse {
   teams: any[]
 }
 
+type UserLevel = 'JUNIOR' | 'MID' | 'SENIOR'
+
 interface DetailedUser {
   id: string
   name: string
   email: string
   active: boolean
+  level: UserLevel
   roles: Array<{
     id: number
     userId: string
     typeId: number
     brandId?: string | null
+    // Cargo primario (true) vs secundario (false) para este tipo de tarea.
+    isPrimary: boolean
     type: {
       id: number
       name: string
@@ -92,10 +98,16 @@ export const useUserDetails = (userId: string, enabled = true) => {
   return useQuery({
     queryKey: userKeys.details(userId),
     queryFn: async (): Promise<DetailedUser> => {
-      const { data } = await axios.get(`/api/users/${userId}/details`)
+      const { data } = await axios.get(`/api/users/${userId}`)
       return data
     },
     enabled: enabled && !!userId,
+    // El detalle alimenta el modal de edición, donde el usuario edita en vivo
+    // (nivel, roles, vacaciones) y espera ver el cambio al instante. El
+    // staleTime global de 5 min hacía que al reabrir mostrara datos viejos:
+    // aquí forzamos que siempre esté fresco y se refetchee al montar.
+    staleTime: 0,
+    refetchOnMount: 'always',
   })
 }
 
@@ -142,36 +154,37 @@ export const useSyncUsers = (options?: {
 
 export const useAddUserRole = (options?: {
   onSuccess?: () => void
-  onError?: () => void
+  onError?: (error: unknown) => void
 }) => {
   const queryClient = useQueryClient()
-  
+
   return useMutation({
-    mutationFn: async (payload: { userId: string; typeId: number; brandId?: string | null }) => {
-      const { data } = await axios.post('/api/users/roles', payload)
+    mutationFn: async (payload: { userId: string; typeId: number; brandId?: string | null; isPrimary?: boolean }) => {
+      const { userId, ...body } = payload
+      const { data } = await axios.post(`/api/users/${userId}/roles`, body)
       return data
     },
     onSuccess: (_, variables) => {
-      // ✅ FIX: Invalidate user details to refetch roles
+      // Refresca el modal (detalle) y la tarjeta/lista (workload + clickup users),
+      // que muestran roles/nivel/estado del diseñador.
       queryClient.invalidateQueries({ queryKey: userKeys.details(variables.userId) })
-      
-      // ✅ NEW: Comprehensive cache invalidation for task assignment
+      queryClient.invalidateQueries({ queryKey: workloadKeys.all })
+      queryClient.invalidateQueries({ queryKey: userKeys.clickup() })
+
+      // Invalidación de los caches del motor de asignación.
       queryClient.invalidateQueries({ queryKey: ['task-suggestion'] })
       queryClient.invalidateQueries({ queryKey: ['compatible-users'] })
       queryClient.invalidateQueries({ queryKey: ['user-slots'] })
       queryClient.invalidateQueries({ queryKey: ['best-user-selection'] })
-      
-      // ✅ NEW: Also invalidate task data queries (for user compatibility)
       queryClient.invalidateQueries({ queryKey: ['task-data'] })
-      
-      console.log('🔄 Cache invalidated after role addition - task suggestions will be recalculated')
+
       options?.onSuccess?.()
     },
     onError: options?.onError,
   })
 }
 
-// ✅ FIXED: Proper deletion with userId context
+// Eliminación de rol con el userId en contexto para poder invalidar su detalle.
 export const useDeleteUserRole = (userId: string, options?: {
   onSuccess?: () => void
   onError?: () => void
@@ -180,21 +193,65 @@ export const useDeleteUserRole = (userId: string, options?: {
   
   return useMutation({
     mutationFn: async (roleId: number) => {
-      await axios.delete(`/api/users/roles/${roleId}`)
+      await axios.delete(`/api/users/${userId}/roles/${roleId}`)
       return { roleId, userId }
     },
     onSuccess: (data) => {
-      // ✅ FIX: Now we always have userId to invalidate
+      // Refresca el modal (detalle) y la tarjeta/lista (workload + clickup users).
       queryClient.invalidateQueries({ queryKey: userKeys.details(data.userId) })
-      
-      // ✅ NEW: Comprehensive cache invalidation for task assignment
+      queryClient.invalidateQueries({ queryKey: workloadKeys.all })
+      queryClient.invalidateQueries({ queryKey: userKeys.clickup() })
+
+      // Invalidación de los caches del motor de asignación.
       queryClient.invalidateQueries({ queryKey: ['task-suggestion'] })
       queryClient.invalidateQueries({ queryKey: ['compatible-users'] })
       queryClient.invalidateQueries({ queryKey: ['user-slots'] })
       queryClient.invalidateQueries({ queryKey: ['best-user-selection'] })
       queryClient.invalidateQueries({ queryKey: ['task-data'] })
-      
-      console.log('🔄 Cache invalidated after role deletion - task suggestions will be recalculated')
+
+      options?.onSuccess?.()
+    },
+    onError: options?.onError,
+  })
+}
+
+// Alterna (o fija) el flag `isPrimary` de un rol. Como afecta a qué diseñador
+// prefiere el motor, invalida también los caches de asignación.
+export const useToggleUserRolePrimary = (userId: string, options?: {
+  onSuccess?: () => void
+  onError?: () => void
+}) => {
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: async (payload: { roleId: number; isPrimary: boolean }) => {
+      const { data } = await axios.patch(`/api/users/${userId}/roles/${payload.roleId}`, {
+        isPrimary: payload.isPrimary,
+      })
+      return data
+    },
+    onSuccess: (_, { roleId, isPrimary }) => {
+      // Actualización OPTIMISTA: el Switch de la fila refleja `role.isPrimary`
+      // desde esta query, así que lo escribimos al instante en vez de esperar
+      // al refetch.
+      queryClient.setQueryData<DetailedUser>(userKeys.details(userId), (old) =>
+        old
+          ? { ...old, roles: old.roles.map((r) => (r.id === roleId ? { ...r, isPrimary } : r)) }
+          : old
+      )
+
+      // El cargo primario define el título del puesto que muestra la tarjeta:
+      // refrescar detalle + workload + lista de usuarios.
+      queryClient.invalidateQueries({ queryKey: userKeys.details(userId) })
+      queryClient.invalidateQueries({ queryKey: workloadKeys.all })
+      queryClient.invalidateQueries({ queryKey: userKeys.clickup() })
+
+      queryClient.invalidateQueries({ queryKey: ['task-suggestion'] })
+      queryClient.invalidateQueries({ queryKey: ['compatible-users'] })
+      queryClient.invalidateQueries({ queryKey: ['user-slots'] })
+      queryClient.invalidateQueries({ queryKey: ['best-user-selection'] })
+      queryClient.invalidateQueries({ queryKey: ['task-data'] })
+
       options?.onSuccess?.()
     },
     onError: options?.onError,
@@ -209,27 +266,28 @@ export const useAddUserVacation = (options?: {
   
   return useMutation({
     mutationFn: async (payload: { userId: string; startDate: string; endDate: string }) => {
-      const { data } = await axios.post('/api/users/vacations', payload)
+      const { userId, ...body } = payload
+      const { data } = await axios.post(`/api/users/${userId}/vacations`, body)
       return data
     },
     onSuccess: (_, variables) => {
-      // ✅ FIX: Invalidate user details to refetch vacations
+      // Refresca el modal (detalle) y la tarjeta (workload: estado "On vacation").
       queryClient.invalidateQueries({ queryKey: userKeys.details(variables.userId) })
-      
-      // ✅ NEW: Vacation-specific cache invalidation (affects task assignment logic)
+      queryClient.invalidateQueries({ queryKey: workloadKeys.all })
+
+      // Las vacaciones afectan la lógica de disponibilidad del motor.
       queryClient.invalidateQueries({ queryKey: ['task-suggestion'] })
       queryClient.invalidateQueries({ queryKey: ['user-slots'] })
       queryClient.invalidateQueries({ queryKey: ['best-user-selection'] })
       queryClient.invalidateQueries({ queryKey: ['vacation-aware'] })
-      
-      console.log('🏖️ Cache invalidated after vacation addition - vacation-aware logic will recalculate')
+
       options?.onSuccess?.()
     },
     onError: options?.onError,
   })
 }
 
-// ✅ FIXED: Proper deletion with userId context
+// Eliminación de vacación con el userId en contexto para invalidar su detalle.
 export const useDeleteUserVacation = (userId: string, options?: {
   onSuccess?: () => void
   onError?: () => void
@@ -238,20 +296,57 @@ export const useDeleteUserVacation = (userId: string, options?: {
   
   return useMutation({
     mutationFn: async (vacationId: number) => {
-      await axios.delete(`/api/users/vacations/${vacationId}`)
+      await axios.delete(`/api/users/${userId}/vacations/${vacationId}`)
       return { vacationId, userId }
     },
     onSuccess: (data) => {
-      // ✅ FIX: Now we always have userId to invalidate
+      // Refresca el modal (detalle) y la tarjeta (workload: estado "On vacation").
       queryClient.invalidateQueries({ queryKey: userKeys.details(data.userId) })
-      
-      // ✅ NEW: Vacation-specific cache invalidation
+      queryClient.invalidateQueries({ queryKey: workloadKeys.all })
+
+      // Las vacaciones afectan la lógica de disponibilidad del motor.
       queryClient.invalidateQueries({ queryKey: ['task-suggestion'] })
       queryClient.invalidateQueries({ queryKey: ['user-slots'] })
       queryClient.invalidateQueries({ queryKey: ['best-user-selection'] })
       queryClient.invalidateQueries({ queryKey: ['vacation-aware'] })
-      
-      console.log('🏖️ Cache invalidated after vacation deletion - vacation-aware logic will recalculate')
+
+      options?.onSuccess?.()
+    },
+    onError: options?.onError,
+  })
+}
+
+// Actualiza el nivel del diseñador (Junior/Mid/Senior). Afecta la asignación automática.
+export const useUpdateUserLevel = (userId: string, options?: {
+  onSuccess?: () => void
+  onError?: () => void
+}) => {
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: async (level: UserLevel) => {
+      const { data } = await axios.patch(`/api/users/${userId}`, { level })
+      return data
+    },
+    onSuccess: (_, level) => {
+      // Actualización OPTIMISTA del detalle: el Select de nivel lee `user.level`
+      // de esta query. Escribirla al instante evita depender del timing del
+      // refetch (que podía repintar con el valor viejo aún en vuelo).
+      queryClient.setQueryData<DetailedUser>(userKeys.details(userId), (old) =>
+        old ? { ...old, level } : old
+      )
+
+      // El nivel se muestra en la tarjeta (p.ej. "Senior UX/UI Designer"):
+      // refrescar detalle + workload + lista de usuarios, y los caches del motor.
+      queryClient.invalidateQueries({ queryKey: userKeys.details(userId) })
+      queryClient.invalidateQueries({ queryKey: workloadKeys.all })
+      queryClient.invalidateQueries({ queryKey: userKeys.clickup() })
+
+      queryClient.invalidateQueries({ queryKey: ['task-suggestion'] })
+      queryClient.invalidateQueries({ queryKey: ['user-slots'] })
+      queryClient.invalidateQueries({ queryKey: ['best-user-selection'] })
+      queryClient.invalidateQueries({ queryKey: ['task-data'] })
+
       options?.onSuccess?.()
     },
     onError: options?.onError,

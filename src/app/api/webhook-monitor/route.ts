@@ -36,22 +36,6 @@ export async function POST(req: Request) {
     
     lastEvents.unshift(eventData)
     if (lastEvents.length > 10) lastEvents = lastEvents.slice(0, 10) // Solo últimos 10
-    
-    // Log inmediato
-    console.log(`\n🔥 WEBHOOK RECEIVED - ${timestamp}`)
-    console.log(`📧 Method: POST`)
-    console.log(`🎯 Event: ${body.event || 'NONE'}`)
-    console.log(`📋 Task ID: ${body.task_id || 'NONE'}`)
-    console.log(`📦 Body size: ${rawBody.length} chars`)
-    console.log(`📊 Total events stored: ${lastEvents.length}`)
-    
-    if (body.event) {
-      console.log(`✅ REAL EVENT DETECTED: ${body.event}`)
-    } else {
-      console.log(`🧪 TEST/PING EVENT (no event type)`)
-    }
-    
-    console.log(`-`.repeat(50))
 
     return NextResponse.json({
       success: true,
@@ -63,8 +47,8 @@ export async function POST(req: Request) {
     })
 
   } catch (error) {
-    console.error('❌ Webhook monitor error:', error)
-    
+    console.error('Webhook monitor error:', error)
+
     const errorData = {
       timestamp,
       method: 'POST',
@@ -90,8 +74,7 @@ export async function GET(req: Request) {
   
   // Handle ClickUp verification
   if (challenge) {
-    console.log('🔐 ClickUp verification challenge:', challenge)
-    return new Response(challenge, { 
+    return new Response(challenge, {
       status: 200,
       headers: { 'Content-Type': 'text/plain' }
     })

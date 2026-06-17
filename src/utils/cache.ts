@@ -43,7 +43,6 @@ export const deleteFromCache = (key: string | string[]): number => {
  */
 export const invalidateAllCache = (): void => {
   appCache.flushAll();
-  console.log('Cache: All items invalidated.');
 };
 
 /**
@@ -55,6 +54,5 @@ export const invalidateCacheByPrefix = (prefix: string): void => {
   const keysToDelete = keys.filter(key => key.startsWith(prefix));
   if (keysToDelete.length > 0) {
     appCache.del(keysToDelete);
-    console.log(`Cache: ${keysToDelete.length} items invalidated with prefix "${prefix}"`);
   }
 };

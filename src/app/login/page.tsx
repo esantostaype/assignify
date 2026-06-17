@@ -17,8 +17,6 @@ export default function LoginPage() {
     setError("");
 
     try {
-      console.log("🔐 Starting login process");
-
       const response = await fetch("/api/auth/login", {
         method: "POST",
         headers: {
@@ -29,16 +27,11 @@ export default function LoginPage() {
       });
 
       const data = await response.json();
-      console.log("📡 Login response:", { success: data.success, status: response.status });
 
       if (data.success) {
-        console.log("✅ Login successful, redirecting...");
-
-        // Redirección inmediata sin delay
+        // Immediate redirect without delay
         window.location.href = '/tasks';
-
       } else {
-        console.log("❌ Login failed:", data.message);
         setError(data.message || "Login failed");
       }
     } catch (error) {

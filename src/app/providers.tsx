@@ -6,7 +6,7 @@ import { QueryProvider } from "@/providers/QueryProvider";
 import { UiThemeProvider } from "@/providers/UiThemeProvider";
 import { AuthProvider, useAuth } from "@/contexts/AuthContext";
 import { usePathname } from "next/navigation";
-import { Toaster } from "react-hot-toast";
+import { HotToaster } from "@/lib/hotToast";
 
 // Wrapper condicional para AuthProvider
 function ConditionalAuthWrapper({ children }: { children: React.ReactNode }) {
@@ -36,7 +36,7 @@ export const Providers = ({ children }: { children: React.ReactNode }) => {
       <QueryProvider>
         <ConditionalAuthWrapper>
           {children}
-          <Toaster position="top-right" />
+          <HotToaster />
         </ConditionalAuthWrapper>
       </QueryProvider>
     </UiThemeProvider>
