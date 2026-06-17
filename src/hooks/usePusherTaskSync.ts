@@ -6,6 +6,7 @@ import { useEffect, useRef } from 'react'
 import PusherClient from 'pusher-js'
 import { useQueryClient } from '@tanstack/react-query'
 import { taskKeys } from '@/hooks/queries/useTasks'
+import { workloadKeys } from '@/hooks/queries/useWorkload'
 import { requestNotificationPermission, notifyTaskChange } from '@/utils/notifications'
 
 interface TaskUpdatePayload {
@@ -46,6 +47,8 @@ export const usePusherTaskSync = () => {
       }
       // El kanban lee en vivo desde ClickUp → re-pedir la query para repintar (siempre).
       queryClient.invalidateQueries({ queryKey: taskKeys.clickup() })
+      // El panel "Carga del equipo" también depende de las tareas → refrescarlo.
+      queryClient.invalidateQueries({ queryKey: workloadKeys.all })
 
       // Anti-duplicados: si el mismo taskId llegó hace < 4s, no volver a notificar.
       const now = Date.now()

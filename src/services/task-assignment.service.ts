@@ -386,7 +386,9 @@ async function getVacationAwareUserSlots(
   
   const allRelevantTasks = await prisma.task.findMany({
     where: {
-      typeId: typeId,
+      // No filtramos por typeId: la disponibilidad y la carga de un diseñador
+      // dependen de TODAS sus tareas pendientes (está ocupado sin importar el tipo
+      // de la tarea nueva). Filtrar por tipo subestimaba la carga real.
       status: { in: OCCUPYING_STATUSES },
       assignees: { some: { userId: { in: userIds } } }
     },
@@ -439,11 +441,13 @@ async function getVacationAwareUserSlots(
     // Calculate when user would be available
     let baseAvailableDate: Date;
     let totalAssignedDurationDays = 0;
+    let lastDeadline: Date | undefined;
 
     if (userTasks.length > 0) {
-      const lastTask = userTasks[userTasks.length - 1];
-      baseAvailableDate = await getNextAvailableStart(new Date(lastTask.deadline));
-      
+      // Se libera tras su última entrega pendiente (la deadline MÁS lejana de su cola).
+      lastDeadline = new Date(Math.max(...userTasks.map((t) => new Date(t.deadline).getTime())));
+      baseAvailableDate = await getNextAvailableStart(lastDeadline);
+
       totalAssignedDurationDays = userTasks.reduce((sum, task) => {
         if (!task.tier) {
           console.warn(`⚠️ Task ${task.id} missing tier, using default duration`);
@@ -485,7 +489,7 @@ async function getVacationAwareUserSlots(
       tasks: userTasks,
       cargaTotal: userTasks.length,
       isSpecialist,
-      lastTaskDeadline: userTasks.length > 0 ? new Date(userTasks[userTasks.length - 1].deadline) : undefined,
+      lastTaskDeadline: lastDeadline,
       upcomingVacations,
       potentialTaskStart: availableDate,
       potentialTaskEnd,
