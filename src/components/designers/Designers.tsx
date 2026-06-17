@@ -7,6 +7,7 @@ import React, { useState, useMemo } from 'react'
 import toast from 'react-hot-toast'
 import { DesignersHeader } from './DesignersHeader'
 import { UsersList } from './UsersList'
+import { TeamWorkload } from './TeamWorkload'
 import { UserEditModal } from './UserEditModal'
 import { useModalStore } from '@/stores/modalStore'
 import {
@@ -187,14 +188,21 @@ export const ClickUpUsersSync: React.FC = () => {
         syncing={syncing}
       />
 
-      <div className="p-6 flex-1">
-        <UsersList
-          users={filteredUsers}
-          selectedUsers={selectedUsers}
-          onUserSelect={handleUserSelection}
-          onUserEdit={handleEditUser}
-          loading={isLoading}
-        />
+      <div className="p-6 flex-1 flex flex-col gap-8">
+        <section>
+          <h2 className="mb-4 text-lg font-semibold text-(--color-text-strong)">Carga del equipo</h2>
+          <TeamWorkload />
+        </section>
+        <section>
+          <h2 className="mb-4 text-lg font-semibold text-(--color-text-strong)">Diseñadores</h2>
+          <UsersList
+            users={filteredUsers}
+            selectedUsers={selectedUsers}
+            onUserSelect={handleUserSelection}
+            onUserEdit={handleEditUser}
+            loading={isLoading}
+          />
+        </section>
       </div>
     </>
   )
