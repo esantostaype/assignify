@@ -2,10 +2,9 @@
 // src/hooks/usePusherTaskSync.ts — Suscriptor de Pusher en el CLIENTE.
 // Al recibir un cambio de ClickUp, invalida la query del kanban para que
 // React Query la vuelva a pedir y la lista se repinte sola en tiempo real.
-import { useEffect } from 'react'
+import { useEffect, useRef } from 'react'
 import PusherClient from 'pusher-js'
 import { useQueryClient } from '@tanstack/react-query'
-import { toast } from 'react-toastify'
 import { taskKeys } from '@/hooks/queries/useTasks'
 import { requestNotificationPermission, notifyTaskChange } from '@/utils/notifications'
 
@@ -18,6 +17,8 @@ interface TaskUpdatePayload {
 
 export const usePusherTaskSync = () => {
   const queryClient = useQueryClient()
+  // Evita notificaciones duplicadas cuando ClickUp manda varios eventos por un mismo cambio.
+  const lastNotifiedRef = useRef<{ taskId?: string; at: number }>({ at: 0 })
 
   useEffect(() => {
     // Pedir permiso de notificaciones del navegador (si aún no se decidió).
@@ -43,8 +44,16 @@ export const usePusherTaskSync = () => {
         }>(taskKeys.clickup())
         nombre = data?.clickupTasks?.find((t) => t.clickupId === payload.taskId)?.name
       }
-      // El kanban lee en vivo desde ClickUp → re-pedir la query para repintar.
+      // El kanban lee en vivo desde ClickUp → re-pedir la query para repintar (siempre).
       queryClient.invalidateQueries({ queryKey: taskKeys.clickup() })
+
+      // Anti-duplicados: si el mismo taskId llegó hace < 4s, no volver a notificar.
+      const now = Date.now()
+      const last = lastNotifiedRef.current
+      if (last.taskId === payload?.taskId && now - last.at < 4000) {
+        return
+      }
+      lastNotifiedRef.current = { taskId: payload?.taskId, at: now }
 
       const accion =
         payload?.event === 'taskCreated'
@@ -54,7 +63,7 @@ export const usePusherTaskSync = () => {
           : 'actualizada'
       const mensaje = nombre ? `Tarea "${nombre}" ${accion}` : 'Tablero de tareas actualizado'
 
-      toast.info(mensaje)
+      // Solo notificación del navegador + sonido (sin toast).
       notifyTaskChange('Assignify · ClickUp', mensaje)
     })
 
