@@ -6,10 +6,7 @@ import { NextResponse } from 'next/server'
 import { prisma } from '@/utils/prisma'
 import axios from 'axios'
 import { Status, Priority } from '@prisma/client'
-import {
-  calculateUserSlots,
-  getBestUserWithCache
-} from '@/services/task-assignment.service'
+import { getBestUserWithCache } from '@/services/task-assignment.service'
 import { createTaskInClickUp } from '@/services/clickup.service' // ✅ USAR SERVICIO REAL
 import { TaskCreationParams, UserSlot, UserWithRoles, ClickUpBrand, TaskWhereInput, UserVacation } from '@/interfaces'
 import {
