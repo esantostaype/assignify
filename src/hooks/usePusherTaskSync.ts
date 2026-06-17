@@ -7,6 +7,7 @@ import PusherClient from 'pusher-js'
 import { useQueryClient } from '@tanstack/react-query'
 import { toast } from 'react-toastify'
 import { taskKeys } from '@/hooks/queries/useTasks'
+import { requestNotificationPermission, notifyTaskChange } from '@/utils/notifications'
 
 interface TaskUpdatePayload {
   taskId?: string
@@ -19,6 +20,9 @@ export const usePusherTaskSync = () => {
   const queryClient = useQueryClient()
 
   useEffect(() => {
+    // Pedir permiso de notificaciones del navegador (si aún no se decidió).
+    requestNotificationPermission()
+
     const key = process.env.NEXT_PUBLIC_PUSHER_KEY
     const cluster = process.env.NEXT_PUBLIC_PUSHER_CLUSTER
 
@@ -41,7 +45,17 @@ export const usePusherTaskSync = () => {
       }
       // El kanban lee en vivo desde ClickUp → re-pedir la query para repintar.
       queryClient.invalidateQueries({ queryKey: taskKeys.clickup() })
-      toast.info(nombre ? `Tarea "${nombre}" actualizada` : 'Tablero de tareas actualizado')
+
+      const accion =
+        payload?.event === 'taskCreated'
+          ? 'creada'
+          : payload?.event === 'taskDeleted'
+          ? 'eliminada'
+          : 'actualizada'
+      const mensaje = nombre ? `Tarea "${nombre}" ${accion}` : 'Tablero de tareas actualizado'
+
+      toast.info(mensaje)
+      notifyTaskChange('Assignify · ClickUp', mensaje)
     })
 
     return () => {
