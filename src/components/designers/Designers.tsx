@@ -8,7 +8,7 @@ import toast from 'react-hot-toast'
 import { DesignersHeader } from './DesignersHeader'
 import { UsersList } from './UsersList'
 import { UserEditModal } from './UserEditModal'
-import { useModalStore } from '@/stores/modalStore'
+import { Modal } from '@/components/ui'
 import {
   useClickUpUsers,
   useSyncUsers,
@@ -24,9 +24,6 @@ export const ClickUpUsersSync: React.FC = () => {
   const [selectedUsers, setSelectedUsers] = useState<Set<string>>(new Set())
   const [searchFilter, setSearchFilter] = useState('')
   const [editingUserId, setEditingUserId] = useState<string | null>(null)
-
-  // Modal store
-  const { openModal, closeModal } = useModalStore()
 
   // Queries
   const {
@@ -149,30 +146,6 @@ export const ClickUpUsersSync: React.FC = () => {
 
   const handleEditUser = (userId: string) => {
     setEditingUserId(userId)
-    
-    openModal({
-      title: `Edit User: ${clickupUsers.find(u => u.clickupId === userId)?.name}`,
-      content: (
-        <UserEditModalWrapper
-          userId={userId}
-          onAddRole={(typeId, brandId) => {
-            addRole({ 
-              userId, 
-              typeId, 
-              brandId: brandId || null 
-            })
-          }}
-          onAddVacation={(startDate, endDate) => {
-            addVacation({ userId, startDate, endDate })
-          }}
-          loadingStates={{
-            addingRole,
-            addingVacation,
-          }}
-        />
-      ),
-      onClose: () => setEditingUserId(null),
-    })
   }
 
   return (
@@ -201,6 +174,34 @@ export const ClickUpUsersSync: React.FC = () => {
           workloadLoading={workloadLoading}
         />
       </div>
+
+      {/* Modal de edición renderizado EN VIVO (no como snapshot en el modalStore):
+          así el modal forma parte del árbol de Designers y se re-renderiza cuando
+          las queries cambian, reflejando al instante nivel / cargo / vacaciones
+          tras cada mutación (antes quedaba congelado en el store global). */}
+      <Modal
+        open={!!editingUserId}
+        onClose={() => setEditingUserId(null)}
+        title={
+          editingUserId
+            ? `Edit User: ${clickupUsers.find((u) => u.clickupId === editingUserId)?.name ?? ''}`
+            : ''
+        }
+        size="lg"
+      >
+        {editingUserId && (
+          <UserEditModalWrapper
+            userId={editingUserId}
+            onAddRole={(typeId, brandId) =>
+              addRole({ userId: editingUserId, typeId, brandId: brandId || null })
+            }
+            onAddVacation={(startDate, endDate) =>
+              addVacation({ userId: editingUserId, startDate, endDate })
+            }
+            loadingStates={{ addingRole, addingVacation }}
+          />
+        )}
+      </Modal>
     </>
   )
 }

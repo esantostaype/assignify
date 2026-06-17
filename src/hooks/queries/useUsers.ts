@@ -102,6 +102,12 @@ export const useUserDetails = (userId: string, enabled = true) => {
       return data
     },
     enabled: enabled && !!userId,
+    // El detalle alimenta el modal de edición, donde el usuario edita en vivo
+    // (nivel, roles, vacaciones) y espera ver el cambio al instante. El
+    // staleTime global de 5 min hacía que al reabrir mostrara datos viejos:
+    // aquí forzamos que siempre esté fresco y se refetchee al montar.
+    staleTime: 0,
+    refetchOnMount: 'always',
   })
 }
 

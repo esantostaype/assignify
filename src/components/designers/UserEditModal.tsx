@@ -92,6 +92,7 @@ export const UserEditModal: React.FC<UserEditModalProps> = ({
   // Alterna el cargo primario/secundario de un rol existente.
   const { mutate: togglePrimary, isPending: togglingPrimary, variables: togglingVars } =
     useToggleUserRolePrimary(userId, {
+      onSuccess: () => toast.success('Primary role updated'),
       onError: () => toast.error('Error updating primary role'),
     })
 
