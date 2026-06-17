@@ -50,15 +50,15 @@ export const ClickUpUsersSync: React.FC = () => {
         successMessage += ` (${errors.length} errors)`
       }
 
-      toast.success({ title: successMessage })
+      toast.success({ title: successMessage, description: 'Designers are now available.' })
 
       if (notFoundUsers && notFoundUsers.length > 0) {
-        toast.neutral({ title: `Users not found in teams: ${notFoundUsers.join(', ')}` })
+        toast.neutral({ title: `Users not found in teams: ${notFoundUsers.join(', ')}`, description: 'They were skipped.' })
       }
 
       if (errors && errors.length > 0) {
         console.warn('Errors during sync:', errors)
-        toast.neutral({ title: 'Some users had errors. Check console for details.' })
+        toast.neutral({ title: 'Some users had errors. Check console for details.', description: 'The rest synced fine.' })
       }
 
       setSelectedUsers(new Set())
@@ -66,22 +66,22 @@ export const ClickUpUsersSync: React.FC = () => {
     onError: (error: any) => {
       console.error('❌ Sync error:', error)
       const message = error.response?.data?.error || error.message
-      toast.error({ title: `Sync error: ${message}` })
+      toast.error({ title: 'Sync failed', description: message })
     },
   })
 
   const { mutate: addRole, isPending: addingRole } = useAddUserRole({
     onSuccess: () => {
-      toast.success({ title: 'Role added successfully' })
+      toast.success({ title: 'Role added successfully', description: 'Assigned to the designer.' })
     },
     onError: () => {
-      toast.error({ title: 'Error adding role' })
+      toast.error({ title: 'Error adding role', description: 'The role was not assigned.' })
     },
   })
 
   const { mutate: addVacation, isPending: addingVacation } = useAddUserVacation({
     onSuccess: () => {
-      toast.success({ title: 'Vacation added successfully' })
+      toast.success({ title: 'Vacation added successfully', description: 'Saved to the calendar.' })
     }
   })
 
@@ -133,7 +133,7 @@ export const ClickUpUsersSync: React.FC = () => {
 
   const handleSync = () => {
     if (selectedUsers.size === 0) {
-      toast.neutral({ title: 'Select at least one user to sync' })
+      toast.neutral({ title: 'Select at least one user to sync', description: 'Nothing selected yet.' })
       return
     }
 
@@ -226,19 +226,19 @@ const UserEditModalWrapper: React.FC<UserEditModalWrapperProps> = ({
   // ✅ Create deletion mutations with proper userId context
   const { mutate: deleteRole } = useDeleteUserRole(userId, {
     onSuccess: () => {
-      toast.success({ title: 'Role removed successfully' })
+      toast.success({ title: 'Role removed successfully', description: 'No longer assigned.' })
     },
     onError: () => {
-      toast.error({ title: 'Error removing role' })
+      toast.error({ title: 'Error removing role', description: 'The role is still assigned.' })
     },
   })
 
   const { mutate: deleteVacation } = useDeleteUserVacation(userId, {
     onSuccess: () => {
-      toast.success({ title: 'Vacation removed successfully' })
+      toast.success({ title: 'Vacation removed successfully', description: 'Removed from the calendar.' })
     },
     onError: () => {
-      toast.error({ title: 'Error removing vacation' })
+      toast.error({ title: 'Error removing vacation', description: 'It is still on the calendar.' })
     },
   })
 

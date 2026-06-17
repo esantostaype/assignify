@@ -77,23 +77,23 @@ export const UserEditModal: React.FC<UserEditModalProps> = ({
   } = useBrands()
 
   const { mutate: updateLevel, isPending: updatingLevel } = useUpdateUserLevel(userId, {
-    onSuccess: () => toast.success({ title: 'Level updated' }),
-    onError: () => toast.error({ title: 'Error updating level' }),
+    onSuccess: () => toast.success({ title: 'Level updated', description: 'Auto-assignment recalculated.' }),
+    onError: () => toast.error({ title: 'Error updating level', description: 'The level was not changed.' }),
   })
 
   // Alta de rol gestionada aquí para poder enviar también `isPrimary`.
   const { mutate: addRole, isPending: addingRole } = useAddUserRole({
-    onSuccess: () => toast.success({ title: 'Role added successfully' }),
+    onSuccess: () => toast.success({ title: 'Role added successfully', description: 'Assigned to the designer.' }),
     // Muestra el mensaje real del servidor (p.ej. "Role already exists for this
     // user" en un 409) en lugar del genérico, para que los errores sean visibles.
-    onError: (error) => toast.error({ title: serverErrorMessage(error, 'Error adding role') }),
+    onError: (error) => toast.error({ title: "Couldn't add role", description: serverErrorMessage(error, 'Error adding role') }),
   })
 
   // Alterna el cargo primario/secundario de un rol existente.
   const { mutate: togglePrimary, isPending: togglingPrimary, variables: togglingVars } =
     useToggleUserRolePrimary(userId, {
-      onSuccess: () => toast.success({ title: 'Primary role updated' }),
-      onError: () => toast.error({ title: 'Error updating primary role' }),
+      onSuccess: () => toast.success({ title: 'Primary role updated', description: 'Engine preference updated.' }),
+      onError: () => toast.error({ title: 'Error updating primary role', description: 'The change was not saved.' }),
     })
 
   if (userError || typesError || brandsError) {

@@ -13,6 +13,7 @@ import {
   Alert,
   Spinner,
   FormSeparator,
+  AlertDialog,
 } from "@/components/ui";
 import {
   Icon,
@@ -64,6 +65,7 @@ export const SettingsForm: React.FC = () => {
   const [tierChanges, setTierChanges] = useState<Record<number, number>>({});
   const [loadingTiers, setLoadingTiers] = useState(true);
   const [savingTiers, setSavingTiers] = useState(false);
+  const [showResetDialog, setShowResetDialog] = useState(false);
 
   // Cargar tiers
   useEffect(() => {
@@ -74,7 +76,10 @@ export const SettingsForm: React.FC = () => {
         setTiers(response.data);
       } catch (error) {
         console.error("Error loading tiers:", error);
-        toast.error({ title: "Error loading tier settings" });
+        toast.error({
+          title: "Couldn't load tiers",
+          description: "Tier durations failed to load.",
+        });
       } finally {
         setLoadingTiers(false);
       }
@@ -213,31 +218,41 @@ export const SettingsForm: React.FC = () => {
         // Invalidate task data cache so other components refresh
         invalidateTiers();
 
-        toast.success({ title: "Tier durations updated successfully" });
+        toast.success({
+          title: "Tier durations updated",
+          description: "New durations saved.",
+        });
       }
 
       // Recargar settings
       await refetch();
     } catch (error) {
       console.error("Error saving:", error);
-      toast.error({ title: "Error saving settings" });
+      toast.error({
+        title: "Couldn't save settings",
+        description: "Your changes weren't saved.",
+      });
     } finally {
       setSavingTiers(false);
     }
   };
 
-  // Handle reset to defaults
-  const handleReset = async () => {
-    if (
-      window.confirm(
-        "Are you sure you want to reset these settings to their default values?"
-      )
-    ) {
+  // Reset a valores por defecto (confirmado vía AlertDialog).
+  const doReset = async () => {
+    try {
       await resetSettingsMutation.mutateAsync();
       setTierChanges({});
-
-      // Invalidate all task data cache after the reset
       invalidateAll();
+      toast.success({
+        title: "Settings reset",
+        description: "Restored to default values.",
+      });
+    } catch (error) {
+      console.error("Error resetting settings:", error);
+      toast.error({
+        title: "Reset failed",
+        description: "Couldn't restore the defaults.",
+      });
     }
   };
 
@@ -331,7 +346,7 @@ export const SettingsForm: React.FC = () => {
 
   if (isLoading) {
     return (
-      <div className="p-8 max-w-6xl mx-auto">
+      <div className="max-w-6xl mx-auto">
         <div className="flex items-center gap-2 mb-4">
           <Icon icon={PiGear} size={20} />
           <span className="text-lg font-medium">Loading Settings...</span>
@@ -471,7 +486,7 @@ export const SettingsForm: React.FC = () => {
             aria-label="Reset settings to defaults"
             variant="outlined"
             color="error"
-            onClick={handleReset}
+            onClick={() => setShowResetDialog(true)}
             disabled={resetSettingsMutation.isPending}
           >
             {resetSettingsMutation.isPending ? (
@@ -504,6 +519,18 @@ export const SettingsForm: React.FC = () => {
           </div>
         </Alert>
       )}
+
+      {/* Confirmación del reset a valores por defecto */}
+      <AlertDialog
+        open={showResetDialog}
+        onClose={() => setShowResetDialog(false)}
+        tone="warning"
+        title="Reset settings?"
+        description="This restores work schedule, task assignment and tier durations to their default values. This can't be undone."
+        confirmLabel="Reset to defaults"
+        cancelLabel="Cancel"
+        onConfirm={doReset}
+      />
     </>
   );
 };

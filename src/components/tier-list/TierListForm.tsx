@@ -67,7 +67,7 @@ export const TierListForm: React.FC = () => {
         setTiers(response.data);
       } catch (error) {
         console.error("Error loading tiers:", error);
-        toast.error({ title: "Error loading tier settings" });
+        toast.error({ title: "Error loading tier settings", description: "Couldn't reach the server." });
       } finally {
         setLoadingTiers(false);
       }
@@ -118,11 +118,11 @@ export const TierListForm: React.FC = () => {
         // Invalidate task data cache so other components refresh
         invalidateTiers();
 
-        toast.success({ title: "Tier durations updated successfully" });
+        toast.success({ title: "Tier durations updated successfully", description: "Changes saved." });
       }
     } catch (error) {
       console.error("Error saving:", error);
-      toast.error({ title: "Error saving tier durations" });
+      toast.error({ title: "Error saving tier durations", description: "Changes were not saved." });
     } finally {
       setSavingTiers(false);
     }

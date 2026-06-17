@@ -202,19 +202,19 @@ export const CreateTaskForm: FC = () => {
   const handleSubmit = async (values: FormValues, { resetForm }: any) => {
     try {
       if (!currentTypeId) {
-        toast.error({ title: "No type found for the selected kind" });
+        toast.error({ title: "No type found for the selected kind", description: "Pick a different kind." });
         return;
       }
 
       const selectedTier = tiers.find((t) => t.id.toString() === values.tierId);
       if (!selectedTier) {
-        toast.error({ title: "Selected tier not found" });
+        toast.error({ title: "Selected tier not found", description: "Choose a valid tier." });
         return;
       }
 
       const finalDurationDays = parseFloat(values.durationDays as string);
       if (finalDurationDays <= 0) {
-        toast.error({ title: "Task duration must be greater than zero." });
+        toast.error({ title: "Task duration must be greater than zero.", description: "Enter a positive value." });
         return;
       }
 
@@ -263,11 +263,11 @@ export const CreateTaskForm: FC = () => {
     } catch (error: unknown) {
       setLoading(false);
       if (axios.isAxiosError(error) && error.response?.data?.error) {
-        toast.error({ title: error.response.data.error });
+        toast.error({ title: "Couldn't create task", description: error.response.data.error });
       } else if (axios.isAxiosError(error) && error.response?.data?.details) {
-        toast.error({ title: `Error: ${error.response.data.details}` });
+        toast.error({ title: "Couldn't create task", description: error.response.data.details });
       } else {
-        toast.error({ title: "Unexpected error while creating the task" });
+        toast.error({ title: "Unexpected error while creating the task", description: "Please try again." });
       }
     }
   };
@@ -313,7 +313,7 @@ export const CreateTaskForm: FC = () => {
           const handleInactivityReset = () => {
             resetForm();
             resetLocalState();
-            toast.neutral({ title: "Form reset due to inactivity" });
+            toast.neutral({ title: "Form reset due to inactivity", description: "Start a new task." });
           };
 
           return (

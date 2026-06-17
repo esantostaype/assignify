@@ -21,8 +21,8 @@ export const TasksSync: React.FC = () => {
   const { data: tasksData, isLoading: loadingTasks, error: tasksError } = useClickUpTasks();
 
   const { mutate: refreshTasks, isPending: refreshing } = useRefreshTasks({
-    onSuccess: () => toast.success({ title: "Tasks updated" }),
-    onError: () => toast.error({ title: "Failed to update tasks" }),
+    onSuccess: () => toast.success({ title: "Tasks updated", description: "Synced from ClickUp." }),
+    onError: () => toast.error({ title: "Failed to update tasks", description: "Try again in a moment." }),
   });
 
   const tasks = useMemo(() => {
@@ -52,9 +52,8 @@ export const TasksSync: React.FC = () => {
     <div className="flex flex-col h-full">
       <div className="sticky top-16 z-50 bg-(--color-surface-app)/70 backdrop-blur-lg">
         <div className="flex items-center justify-between border-b border-(--color-border-default) p-4">
-          <h1 className="flex items-center gap-2 text-2xl font-medium text-(--color-text-strong)">
-            <Icon icon={PiListChecks} size={28} />
-            ClickUp Tasks
+          <h1 className="flex items-center gap-2 text-xl text-(--color-text-strong)">
+            Tasks
           </h1>
           <div className="flex items-center gap-3">
             <Input

@@ -106,8 +106,11 @@ function HotToastBody({
   input: HotToastInput;
   tone: HotToastTone;
 }) {
-  const IconCmp = input.icon === 'spinner' || !input.icon ? null : input.icon;
-  const showIcon = IconCmp != null || input.icon === 'spinner';
+  // Siempre mostramos un ícono representativo: el custom si se pasa, el spinner,
+  // o el del tono por defecto (success→check, error→x, warning→!, etc.).
+  const useSpinner = input.icon === 'spinner';
+  const ResolvedIcon: IconComponent =
+    typeof input.icon === 'function' ? input.icon : TONE_ICON[tone];
 
   // `t.position` is the live value the library resolved for this toast —
   // honours per-toast `position` overrides AND the Toaster's default.
@@ -137,15 +140,13 @@ function HotToastBody({
       )}
     >
       <div className="flex items-start gap-3 py-3.5 px-4">
-        {showIcon && (
-          <span className={cn('inline-flex size-9 shrink-0 items-center justify-center rounded-full', TONE_BG[tone])}>
-            {input.icon === 'spinner' ? (
-              <Icon icon={PiSpinner} size={18} className="animate-spin" />
-            ) : (
-              <Icon icon={IconCmp ?? TONE_ICON[tone]} size={18} />
-            )}
-          </span>
-        )}
+        <span className={cn('inline-flex size-9 shrink-0 items-center justify-center rounded-full', TONE_BG[tone])}>
+          {useSpinner ? (
+            <Icon icon={PiSpinner} size={18} className="animate-spin" />
+          ) : (
+            <Icon icon={ResolvedIcon} size={18} />
+          )}
+        </span>
 
         <div className="flex-1 min-w-0">
           {input.title && (

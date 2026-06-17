@@ -1,8 +1,9 @@
 'use client'
 // src/hooks/usePusherTaskSync.ts — Suscriptor de Pusher en el CLIENTE.
-// Al recibir un cambio de ClickUp, invalida la query del kanban para que
-// React Query la vuelva a pedir y la lista se repinte sola en tiempo real.
-import { useEffect, useRef } from 'react'
+// Al recibir un cambio de ClickUp, invalida las queries del kanban y la carga
+// del equipo para que React Query las vuelva a pedir y todo se repinte en vivo,
+// y emite UNA notificación del navegador + sonido.
+import { useEffect } from 'react'
 import PusherClient from 'pusher-js'
 import { useQueryClient } from '@tanstack/react-query'
 import { taskKeys } from '@/hooks/queries/useTasks'
@@ -16,10 +17,20 @@ interface TaskUpdatePayload {
   event?: string
 }
 
+// Conexión Pusher ÚNICA a nivel de módulo. Evita que React StrictMode (dev) o
+// varios montajes creen MÚLTIPLES conexiones/bindings, que era la causa de las
+// notificaciones duplicadas (2 por cada cambio en ClickUp).
+let pusherSingleton: PusherClient | null = null
+function getPusher(key: string, cluster: string): PusherClient {
+  if (!pusherSingleton) pusherSingleton = new PusherClient(key, { cluster })
+  return pusherSingleton
+}
+
+// Anti-duplicados GLOBAL: ClickUp puede emitir varios eventos por un mismo cambio.
+const lastNotified = { taskId: undefined as string | undefined, at: 0 }
+
 export const usePusherTaskSync = () => {
   const queryClient = useQueryClient()
-  // Evita notificaciones duplicadas cuando ClickUp manda varios eventos por un mismo cambio.
-  const lastNotifiedRef = useRef<{ taskId?: string; at: number }>({ at: 0 })
 
   useEffect(() => {
     // Pedir permiso de notificaciones del navegador (si aún no se decidió).
@@ -27,15 +38,12 @@ export const usePusherTaskSync = () => {
 
     const key = process.env.NEXT_PUBLIC_PUSHER_KEY
     const cluster = process.env.NEXT_PUBLIC_PUSHER_CLUSTER
+    if (!key || !cluster) return
 
-    if (!key || !cluster) {
-      return
-    }
+    const client = getPusher(key, cluster)
+    const channel = client.subscribe(taskKeys.all[0]) // 'tasks'
 
-    const pusher = new PusherClient(key, { cluster })
-    const channel = pusher.subscribe(taskKeys.all[0]) // 'tasks'
-
-    channel.bind('task-updated', (payload: TaskUpdatePayload) => {
+    const handler = (payload: TaskUpdatePayload) => {
       // ClickUp no envía el nombre en el webhook; intentamos sacarlo de la caché.
       let taskName = payload?.name
       if (!taskName && payload?.taskId) {
@@ -44,35 +52,39 @@ export const usePusherTaskSync = () => {
         }>(taskKeys.clickup())
         taskName = data?.clickupTasks?.find((t) => t.clickupId === payload.taskId)?.name
       }
-      // El kanban lee en vivo desde ClickUp → re-pedir la query para repintar (siempre).
+
+      // El kanban y el panel "Carga del equipo" leen en vivo → re-pedir queries.
       queryClient.invalidateQueries({ queryKey: taskKeys.clickup() })
-      // El panel "Carga del equipo" también depende de las tareas → refrescarlo.
       queryClient.invalidateQueries({ queryKey: workloadKeys.all })
 
       // Anti-duplicados: si el mismo taskId llegó hace < 4s, no volver a notificar.
       const now = Date.now()
-      const last = lastNotifiedRef.current
-      if (last.taskId === payload?.taskId && now - last.at < 4000) {
+      if (lastNotified.taskId === payload?.taskId && now - lastNotified.at < 4000) {
         return
       }
-      lastNotifiedRef.current = { taskId: payload?.taskId, at: now }
+      lastNotified.taskId = payload?.taskId
+      lastNotified.at = now
 
       const action =
         payload?.event === 'taskCreated'
           ? 'created'
           : payload?.event === 'taskDeleted'
-          ? 'deleted'
-          : 'updated'
+            ? 'deleted'
+            : 'updated'
       const message = taskName ? `Task "${taskName}" ${action}` : 'Task board updated'
 
-      // Solo notificación del navegador + sonido (sin toast).
+      // UNA notificación del navegador + sonido (alert.mp3). Sin toast.
       notifyTaskChange('Assignify · ClickUp', message)
-    })
+    }
+
+    // Rebind defensivo: quita cualquier handler previo del evento antes de
+    // añadir el nuevo, para que un re-montaje (StrictMode) no acumule listeners.
+    channel.unbind('task-updated')
+    channel.bind('task-updated', handler)
 
     return () => {
-      channel.unbind_all()
-      pusher.unsubscribe(taskKeys.all[0])
-      pusher.disconnect()
+      // Solo quitamos NUESTRO handler; la conexión singleton se reutiliza.
+      channel.unbind('task-updated', handler)
     }
   }, [queryClient])
 }

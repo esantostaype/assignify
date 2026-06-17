@@ -86,7 +86,7 @@ export const useTaskSuggestion = (
         if (axios.isAxiosError(error)) {
           // 400 = validation error while typing: stay quiet, no toast.
           if (error.response?.status !== 400) {
-            toast.error({ title: 'Failed to get assignment suggestion.' })
+            toast.error({ title: 'Failed to get assignment suggestion.', description: 'No designer suggested.' })
           }
         }
       } finally {

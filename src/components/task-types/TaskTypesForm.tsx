@@ -49,7 +49,7 @@ export const TaskTypesForm: React.FC = () => {
         setTypes(response.data);
       } catch (error) {
         console.error("Error loading types:", error);
-        toast.error({ title: "Error loading task types" });
+        toast.error({ title: "Error loading task types", description: "Couldn't reach the server." });
       } finally {
         setLoading(false);
       }
@@ -89,10 +89,10 @@ export const TaskTypesForm: React.FC = () => {
       setEditingId(null);
       setEditingName("");
       invalidateAll();
-      toast.success({ title: "Task type updated successfully" });
+      toast.success({ title: "Task type updated successfully", description: "Changes saved." });
     } catch (error) {
       console.error("Error updating type:", error);
-      toast.error({ title: "Error updating task type" });
+      toast.error({ title: "Error updating task type", description: "Changes were not saved." });
     } finally {
       setSaving(false);
     }
@@ -111,12 +111,12 @@ export const TaskTypesForm: React.FC = () => {
       setTypes((prev) => [...prev, response.data]);
       setNewTypeName("");
       invalidateAll();
-      toast.success({ title: "Task type created successfully" });
+      toast.success({ title: "Task type created successfully", description: "Added to the list." });
     } catch (error: any) {
       console.error("Error creating type:", error);
       const errorMessage =
         error.response?.data?.error || "Error creating task type";
-      toast.error({ title: errorMessage });
+      toast.error({ title: "Couldn't create task type", description: errorMessage });
     } finally {
       setSaving(false);
     }
@@ -130,12 +130,12 @@ export const TaskTypesForm: React.FC = () => {
 
       setTypes((prev) => prev.filter((type) => type.id !== typeId));
       invalidateAll();
-      toast.success({ title: "Task type deleted successfully" });
+      toast.success({ title: "Task type deleted successfully", description: "Removed from the list." });
     } catch (error: any) {
       console.error("Error deleting type:", error);
       const errorMessage =
         error.response?.data?.error || "Error deleting task type";
-      toast.error({ title: errorMessage });
+      toast.error({ title: "Couldn't delete task type", description: errorMessage });
     } finally {
       setDeleting(null);
     }
