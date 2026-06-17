@@ -199,7 +199,9 @@ export async function GET() {
             name: assignee.username,
             email: assignee.email,
             initials: assignee.initials,
-            color: assignee.color
+            color: assignee.color,
+            // Avatar real de ClickUp (puede ser null si el usuario no tiene foto).
+            profilePicture: assignee.profilePicture ?? null,
           })),
           dueDate: new Date(parseInt(clickupTask.due_date)).toISOString(),
           startDate: new Date(parseInt(clickupTask.start_date)).toISOString(),
