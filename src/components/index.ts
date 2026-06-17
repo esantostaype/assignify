@@ -1,4 +1,3 @@
-export * from './ToastNotification'
 export * from './Spinner'
 export * from './SpinnerCreatingTask'
 export * from './SpinnerSearching'

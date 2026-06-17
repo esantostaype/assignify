@@ -1,14 +1,14 @@
 import React from "react";
-import { HugeiconsIcon } from "@hugeicons/react";
 import {
-  Calendar03Icon,
-  UserIcon,
-  Edit02Icon,
-  DatabaseSync01Icon,
-  CheckmarkSquare02Icon,
-  Flag02Icon
-} from "@hugeicons/core-free-icons";
-import { Avatar, Checkbox, IconButton } from "@mui/joy";
+  Icon,
+  PiCalendarBlank,
+  PiUser,
+  PiPencilSimple,
+  PiArrowsClockwise,
+  PiCheckSquare,
+  PiTarget,
+} from "@/lib/icons";
+import { Avatar, Checkbox, IconButton } from "@/components/ui";
 
 interface TaskCardProps {
   task: {
@@ -59,15 +59,15 @@ export const TaskCard: React.FC<TaskCardProps> = ({
   // ✅ NUEVA FUNCIÓN: Formatear fecha y hora
   const formatDateTime = (dateString: string) => {
     const date = new Date(dateString);
-    
+
     const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
       'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-    
+
     const month = monthNames[date.getMonth()];
     const day = date.getDate();
     const hours = date.getHours().toString().padStart(2, '0');
     const minutes = date.getMinutes().toString().padStart(2, '0');
-    
+
     return `${month} ${day}, ${hours}:${minutes}`;
   };
 
@@ -76,21 +76,21 @@ export const TaskCard: React.FC<TaskCardProps> = ({
     if (!task.dueDate) return null;
 
     const dueDateTime = formatDateTime(task.dueDate);
-    
+
     // Si tenemos fecha de inicio, mostrar rango
     if (task.startDate) {
       const startDateTime = formatDateTime(task.startDate);
       return `${startDateTime} - ${dueDateTime}`;
     }
-    
+
     // Si no tenemos fecha de inicio, solo mostrar fecha de vencimiento
     return `Due: ${dueDateTime}`;
   };
 
   // ✅ NUEVA FUNCIÓN: Determinar color según urgencia
   const getDateColor = () => {
-    if (!task.dueDate) return "text-gray-400";
-    
+    if (!task.dueDate) return "text-(--color-text-muted)";
+
     const dueDate = new Date(task.dueDate);
     const now = new Date();
     const diffTime = dueDate.getTime() - now.getTime();
@@ -99,11 +99,11 @@ export const TaskCard: React.FC<TaskCardProps> = ({
     if (diffDays < 0 && task.status !== 'in_progress') {
       return "text-red-400"; // Overdue
     } else if (diffDays === 0) {
-      return "text-orange-400"; // Due today  
+      return "text-orange-400"; // Due today
     } else if (diffDays <= 1) {
       return "text-yellow-400"; // Due soon
     } else {
-      return "text-gray-300"; // Normal
+      return "text-(--color-text-subtle)"; // Normal
     }
   };
 
@@ -118,10 +118,10 @@ export const TaskCard: React.FC<TaskCardProps> = ({
       flex flex-col justify-between
       ${
         task.existsInLocal
-          ? "bg-white/4 border-transparent"
+          ? "bg-(--color-surface-hover) border-transparent"
           : isSelected
-          ? "bg-accent/10 border-accent/30"
-          : "bg-accent/10 border-transparent hover:bg-accent/20"
+          ? "bg-primary-500/10 border-primary-500/30"
+          : "bg-primary-500/10 border-transparent hover:bg-primary-500/20"
       }
     `}
     >
@@ -136,22 +136,23 @@ export const TaskCard: React.FC<TaskCardProps> = ({
         {/* Edit button for existing tasks */}
         {task.existsInLocal && onEdit && (
           <IconButton
+            aria-label="Edit task"
             size="sm"
             variant="soft"
             color="primary"
             onClick={onEdit}
           >
-            <HugeiconsIcon icon={Edit02Icon} size={16} />
+            <Icon icon={PiPencilSimple} size={16} />
           </IconButton>
         )}
         {task.existsInLocal ? (
-          <div className="flex items-center gap-1 text-xs uppercase text-accent-400">
-            <HugeiconsIcon icon={DatabaseSync01Icon} size={16} />
+          <div className="flex items-center gap-1 text-xs uppercase text-primary-400">
+            <Icon icon={PiArrowsClockwise} size={16} />
             Synced
           </div>
         ) : (
           <div className="flex items-center gap-1 text-xs uppercase text-green-400">
-            <HugeiconsIcon icon={CheckmarkSquare02Icon} size={16} />
+            <Icon icon={PiCheckSquare} size={16} />
             Available
           </div>
         )}
@@ -161,33 +162,31 @@ export const TaskCard: React.FC<TaskCardProps> = ({
       <h3 className="font-semibold leading-tight line-clamp-2 mt-4 mb-2">{task.name}</h3>
 
       {/* Space and List */}
-      <div className="text-xs text-gray-500">
+      <div className="text-xs text-(--color-text-muted)">
         <div>In {task.list.name}</div>
       </div>
 
       {/* Assignees */}
       {task.assignees.length > 0 && (
         <div className="flex items-center gap-2 my-4">
-          <HugeiconsIcon icon={UserIcon} size={16} className="text-gray-400" />
+          <Icon icon={PiUser} size={16} className="text-(--color-text-muted)" />
           <div className="flex -space-x-2">
             {task.assignees.slice(0, 3).map((assignee, index) => (
               <Avatar
                 key={assignee.id}
-                size="sm"
-                sx={{
-                  width: 24,
-                  height: 24,
-                  bgcolor: assignee.color,
+                size="xs"
+                title={`${assignee.name} (${assignee.email})`}
+                style={{
+                  backgroundColor: assignee.color,
                   fontSize: "0.7rem",
                   zIndex: task.assignees.length - index,
                 }}
-                title={`${assignee.name} (${assignee.email})`}
               >
                 <span className="mt-[2px]">{assignee.initials}</span>
               </Avatar>
             ))}
             {task.assignees.length > 3 && (
-              <div className="flex items-center justify-center w-6 h-6 bg-gray-600 rounded-full text-xs text-white">
+              <div className="flex items-center justify-center w-6 h-6 bg-neutral-600 rounded-full text-xs text-white">
                 +{task.assignees.length - 3}
               </div>
             )}
@@ -200,12 +199,12 @@ export const TaskCard: React.FC<TaskCardProps> = ({
         {/* ✅ NUEVA SECCIÓN: Date Range con formato mejorado */}
         {dateRange && (
           <div className="flex items-center gap-1">
-            <HugeiconsIcon
-              icon={Calendar03Icon}
+            <Icon
+              icon={PiCalendarBlank}
               size={16}
-              className="text-gray-300 flex-shrink-0"
+              className="text-(--color-text-subtle) flex-shrink-0"
             />
-            <div 
+            <div
               className={`${dateColor} text-sm font-medium mt-[2px]`}
               style={{
                 fontSize: '11px',
@@ -222,8 +221,8 @@ export const TaskCard: React.FC<TaskCardProps> = ({
       <div className="flex items-center justify-between mt-6 capitalize">
         <div className="flex items-center gap-1 text-sm" style={{ color: task.priorityColor }}>
           <span>
-            <HugeiconsIcon
-              icon={Flag02Icon}
+            <Icon
+              icon={PiTarget}
               size={16}
             />
           </span>

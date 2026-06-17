@@ -5,18 +5,15 @@ import * as React from "react";
 import { useFormik } from "formik";
 import * as Yup from "yup";
 
-import Box from "@mui/joy/Box";
-import Sheet from "@mui/joy/Sheet";
-import Typography from "@mui/joy/Typography";
-import Stack from "@mui/joy/Stack";
-import Divider from "@mui/joy/Divider";
-import FormControl from "@mui/joy/FormControl";
-import FormLabel from "@mui/joy/FormLabel";
-import Input from "@mui/joy/Input";
-import Textarea from "@mui/joy/Textarea";
-import Button from "@mui/joy/Button";
-import Alert from "@mui/joy/Alert";
-import AspectRatio from "@mui/joy/AspectRatio";
+import {
+  Card,
+  Typography,
+  Divider,
+  Input,
+  Textarea,
+  Button,
+  Alert,
+} from "@/components/ui";
 
 type UploadResult = {
   public_id: string;
@@ -157,76 +154,76 @@ export default function OutlookSignaturePage() {
 
   return (
     <>
-        <Typography level="h2">Outlook Signature Generator</Typography>
-        <Typography level="body-sm" sx={{ opacity: 0.8, mt: 0.5 }}>
-          Formik + Yup + Joy UI. Subes tu logo, opcionalmente lo mejoras con IA, y generas HTML compatible.
+        <Typography variant="h2">Outlook Signature Generator</Typography>
+        <Typography variant="bodySm" className="opacity-80 mt-0.5">
+          Formik + Yup + UI propia. Subes tu logo, opcionalmente lo mejoras con IA, y generas HTML compatible.
         </Typography>
 
-        <Divider sx={{ my: 2 }} />
+        <Divider className="my-4" />
 
         {err && (
-          <Alert color="warning" variant="soft" sx={{ mb: 2 }}>
+          <Alert tone="warning" variant="soft" className="mb-4">
             {err}
           </Alert>
         )}
 
-        <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr", md: "1fr 1fr" }, gap: 2 }}>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {/* LEFT */}
-          <Box>
+          <div>
             <form onSubmit={formik.handleSubmit}>
-              <Stack spacing={1.5}>
-                <FormControl error={Boolean(formik.touched.fullName && formik.errors.fullName)}>
-                  <FormLabel>Nombre</FormLabel>
-                  <Input name="fullName" value={formik.values.fullName} onChange={formik.handleChange} onBlur={formik.handleBlur} />
+              <div className="flex flex-col gap-3">
+                <div>
+                  <Typography variant="label" as="label" className="mb-1.5 block">Nombre</Typography>
+                  <Input name="fullName" value={formik.values.fullName} onChange={formik.handleChange} onBlur={formik.handleBlur} invalid={Boolean(formik.touched.fullName && formik.errors.fullName)} />
                   {formik.touched.fullName && formik.errors.fullName && (
-                    <Typography level="body-xs" color="danger">
+                    <Typography variant="caption" color="error-600" className="mt-1 block">
                       {formik.errors.fullName}
                     </Typography>
                   )}
-                </FormControl>
+                </div>
 
-                <FormControl error={Boolean(formik.touched.title && formik.errors.title)}>
-                  <FormLabel>Cargo</FormLabel>
-                  <Input name="title" value={formik.values.title} onChange={formik.handleChange} onBlur={formik.handleBlur} />
+                <div>
+                  <Typography variant="label" as="label" className="mb-1.5 block">Cargo</Typography>
+                  <Input name="title" value={formik.values.title} onChange={formik.handleChange} onBlur={formik.handleBlur} invalid={Boolean(formik.touched.title && formik.errors.title)} />
                   {formik.touched.title && formik.errors.title && (
-                    <Typography level="body-xs" color="danger">
+                    <Typography variant="caption" color="error-600" className="mt-1 block">
                       {formik.errors.title}
                     </Typography>
                   )}
-                </FormControl>
+                </div>
 
-                <FormControl error={Boolean(formik.touched.phone && formik.errors.phone)}>
-                  <FormLabel>Teléfono</FormLabel>
-                  <Input name="phone" value={formik.values.phone} onChange={formik.handleChange} onBlur={formik.handleBlur} />
+                <div>
+                  <Typography variant="label" as="label" className="mb-1.5 block">Teléfono</Typography>
+                  <Input name="phone" value={formik.values.phone} onChange={formik.handleChange} onBlur={formik.handleBlur} invalid={Boolean(formik.touched.phone && formik.errors.phone)} />
                   {formik.touched.phone && formik.errors.phone && (
-                    <Typography level="body-xs" color="danger">
+                    <Typography variant="caption" color="error-600" className="mt-1 block">
                       {formik.errors.phone}
                     </Typography>
                   )}
-                </FormControl>
+                </div>
 
-                <FormControl error={Boolean(formik.touched.email && formik.errors.email)}>
-                  <FormLabel>Email</FormLabel>
-                  <Input name="email" value={formik.values.email} onChange={formik.handleChange} onBlur={formik.handleBlur} />
+                <div>
+                  <Typography variant="label" as="label" className="mb-1.5 block">Email</Typography>
+                  <Input name="email" value={formik.values.email} onChange={formik.handleChange} onBlur={formik.handleBlur} invalid={Boolean(formik.touched.email && formik.errors.email)} />
                   {formik.touched.email && formik.errors.email && (
-                    <Typography level="body-xs" color="danger">
+                    <Typography variant="caption" color="error-600" className="mt-1 block">
                       {formik.errors.email}
                     </Typography>
                   )}
-                </FormControl>
+                </div>
 
-                <FormControl error={Boolean(formik.touched.address && formik.errors.address)}>
-                  <FormLabel>Dirección</FormLabel>
-                  <Input name="address" value={formik.values.address} onChange={formik.handleChange} onBlur={formik.handleBlur} />
+                <div>
+                  <Typography variant="label" as="label" className="mb-1.5 block">Dirección</Typography>
+                  <Input name="address" value={formik.values.address} onChange={formik.handleChange} onBlur={formik.handleBlur} invalid={Boolean(formik.touched.address && formik.errors.address)} />
                   {formik.touched.address && formik.errors.address && (
-                    <Typography level="body-xs" color="danger">
+                    <Typography variant="caption" color="error-600" className="mt-1 block">
                       {formik.errors.address}
                     </Typography>
                   )}
-                </FormControl>
+                </div>
 
-                <FormControl>
-                  <FormLabel>Otros</FormLabel>
+                <div>
+                  <Typography variant="label" as="label" className="mb-1.5 block">Otros</Typography>
                   <Textarea
                     name="extra"
                     minRows={3}
@@ -234,24 +231,24 @@ export default function OutlookSignaturePage() {
                     onChange={formik.handleChange}
                     onBlur={formik.handleBlur}
                   />
-                </FormControl>
+                </div>
 
-                <Divider sx={{ my: 1 }} />
+                <Divider className="my-2" />
 
-                <FormControl>
-                  <FormLabel>Logo personalizado (usuario)</FormLabel>
+                <div>
+                  <Typography variant="label" as="label" className="mb-1.5 block">Logo personalizado (usuario)</Typography>
                   <Input
                     type="file"
-                    slotProps={{ input: { accept: "image/*" } }}
+                    accept="image/*"
                     onChange={(e) => {
                       const f = (e.target as HTMLInputElement).files?.[0];
                       if (f) handleUpload(f);
                     }}
                     disabled={busyUpload}
                   />
-                </FormControl>
+                </div>
 
-                <Stack direction="row" spacing={1}>
+                <div className="flex flex-row gap-2">
                   <Button
                     variant="soft"
                     onClick={handleEnhance}
@@ -263,67 +260,67 @@ export default function OutlookSignaturePage() {
                   <Button type="submit" disabled={!formik.isValid || busyGenerate}>
                     {busyGenerate ? "Generando..." : "Generar firma"}
                   </Button>
-                </Stack>
-              </Stack>
+                </div>
+              </div>
             </form>
 
-            <Divider sx={{ my: 2 }} />
+            <Divider className="my-4" />
 
-            <Typography level="title-md" sx={{ mb: 1 }}>
+            <Typography variant="h5" className="mb-1">
               Logos
             </Typography>
-            <Box sx={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 2 }}>
+            <div className="grid grid-cols-2 gap-4">
               <LogoCard title="Original" data={original} />
               <LogoCard title="Procesado" data={enhanced} />
-            </Box>
-          </Box>
+            </div>
+          </div>
 
           {/* RIGHT */}
-          <Box>
-            <Typography level="title-md" sx={{ mb: 1 }}>
+          <div>
+            <Typography variant="h5" className="mb-1">
               Preview
             </Typography>
             <div className="bg-white p-8 rounded-lg">
               {signatureHtml ? (
                 <div dangerouslySetInnerHTML={{ __html: signatureHtml }} />
               ) : (
-                <Typography level="body-sm" sx={{ opacity: 0.8 }}>
+                <Typography variant="bodySm" className="opacity-80">
                   Genera la firma para ver el preview.
                 </Typography>
               )}
             </div>
 
             {signatureHtml && (
-              <Button variant="outlined" onClick={() => copyHtml(signatureHtml)}>
+              <Button variant="outlined" onClick={() => copyHtml(signatureHtml)} className="mt-4">
                 Copy Signature
               </Button>
             )}
-          </Box>
-        </Box>
+          </div>
+        </div>
     </>
   );
 }
 
 function LogoCard({ title, data }: { title: string; data: UploadResult | null }) {
   return (
-    <Sheet variant="outlined" sx={{ borderRadius: "lg", p: 1.5 }}>
-      <Typography level="title-sm" sx={{ mb: 1 }}>
+    <Card variant="outlined" padding="sm" rounded="lg">
+      <Typography variant="h6" className="mb-1">
         {title}
       </Typography>
       {data?.secure_url ? (
-        <Stack spacing={1}>
-          <AspectRatio ratio="4/2">
-            <img src={data.secure_url} alt={title} style={{ objectFit: "contain" }} />
-          </AspectRatio>
-          <Typography level="body-xs" sx={{ opacity: 0.8 }}>
+        <div className="flex flex-col gap-2">
+          <div className="relative w-full aspect-[2/1] overflow-hidden rounded-md">
+            <img src={data.secure_url} alt={title} className="absolute inset-0 h-full w-full object-contain" />
+          </div>
+          <Typography variant="caption" className="opacity-80">
             {data.width}×{data.height} • {Math.round((data.bytes ?? 0) / 1024)} KB • {data.format}
           </Typography>
-        </Stack>
+        </div>
       ) : (
-        <Typography level="body-xs" sx={{ opacity: 0.7 }}>
+        <Typography variant="caption" className="opacity-70">
           Sin imagen
         </Typography>
       )}
-    </Sheet>
+    </Card>
   );
 }

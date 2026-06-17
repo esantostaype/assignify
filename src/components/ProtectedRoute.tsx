@@ -3,11 +3,16 @@
 
 import React from 'react'
 import { useAuth } from '@/contexts/AuthContext'
-import { Box, CircularProgress, Typography } from '@mui/joy'
+import { Spinner } from '@/components/ui'
+import { Typography } from '@/components/ui/typography'
 
 interface ProtectedRouteProps {
   children: React.ReactNode
   fallback?: React.ReactNode
+}
+
+const screenStyle: React.CSSProperties = {
+  background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
 }
 
 export function ProtectedRoute({ children, fallback }: ProtectedRouteProps) {
@@ -17,22 +22,15 @@ export function ProtectedRoute({ children, fallback }: ProtectedRouteProps) {
   if (loading) {
     return (
       fallback || (
-        <Box
-          sx={{
-            display: 'flex',
-            flexDirection: 'column',
-            alignItems: 'center',
-            justifyContent: 'center',
-            minHeight: '100vh',
-            gap: 2,
-            background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-          }}
+        <div
+          className="flex flex-col items-center justify-center min-h-screen gap-4"
+          style={screenStyle}
         >
-          <CircularProgress size="lg" />
-          <Typography level="body-md" color="neutral">
+          <Spinner size={36} colorClassName="text-white" />
+          <Typography variant="body" color="white">
             Verifying authentication...
           </Typography>
-        </Box>
+        </div>
       )
     )
   }
@@ -41,25 +39,18 @@ export function ProtectedRoute({ children, fallback }: ProtectedRouteProps) {
   // Pero mostramos un mensaje por si acaso
   if (!user) {
     return (
-      <Box
-        sx={{
-          display: 'flex',
-          flexDirection: 'column',
-          alignItems: 'center',
-          justifyContent: 'center',
-          minHeight: '100vh',
-          gap: 2,
-          background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-        }}
+      <div
+        className="flex flex-col items-center justify-center min-h-screen gap-4"
+        style={screenStyle}
       >
-        <Typography level="h4" color="neutral">
+        <Typography variant="h4" color="white">
           Access Denied
         </Typography>
-        <Typography level="body-md" color="neutral">
+        <Typography variant="body" color="white">
           Redirecting to login...
         </Typography>
-        <CircularProgress size="sm" />
-      </Box>
+        <Spinner size={24} colorClassName="text-white" />
+      </div>
     )
   }
 
@@ -70,7 +61,7 @@ export function ProtectedRoute({ children, fallback }: ProtectedRouteProps) {
 // Hook personalizado optimizado
 export function useRequireAuth() {
   const { user, loading } = useAuth()
-  
+
   return {
     user,
     loading,

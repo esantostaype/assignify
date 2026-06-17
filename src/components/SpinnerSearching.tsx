@@ -1,5 +1,4 @@
-import { HugeiconsIcon } from '@hugeicons/react'
-import { Search01Icon, UserIdVerificationIcon } from '@hugeicons/core-free-icons'
+import { Icon, PiMagnifyingGlass, PiIdentificationBadge } from '@/lib/icons'
 
 interface Props {
   isActive?: boolean;
@@ -17,17 +16,17 @@ export const SpinnerSearching = ({ isActive }: Props) => {
           <div className="relative z-20">
             <div className="orbit-container">
               <div className="orbiting-icon">
-                <HugeiconsIcon icon={Search01Icon} size={32} strokeWidth={1.5} />
+                <Icon icon={PiMagnifyingGlass} size={32} strokeWidth={1.5} />
               </div>
-            </div>         
+            </div>
           </div>
           <div className='absolute top-0 z-10'>
-            <HugeiconsIcon icon={UserIdVerificationIcon} size={48} strokeWidth={1.5} color="var(--color-gray-600)" />
+            <Icon icon={PiIdentificationBadge} size={48} strokeWidth={1.5} color="var(--color-text-muted)" />
           </div>
         </div>
         <div>Matching designer...</div>
       </div>
-      <span className="absolute z-10 h-dvh w-full bg-background opacity-80 top-0 left-0"></span>
+      <span className="absolute z-10 h-dvh w-full bg-(--color-surface-app) opacity-80 top-0 left-0"></span>
     </div>
   );
 };

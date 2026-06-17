@@ -1,19 +1,8 @@
 "use client";
 
 import React, { useState } from "react";
-import {
-  Button,
-  Input,
-  FormControl,
-  FormLabel,
-  Alert,
-} from "@mui/joy";
-import { HugeiconsIcon } from "@hugeicons/react";
-import {
-  UserIcon,
-  LockPasswordIcon,
-  Login02Icon,
-} from "@hugeicons/core-free-icons";
+import { Button, Input, Alert } from "@/components/ui";
+import { Icon, PiUser, PiLock, PiSignOut } from "@/lib/icons";
 import Image from "next/image";
 
 export default function LoginPage() {
@@ -44,10 +33,10 @@ export default function LoginPage() {
 
       if (data.success) {
         console.log("✅ Login successful, redirecting...");
-        
+
         // Redirección inmediata sin delay
         window.location.href = '/tasks';
-        
+
       } else {
         console.log("❌ Login failed:", data.message);
         setError(data.message || "Login failed");
@@ -62,23 +51,20 @@ export default function LoginPage() {
 
   return (
       <div className="flex min-h-screen items-center justify-center p-4">
-        <div className="w-full max-w-md bg-surface p-10 rounded-lg">
+        <div className="w-full max-w-md bg-(--color-surface-card) p-10 rounded-lg">
           <Image src="/images/logo.svg" alt="Assignify" width={160} height={38} className="mx-auto mb-8" />
           {error && (
-            <Alert color="danger" sx={{ mb: 2 }}>
+            <Alert tone="error" className="mb-4">
               {error}
             </Alert>
           )}
 
           <form onSubmit={handleSubmit}>
-            <FormControl sx={{ mb: 2 }}>
-              <FormLabel>
-                <HugeiconsIcon
-                  icon={UserIcon}
-                  size={20}
-                />
+            <div className="mb-4">
+              <label className="flex items-center gap-2 mb-1.5 text-sm font-semibold text-(--color-text-default)">
+                <Icon icon={PiUser} size={20} />
                 Email
-              </FormLabel>
+              </label>
               <Input
                 type="email"
                 placeholder="Enter your email"
@@ -88,16 +74,13 @@ export default function LoginPage() {
                 disabled={loading}
                 autoComplete="email"
               />
-            </FormControl>
+            </div>
 
-            <FormControl sx={{ mb: 4 }}>
-              <FormLabel>
-                <HugeiconsIcon
-                  icon={LockPasswordIcon}
-                  size={20}
-                />
+            <div className="mb-8">
+              <label className="flex items-center gap-2 mb-1.5 text-sm font-semibold text-(--color-text-default)">
+                <Icon icon={PiLock} size={20} />
                 Password
-              </FormLabel>
+              </label>
               <Input
                 type="password"
                 placeholder="Enter your password"
@@ -107,15 +90,15 @@ export default function LoginPage() {
                 disabled={loading}
                 autoComplete="current-password"
               />
-            </FormControl>
+            </div>
 
             <Button
               type="submit"
               fullWidth
               loading={loading}
               disabled={loading}
-              startDecorator={<HugeiconsIcon icon={Login02Icon} size={20} />}
-              sx={{ mb: 2 }}
+              startIcon={<Icon icon={PiSignOut} size={20} />}
+              className="mb-4"
             >
               {loading ? "Signing in..." : "Sign In"}
             </Button>

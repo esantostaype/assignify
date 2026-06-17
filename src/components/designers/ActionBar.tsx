@@ -1,13 +1,8 @@
 /* eslint-disable @typescript-eslint/no-unused-vars */
 import React from 'react';
-import { Button } from '@mui/joy';
+import { Button } from '@/components/ui';
 import { SearchBar } from './SearchBar';
-import { HugeiconsIcon } from '@hugeicons/react';
-import { 
-  CheckmarkSquare02Icon, 
-  DatabaseSync01Icon, 
-  RefreshIcon 
-} from '@hugeicons/core-free-icons';
+import { Icon, PiCheckSquare, PiArrowsClockwise } from '@/lib/icons';
 
 interface ActionBarProps {
   searchValue: string;
@@ -41,12 +36,12 @@ export const ActionBar: React.FC<ActionBarProps> = ({
         onChange={onSearchChange}
         className="flex-1 w-full md:w-sm"
       />
-      
+
       <div className="flex gap-2">
         <Button
           variant="soft"
           size="sm"
-          startDecorator={<HugeiconsIcon icon={CheckmarkSquare02Icon} size={16} />}
+          startIcon={<Icon icon={PiCheckSquare} size={16} />}
           onClick={onSelectAll}
           disabled={availableCount === 0}
         >
@@ -54,10 +49,10 @@ export const ActionBar: React.FC<ActionBarProps> = ({
         </Button>
 
         <Button
-          variant="solid"
+          variant="filled"
           color="primary"
           size="sm"
-          startDecorator={<HugeiconsIcon icon={DatabaseSync01Icon} size={16} />}
+          startIcon={<Icon icon={PiArrowsClockwise} size={16} />}
           onClick={onSync}
           disabled={selectedCount === 0}
           loading={syncing}
@@ -68,7 +63,7 @@ export const ActionBar: React.FC<ActionBarProps> = ({
         {/* <Button
           variant="soft"
           size="sm"
-          startDecorator={<HugeiconsIcon icon={RefreshIcon} size={16} />}
+          startIcon={<Icon icon={PiArrowsClockwise} size={16} />}
           onClick={onRefresh}
           disabled={loading}
           loading={loading}

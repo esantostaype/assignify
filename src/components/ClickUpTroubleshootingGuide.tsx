@@ -3,23 +3,21 @@
 "use client";
 
 import React, { useState } from 'react';
-import { 
-  Card, 
-  CardContent, 
-  Typography, 
+import {
+  Card,
+  Typography,
   Button,
   Alert,
   Accordion,
-  AccordionDetails,
-  AccordionSummary
-} from '@mui/joy';
-import { HugeiconsIcon } from '@hugeicons/react';
-import { 
-  InformationCircleIcon,
-  BugIcon,
-  ShieldEnergyIcon ,
-  Settings01Icon
-} from '@hugeicons/core-free-icons';
+  AccordionItem,
+} from '@/components/ui';
+import {
+  Icon,
+  PiInfo,
+  PiBug,
+  PiShieldCheck,
+  PiGear,
+} from '@/lib/icons';
 
 interface TroubleshootingGuideProps {
   error?: string;
@@ -76,49 +74,49 @@ export const ClickUpTroubleshootingGuide: React.FC<TroubleshootingGuideProps> = 
   return (
     <div className="space-y-4">
       {error && (
-        <Alert variant="soft" color="danger">
+        <Alert variant="soft" tone="error" icon={null}>
           <div className="flex flex-col gap-3">
             <div className="flex items-start gap-2">
-              <HugeiconsIcon icon={BugIcon} size={20} className="mt-0.5 flex-shrink-0" />
+              <Icon icon={PiBug} size={20} className="mt-0.5 flex-shrink-0" />
               <div className="flex-1">
-                <Typography level="title-sm">
+                <Typography variant="h6">
                   Error al sincronizar usuarios de ClickUp
                 </Typography>
-                <Typography level="body-sm" className="mt-1">
+                <Typography variant="bodySm" className="mt-1">
                   {error}
                 </Typography>
               </div>
             </div>
-            
+
             <div className="flex flex-wrap gap-2">
               {onRetryClick && (
                 <Button
                   size="sm"
                   variant="outlined"
-                  color="danger"
+                  color="error"
                   onClick={onRetryClick}
                 >
                   Reintentar
                 </Button>
               )}
-              
+
               {onDebugClick && (
                 <Button
                   size="sm"
                   variant="outlined"
                   color="warning"
-                  startDecorator={<HugeiconsIcon icon={BugIcon} size={16} />}
+                  startIcon={<Icon icon={PiBug} size={16} />}
                   onClick={onDebugClick}
                 >
                   Debug API
                 </Button>
               )}
-              
+
               <Button
                 size="sm"
                 variant="outlined"
                 color="neutral"
-                startDecorator={<HugeiconsIcon icon={InformationCircleIcon} size={16} />}
+                startIcon={<Icon icon={PiInfo} size={16} />}
                 onClick={() => setShowGuide(!showGuide)}
               >
                 {showGuide ? 'Ocultar' : 'Ver'} Guía
@@ -130,50 +128,48 @@ export const ClickUpTroubleshootingGuide: React.FC<TroubleshootingGuideProps> = 
 
       {showGuide && (
         <Card>
-          <CardContent>
-            <Typography level="title-md" className="mb-3 flex items-center gap-2">
-              <HugeiconsIcon icon={ShieldEnergyIcon } size={20} />
-              Guía de Solución de Problemas
-            </Typography>
-            
-            <div className="space-y-3">
-              {commonIssues.map((issue, index) => (
-                <Accordion key={index}>
-                  <AccordionSummary>
-                    <Typography level="title-sm">
-                      {issue.title}
-                    </Typography>
-                  </AccordionSummary>
-                  <AccordionDetails>
-                    <Typography level="body-sm" className="mb-2 text-gray-300">
-                      {issue.description}
-                    </Typography>
-                    <ul className="space-y-1 text-sm text-gray-400">
-                      {issue.solutions.map((solution, solutionIndex) => (
-                        <li key={solutionIndex} className="flex items-start gap-2">
-                          <span className="text-accent mt-1">•</span>
-                          <span>{solution}</span>
-                        </li>
-                      ))}
-                    </ul>
-                  </AccordionDetails>
-                </Accordion>
-              ))}
-            </div>
+          <Typography variant="h5" className="mb-3 flex items-center gap-2">
+            <Icon icon={PiShieldCheck} size={20} />
+            Guía de Solución de Problemas
+          </Typography>
 
-            <div className="mt-4 p-3 bg-blue-900/20 border border-blue-600 rounded-lg">
-              <Typography level="title-sm" className="mb-2 flex items-center gap-2 text-blue-300">
-                <HugeiconsIcon icon={Settings01Icon} size={16} />
-                Configuración Recomendada
-              </Typography>
-              <div className="text-sm text-blue-200 space-y-1">
-                <div>• <strong>Token Scope:</strong> Workspace-level API token</div>
-                <div>• <strong>Permisos:</strong> Admin o Owner en el workspace</div>
-                <div>• <strong>Variables de entorno:</strong> CLICKUP_API_TOKEN correctamente configurado</div>
-                <div>• <strong>Network:</strong> Conexión estable a internet</div>
-              </div>
+          <div className="space-y-3">
+            <Accordion mode="multiple">
+              {commonIssues.map((issue, index) => (
+                <AccordionItem
+                  key={index}
+                  id={`issue-${index}`}
+                  title={issue.title}
+                  isLast={index === commonIssues.length - 1}
+                >
+                  <Typography variant="bodySm" className="mb-2 text-(--color-text-muted)">
+                    {issue.description}
+                  </Typography>
+                  <ul className="space-y-1 text-sm text-(--color-text-subtle)">
+                    {issue.solutions.map((solution, solutionIndex) => (
+                      <li key={solutionIndex} className="flex items-start gap-2">
+                        <span className="text-primary-600 mt-1">•</span>
+                        <span>{solution}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </AccordionItem>
+              ))}
+            </Accordion>
+          </div>
+
+          <div className="mt-4 p-3 bg-blue-900/20 border border-blue-600 rounded-lg">
+            <Typography variant="h6" className="mb-2 flex items-center gap-2 text-blue-300">
+              <Icon icon={PiGear} size={16} />
+              Configuración Recomendada
+            </Typography>
+            <div className="text-sm text-blue-200 space-y-1">
+              <div>• <strong>Token Scope:</strong> Workspace-level API token</div>
+              <div>• <strong>Permisos:</strong> Admin o Owner en el workspace</div>
+              <div>• <strong>Variables de entorno:</strong> CLICKUP_API_TOKEN correctamente configurado</div>
+              <div>• <strong>Network:</strong> Conexión estable a internet</div>
             </div>
-          </CardContent>
+          </div>
         </Card>
       )}
     </div>

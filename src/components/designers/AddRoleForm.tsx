@@ -1,8 +1,7 @@
 
 import React, { useState } from 'react';
-import { Button, Select, Option, FormControl, FormLabel } from '@mui/joy';
-import { HugeiconsIcon } from '@hugeicons/react';
-import { PlusSignIcon } from '@hugeicons/core-free-icons';
+import { Button, Select, type SelectOption } from '@/components/ui';
+import { Icon, PiPlus } from '@/lib/icons';
 
 interface AddRoleFormProps {
   taskTypes: Array<{ id: number; name: string }>;
@@ -32,62 +31,56 @@ export const AddRoleForm: React.FC<AddRoleFormProps> = ({
     }
   };
 
+  const typeOptions: SelectOption[] =
+    loadingTypes && taskTypes.length === 0
+      ? [{ value: '', label: 'Loading types...', disabled: true }]
+      : taskTypes.map((type) => ({
+          value: type.id.toString(),
+          label: type.name,
+        }));
+
+  const brandOptions: SelectOption[] =
+    loadingBrands && brands.length === 0
+      ? [{ value: '', label: 'Loading brands...', disabled: true }]
+      : [
+          { value: '', label: 'Global (All brands)' },
+          ...brands.map((brand) => ({ value: brand.id, label: brand.name })),
+        ];
+
   return (
-    <div className="flex gap-2 mt-3">
-      <FormControl sx={{ flex: 1 }}>
-        <FormLabel>Role Type</FormLabel>
+    <div className="flex gap-2 mt-3 items-end">
+      <div className="flex-1">
         <Select
+          label="Role Type"
+          options={typeOptions}
           value={typeId}
-          onChange={(_, value) => setTypeId(value as string)}
+          onChange={(value) => setTypeId(value)}
           placeholder="Select role type"
           disabled={loadingTypes}
-          size='sm'
-        >
-          {loadingTypes && taskTypes.length === 0 ? (
-            <Option value="" disabled>Loading types...</Option>
-          ) : (
-            taskTypes.map((type) => (
-              <Option key={type.id} value={type.id.toString()}>
-                {type.name}
-              </Option>
-            ))
-          )}
-        </Select>
-      </FormControl>
-      
-      <FormControl sx={{ flex: 1 }}>
-        <FormLabel>Brand (Optional)</FormLabel>
+          size="sm"
+        />
+      </div>
+
+      <div className="flex-1">
         <Select
+          label="Brand (Optional)"
+          options={brandOptions}
           value={brandId}
-          onChange={(_, value) => setBrandId(value as string)}
+          onChange={(value) => setBrandId(value)}
           placeholder="Select brand (optional)"
           disabled={loadingBrands}
-          size='sm'
-        >
-          {loadingBrands && brands.length === 0 ? (
-            <Option value="" disabled>Loading brands...</Option>
-          ) : (
-            <>
-              <Option value="">Global (All brands)</Option>
-              {brands.map((brand) => (
-                <Option key={brand.id} value={brand.id}>
-                  {brand.name}
-                </Option>
-              ))}
-            </>
-          )}
-        </Select>
-      </FormControl>
-      
+          size="sm"
+        />
+      </div>
+
       <Button
-        variant="solid"
+        variant="filled"
         color="primary"
-        startDecorator={<HugeiconsIcon icon={PlusSignIcon} size={16} />}
+        startIcon={<Icon icon={PiPlus} size={16} />}
         onClick={handleAdd}
         disabled={!typeId || loadingTypes || loadingBrands}
         loading={loading}
-        sx={{ mt: 'auto' }}
-        size='sm'
+        size="sm"
       >
         Add Role
       </Button>

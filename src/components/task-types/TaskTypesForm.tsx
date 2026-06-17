@@ -3,23 +3,11 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 "use client";
 import React, { useState, useEffect } from "react";
-import {
-  Button,
-  Input,
-  IconButton,
-  LinearProgress,
-  Alert,
-  FormLabel,
-} from "@mui/joy";
-import { HugeiconsIcon } from "@hugeicons/react";
-import {
-  Add01Icon,
-  Delete02Icon,
-  SwatchIcon,
-} from "@hugeicons/core-free-icons";
+import { Button, Input, IconButton, Typography, Spinner } from "@/components/ui";
+import { Icon, PiPlus, PiTrash } from "@/lib/icons";
 import { useTaskDataInvalidation } from "@/hooks/useTaskData";
 import axios from "axios";
-import { toast } from "react-toastify";
+import toast from "react-hot-toast";
 import { TableTd, TableTh } from "@/components";
 import { useConfirmationStore } from "@/stores/confirmationStore";
 
@@ -33,15 +21,15 @@ interface TaskType {
 
 // Agregar este componente dentro del archivo, antes del componente principal:
 const TaskTypeSkeleton: React.FC = () => (
-  <tr className="border-t border-white/5 animate-pulse">
+  <tr className="border-t border-(--color-border-default) animate-pulse">
     <TableTd>
-      <div className="h-3 bg-white/10 rounded w-32"></div>
+      <div className="h-3 bg-(--color-surface-hover) rounded w-32"></div>
     </TableTd>
     <TableTd>
-      <div className="h-3 bg-white/5 rounded w-20"></div>
+      <div className="h-3 bg-(--color-surface-hover) rounded w-20"></div>
     </TableTd>
     <TableTd>
-      <div className="size-8 bg-white/10 rounded"></div>
+      <div className="size-8 bg-(--color-surface-hover) rounded"></div>
     </TableTd>
   </tr>
 );
@@ -198,9 +186,9 @@ export const TaskTypesForm: React.FC = () => {
       {/* Existing Types Table */}
       {loading || types.length > 0 ? (
         <div className="mb-6">
-          <div className="border border-white/10 rounded-lg overflow-hidden">
+          <div className="border border-(--color-border-default) rounded-lg overflow-hidden">
             <table className="w-full text-sm">
-              <thead className="bg-white/5">
+              <thead className="bg-(--color-surface-hover)">
                 <tr>
                   <TableTh>
                     <span>Name</span>
@@ -222,7 +210,7 @@ export const TaskTypesForm: React.FC = () => {
                 ) : (
                   // Datos reales
                   types.map((type) => (
-                    <tr key={type.id} className="border-t border-white/5">
+                    <tr key={type.id} className="border-t border-(--color-border-default)">
                       <TableTd>
                         {editingId === type.id ? (
                           <Input
@@ -237,7 +225,7 @@ export const TaskTypesForm: React.FC = () => {
                         ) : (
                           <span
                             onClick={() => startEditing(type)}
-                            className="cursor-pointer hover:text-accent transition-colors w-[10rem]"
+                            className="cursor-pointer hover:text-primary-600 transition-colors w-[10rem]"
                             title="Click to edit"
                           >
                             {type.name}
@@ -246,7 +234,7 @@ export const TaskTypesForm: React.FC = () => {
                       </TableTd>
                       <TableTd>
                         <div>
-                          <span className="text-sm text-gray-500">
+                          <span className="text-sm text-(--color-text-muted)">
                             {type.categories?.length || 0} categories
                           </span>
                         </div>
@@ -254,14 +242,18 @@ export const TaskTypesForm: React.FC = () => {
                       <TableTd>
                         <div>
                           <IconButton
+                            aria-label="Delete task type"
                             size="sm"
-                            color="danger"
+                            color="error"
                             variant="soft"
                             onClick={() => confirmDelete(type)}
-                            loading={deleting === type.id}
-                            disabled={editingId === type.id}
+                            disabled={editingId === type.id || deleting === type.id}
                           >
-                            <HugeiconsIcon icon={Delete02Icon} size={16} />
+                            {deleting === type.id ? (
+                              <Spinner colorClassName="" />
+                            ) : (
+                              <Icon icon={PiTrash} size={16} />
+                            )}
                           </IconButton>
                         </div>
                       </TableTd>
@@ -276,8 +268,8 @@ export const TaskTypesForm: React.FC = () => {
 
       {/* Add New Type */}
       <div>
-        <FormLabel>Add New Task Type</FormLabel>
-        <div className="flex gap-2">
+        <Typography variant="label" as="label">Add New Task Type</Typography>
+        <div className="flex gap-2 mt-1.5">
           <Input
             placeholder="Enter task type name..."
             value={newTypeName}
@@ -285,14 +277,14 @@ export const TaskTypesForm: React.FC = () => {
             onKeyDown={handleKeyPress}
             size="md"
             className="flex-1"
-            disabled={loading || saving || editingId !== null} // ✅ Agregar loading
+            disabled={loading || saving || editingId !== null}
           />
           <Button
-            startDecorator={<HugeiconsIcon icon={Add01Icon} size={16} />}
+            startIcon={<Icon icon={PiPlus} size={16} />}
             onClick={addNewType}
             disabled={
               loading || !newTypeName.trim() || saving || editingId !== null
-            } // ✅ Agregar loading
+            }
             loading={saving && !editingId}
             color="primary"
           >
@@ -302,8 +294,8 @@ export const TaskTypesForm: React.FC = () => {
       </div>
 
       {/* Instructions */}
-      <div className="mt-6 pt-4 border-t border-white/10">
-        <p className="text-sm text-gray-500 text-center">
+      <div className="mt-6 pt-4 border-t border-(--color-border-default)">
+        <p className="text-sm text-(--color-text-muted) text-center">
           Click on a task type name to edit it • Press Enter to save • Press
           Escape to cancel
         </p>

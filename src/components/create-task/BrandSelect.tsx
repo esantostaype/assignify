@@ -1,8 +1,8 @@
 import React from "react";
-import { Select, Option, FormLabel } from "@mui/joy";
+import { Select } from "@/components/ui";
+import { Typography } from "@/components/ui/typography";
 import { Brand } from "@/interfaces";
-import { HugeiconsIcon } from "@hugeicons/react";
-import { Bookmark02Icon } from "@hugeicons/core-free-icons";
+import { Icon, PiTag } from "@/lib/icons";
 import { TextFieldError } from "@/components";
 
 interface BrandSelectProps {
@@ -23,22 +23,18 @@ export const BrandSelect: React.FC<BrandSelectProps> = ({
   loading = false,
 }) => (
   <div>
-    <FormLabel>
-      <HugeiconsIcon icon={Bookmark02Icon} size={20} strokeWidth={1.5} />
+    <Typography variant="label" className="flex items-center gap-1.5 mb-1.5">
+      <Icon icon={PiTag} size={18} />
       Brand
-    </FormLabel>
+    </Typography>
     <Select
       value={value}
-      onChange={(_, val) => onChange(val as string)}
+      onChange={(val) => onChange(val)}
       placeholder={loading ? "Loading brands..." : "Select a brand"}
       disabled={loading}
-    >
-      {brands.map((brand) => (
-        <Option key={brand.id} value={brand.id}>
-          {brand.name}
-        </Option>
-      ))}
-    </Select>
+      invalid={touched && !!error}
+      options={brands.map((brand) => ({ value: brand.id, label: brand.name }))}
+    />
     {touched && error && <TextFieldError label={error} />}
   </div>
 );

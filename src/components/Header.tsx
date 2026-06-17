@@ -1,9 +1,9 @@
 'use client'
-import { HugeiconsIcon } from '@hugeicons/react'
-import { Layers01Icon, Queue01Icon, Logout02Icon, SwatchIcon, UserIcon, UserGroup03Icon } from '@hugeicons/core-free-icons'
+import { Layers01Icon, Queue01Icon, SwatchIcon, UserGroup03Icon } from '@hugeicons/core-free-icons'
 import Image from 'next/image'
 import { NavItem, TaskTypesForm, TierListForm } from '@/components'
-import { Button } from '@mui/joy'
+import { Button } from '@/components/ui'
+import { Icon, PiUser, PiSignOut } from '@/lib/icons'
 import { useModalStore } from '@/stores/modalStore'
 import { useConfirmationStore } from '@/stores/confirmationStore'
 import { useAuth } from '@/contexts/AuthContext'
@@ -53,7 +53,7 @@ export const Header = () => {
   ]
 
   return (
-    <header className="sticky top-0 bg-background/70 backdrop-blur-lg z-50 flex items-center justify-between px-4 border-b border-b-white/10">
+    <header className="sticky top-0 bg-(--color-surface-app)/70 backdrop-blur-lg z-50 flex items-center justify-between px-4 border-b border-b-(--color-border-default)">
       <div className='flex items-center gap-4'>
         <Image src="/images/logo.svg" alt="Assignify" width={132} height={38} />
         <ul className="flex items-center gap-3 text-sm mb-[-1px]">
@@ -62,23 +62,23 @@ export const Header = () => {
           ))}
         </ul>
       </div>
-      
+
       <div className="flex items-center gap-3">
         {/* User info - opcional */}
         {user && (
-          <span className="text-sm text-gray-300 hidden sm:flex sm:items-center sm:gap-1">
-            <HugeiconsIcon icon={UserIcon} size={20} />  
+          <span className="text-sm text-(--color-text-muted) hidden sm:flex sm:items-center sm:gap-1">
+            <Icon icon={PiUser} size={20} />
             {user.email}
           </span>
         )}
-        
+
         {/* Logout button */}
-        <Button 
-          size='sm' 
-          variant='plain'
+        <Button
+          size='sm'
+          variant='ghost'
           onClick={handleLogoutClick}
-          color='danger'
-          startDecorator={<HugeiconsIcon icon={Logout02Icon} size={20} strokeWidth={1.5} />}
+          color='error'
+          startIcon={<Icon icon={PiSignOut} size={20} />}
         >
           Logout
         </Button>

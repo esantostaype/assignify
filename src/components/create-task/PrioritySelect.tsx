@@ -1,7 +1,7 @@
 import React from 'react'
-import { Select, Option, FormLabel } from '@mui/joy'
-import { HugeiconsIcon } from '@hugeicons/react'
-import { Flag02Icon } from '@hugeicons/core-free-icons'
+import { Select } from '@/components/ui'
+import { Typography } from '@/components/ui/typography'
+import { Icon, PiTarget } from '@/lib/icons'
 import { TextFieldError } from '@/components'
 
 interface PrioritySelectProps {
@@ -11,31 +11,31 @@ interface PrioritySelectProps {
   error?: string
 }
 
-export const PrioritySelect: React.FC<PrioritySelectProps> = ({ 
-  value, 
-  onChange, 
-  touched, 
-  error 
+const PRIORITY_OPTIONS = [
+  { value: 'LOW', label: 'Low' },
+  { value: 'NORMAL', label: 'Normal' },
+  { value: 'HIGH', label: 'High' },
+  { value: 'URGENT', label: 'Urgent' },
+]
+
+export const PrioritySelect: React.FC<PrioritySelectProps> = ({
+  value,
+  onChange,
+  touched,
+  error
 }) => (
   <div>
-    <FormLabel>
-      <HugeiconsIcon
-        icon={ Flag02Icon }
-        size={ 20 }
-        strokeWidth={ 1.5 }
-      />
+    <Typography variant="label" className="flex items-center gap-1.5 mb-1.5">
+      <Icon icon={PiTarget} size={18} />
       Priority
-    </FormLabel>
+    </Typography>
     <Select
       value={value}
-      onChange={(_, val) => onChange(val as string)}
+      onChange={(val) => onChange(val)}
       placeholder="Normal"
-    >
-      <Option value="LOW">Low</Option>
-      <Option value="NORMAL">Normal</Option>
-      <Option value="HIGH">High</Option>
-      <Option value="URGENT">Urgent</Option>
-    </Select>
+      options={PRIORITY_OPTIONS}
+      invalid={touched && !!error}
+    />
     { touched && error && ( <TextFieldError label={ error } /> )}
 </div>
 )

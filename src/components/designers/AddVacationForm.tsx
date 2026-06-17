@@ -1,9 +1,8 @@
 /* eslint-disable @typescript-eslint/no-unused-vars */
 // src/components/designers/AddVacationForm.tsx - ENHANCED VERSION
 import React, { useState, useEffect } from 'react';
-import { Button, Input, FormControl, FormLabel, Alert } from '@mui/joy';
-import { HugeiconsIcon } from '@hugeicons/react';
-import { PlusSignIcon, Alert01Icon } from '@hugeicons/core-free-icons';
+import { Button, Input, Alert } from '@/components/ui';
+import { Icon, PiPlus, PiWarning } from '@/lib/icons';
 
 interface Vacation {
   id: number
@@ -52,7 +51,7 @@ export const AddVacationForm: React.FC<AddVacationFormProps> = ({
 
     const startDateObj = new Date(start);
     const endDateObj = new Date(end);
-    
+
     if (startDateObj >= endDateObj) {
       return { hasConflict: false, conflictingVacations: [], conflictType: 'none' };
     }
@@ -69,16 +68,16 @@ export const AddVacationForm: React.FC<AddVacationFormProps> = ({
     for (const vacation of existingVacations) {
       const vacStart = new Date(vacation.startDate);
       const vacEnd = new Date(vacation.endDate);
-      
+
       // Check for overlap
       const hasOverlap = startDateObj <= vacEnd && endDateObj >= vacStart;
-      
+
       // Check for adjacency (within 1 day)
       const dayBefore = new Date(vacStart);
       dayBefore.setDate(dayBefore.getDate() - 1);
       const dayAfter = new Date(vacEnd);
       dayAfter.setDate(dayAfter.getDate() + 1);
-      
+
       const isAdjacent = (
         startDateObj.getTime() === dayAfter.getTime() ||
         endDateObj.getTime() === dayBefore.getTime()
@@ -88,7 +87,7 @@ export const AddVacationForm: React.FC<AddVacationFormProps> = ({
         const durationDays = Math.ceil(
           (vacEnd.getTime() - vacStart.getTime()) / (1000 * 60 * 60 * 24)
         );
-        
+
         conflictingVacations.push({
           id: vacation.id,
           startDate: vacation.startDate,
@@ -120,12 +119,12 @@ export const AddVacationForm: React.FC<AddVacationFormProps> = ({
   // ✅ Enhanced validation
   const isFormValid = () => {
     if (!startDate || !endDate) return false;
-    
+
     const start = new Date(startDate);
     const end = new Date(endDate);
-    
+
     if (start >= end) return false;
-    
+
     // Allow form submission even with conflicts (user can decide)
     return true;
   };
@@ -149,7 +148,7 @@ export const AddVacationForm: React.FC<AddVacationFormProps> = ({
   const handleStartDateChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const newStartDate = event.target.value;
     setStartDate(newStartDate);
-    
+
     // Auto-adjust end date if it's before start date
     if (endDate && newStartDate && new Date(newStartDate) >= new Date(endDate)) {
       const nextDay = new Date(newStartDate);
@@ -168,37 +167,36 @@ export const AddVacationForm: React.FC<AddVacationFormProps> = ({
 
   return (
     <div className="space-y-4">
-      <div className="flex gap-2">
-        <FormControl sx={{ flex: 1 }}>
-          <FormLabel>Start Date</FormLabel>
+      <div className="flex gap-2 items-end">
+        <div className="flex-1">
           <Input
+            label="Start Date"
             type="date"
             value={startDate}
             onChange={handleStartDateChange}
-            slotProps={{ input: { min: getTodayString() } }}
-            size='sm'
+            min={getTodayString()}
+            size="sm"
           />
-        </FormControl>
-        
-        <FormControl sx={{ flex: 1 }}>
-          <FormLabel>End Date</FormLabel>
+        </div>
+
+        <div className="flex-1">
           <Input
+            label="End Date"
             type="date"
             value={endDate}
             onChange={(event) => setEndDate(event.target.value)}
-            slotProps={{ input: { min: startDate || getTodayString() } }}
-            size='sm'
+            min={startDate || getTodayString()}
+            size="sm"
           />
-        </FormControl>
-        
+        </div>
+
         <Button
-          variant="solid"
+          variant="filled"
           color="primary"
-          startDecorator={<HugeiconsIcon icon={PlusSignIcon} size={16} />}
+          startIcon={<Icon icon={PiPlus} size={16} />}
           onClick={handleAdd}
           disabled={!isFormValid() || loading}
           loading={loading}
-          sx={{ mt: 'auto' }}
           size="sm"
         >
           Add Vacation
@@ -208,18 +206,19 @@ export const AddVacationForm: React.FC<AddVacationFormProps> = ({
       {/* ✅ Conflict warnings */}
       {conflictInfo.hasConflict && (
         <Alert
-          color={conflictInfo.conflictType === 'overlap' ? 'danger' : 'warning'}
+          tone={conflictInfo.conflictType === 'overlap' ? 'error' : 'warning'}
           variant="soft"
-          startDecorator={<HugeiconsIcon icon={Alert01Icon} size={20} />}
+          icon={PiWarning}
+          iconSize={20}
         >
           <div>
             <div className="font-medium mb-2">
-              {conflictInfo.conflictType === 'overlap' 
-                ? '⚠️ Date Overlap Detected' 
+              {conflictInfo.conflictType === 'overlap'
+                ? '⚠️ Date Overlap Detected'
                 : '📅 Adjacent Vacation Detected'
               }
             </div>
-            
+
             <div className="text-sm space-y-1">
               {conflictInfo.conflictType === 'overlap' && (
                 <p>The selected dates overlap with existing vacation(s):</p>
@@ -227,7 +226,7 @@ export const AddVacationForm: React.FC<AddVacationFormProps> = ({
               {conflictInfo.conflictType === 'adjacent' && (
                 <p>The selected dates are adjacent to existing vacation(s). Consider merging:</p>
               )}
-              
+
               <ul className="list-disc list-inside space-y-1 mt-2">
                 {conflictInfo.conflictingVacations.map((vacation) => (
                   <li key={vacation.id}>
@@ -237,7 +236,7 @@ export const AddVacationForm: React.FC<AddVacationFormProps> = ({
                   </li>
                 ))}
               </ul>
-              
+
               {conflictInfo.conflictType === 'overlap' && (
                 <p className="mt-2 text-xs opacity-80">
                   Please adjust the dates to avoid overlap, or delete the conflicting vacation first.
@@ -255,14 +254,14 @@ export const AddVacationForm: React.FC<AddVacationFormProps> = ({
 
       {/* ✅ Validation message for invalid date range */}
       {startDate && endDate && new Date(startDate) >= new Date(endDate) && (
-        <Alert color="danger" variant="soft" size="sm">
+        <Alert tone="error" variant="soft">
           End date must be after start date
         </Alert>
       )}
 
       {/* ✅ Duration preview */}
       {startDate && endDate && new Date(startDate) < new Date(endDate) && (
-        <div className="text-sm text-gray-400">
+        <div className="text-sm text-(--color-text-subtle)">
           Duration: {Math.ceil((new Date(endDate).getTime() - new Date(startDate).getTime()) / (1000 * 60 * 60 * 24))} days
         </div>
       )}

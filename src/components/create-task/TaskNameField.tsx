@@ -1,8 +1,8 @@
 import React from 'react'
 import { Field } from 'formik'
-import { FormLabel, Input } from '@mui/joy'
-import { HugeiconsIcon } from '@hugeicons/react'
-import { Note01Icon } from '@hugeicons/core-free-icons'
+import { Input } from '@/components/ui'
+import { Typography } from '@/components/ui/typography'
+import { Icon, PiNote } from '@/lib/icons'
 import { TextFieldError } from '@/components'
 
 interface TaskNameFieldProps {
@@ -12,18 +12,14 @@ interface TaskNameFieldProps {
 
 export const TaskNameField: React.FC<TaskNameFieldProps> = ({ touched, error }) => (
   <div>
-    <FormLabel>
-      <HugeiconsIcon
-        icon={ Note01Icon }
-        size={ 20 }
-        strokeWidth={ 1.5 }
-      />
+    <Typography variant="label" className="flex items-center gap-1.5 mb-1.5">
+      <Icon icon={PiNote} size={18} />
       Task Name
-    </FormLabel>
+    </Typography>
     <Field
       as={Input}
       name="name"
-      error={touched && !!error}
+      invalid={touched && !!error}
       placeholder="Enter a Task Name"
     />
     { touched && error && ( <TextFieldError label={ error } /> )}

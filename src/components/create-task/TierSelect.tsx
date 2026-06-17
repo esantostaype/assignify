@@ -1,8 +1,8 @@
 "use client";
 import React from "react";
-import { Select, Option, FormLabel } from "@mui/joy";
-import { HugeiconsIcon } from "@hugeicons/react";
-import { Layers01Icon } from "@hugeicons/core-free-icons";
+import { Select } from "@/components/ui";
+import { Typography } from "@/components/ui/typography";
+import { Icon, PiSteps } from "@/lib/icons";
 import { TextFieldError } from "@/components";
 import { formatDaysToReadable } from "@/utils/duration-utils";
 import { TierInfo } from "@/interfaces";
@@ -37,27 +37,30 @@ export const TierSelect: React.FC<TierSelectProps> = ({
 
   return (
     <div>
-      <FormLabel>
-        <HugeiconsIcon icon={Layers01Icon} size={20} strokeWidth={1.5} />
+      <Typography variant="label" className="flex items-center gap-1.5 mb-1.5">
+        <Icon icon={PiSteps} size={18} />
         Tier
-      </FormLabel>
+      </Typography>
 
       <Select
         placeholder={loading ? "Loading tiers..." : "Select a tier"}
-        value={value}
-        onChange={(_, val) => onChange(val as string | null)}
+        value={value ?? undefined}
+        onChange={(val) => onChange(val)}
         disabled={loading}
-        color={touched && error ? "danger" : "neutral"}
-      >
-        {sortedTiers.map((tier) => (
-          <Option key={tier.id} value={tier.id.toString()}>
-            <span style={{ fontWeight: 600, marginRight: 8 }}>{tier.name}</span>
-            <span style={{ opacity: 0.6, fontSize: "0.8rem" }}>
-              {formatDaysToReadable(tier.duration)}
-            </span>
-          </Option>
-        ))}
-      </Select>
+        invalid={!!(touched && error)}
+        options={sortedTiers.map((tier) => ({
+          value: tier.id.toString(),
+          label: (
+            <>
+              <span style={{ fontWeight: 600, marginRight: 8 }}>{tier.name}</span>
+              <span style={{ opacity: 0.6, fontSize: "0.8rem" }}>
+                {formatDaysToReadable(tier.duration)}
+              </span>
+            </>
+          ),
+          searchValue: tier.name,
+        }))}
+      />
 
       {touched && error && <TextFieldError label={error} />}
     </div>

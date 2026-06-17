@@ -7,23 +7,24 @@ import {
   Button,
   Input,
   Switch,
-  FormControl,
   IconButton,
   Tooltip,
-  LinearProgress,
+  Progress,
   Alert,
-} from "@mui/joy";
-import { HugeiconsIcon } from "@hugeicons/react";
+  Spinner,
+} from "@/components/ui";
 import {
-  Settings01Icon,
-  Download04Icon,
-  Alert01Icon,
-  InformationCircleIcon,
-  Rotate02Icon,
-  Clock01Icon,
-  Layers01Icon,
-  BriefcaseIcon,
-} from "@hugeicons/core-free-icons";
+  Icon,
+  PiGear,
+  PiDownloadSimple,
+  PiWarning,
+  PiInfo,
+  PiArrowsClockwise,
+  PiClock,
+  PiSquaresFour,
+  PiBriefcase,
+  type IconComponent,
+} from "@/lib/icons";
 import {
   useSettings,
   useUpdateSettings,
@@ -31,7 +32,7 @@ import {
 } from "@/hooks/useSettings";
 import { useTaskDataInvalidation } from "@/hooks/useTaskData"; // ✅ NUEVO IMPORT
 import axios from "axios";
-import { toast } from "react-toastify";
+import toast from "react-hot-toast";
 import { TableTh } from "../TableTh";
 import { TableTd } from "../TableTd";
 
@@ -56,7 +57,7 @@ export const SettingsForm: React.FC = () => {
   const { data: settingsData, isLoading, error, refetch } = useSettings();
   const updateSettingsMutation = useUpdateSettings();
   const resetSettingsMutation = useResetSettings();
-  
+
   // ✅ NUEVO: Hook para invalidar cache de task data
   const { invalidateTiers, invalidateAll } = useTaskDataInvalidation();
 
@@ -240,7 +241,7 @@ export const SettingsForm: React.FC = () => {
     ) {
       await resetSettingsMutation.mutateAsync();
       setTierChanges({});
-      
+
       // ✅ NUEVO: Invalidar todo el cache después del reset
       console.log('🔄 Invalidating all task data cache after settings reset...');
       invalidateAll();
@@ -265,7 +266,6 @@ export const SettingsForm: React.FC = () => {
                 event.target.checked
               )
             }
-            color={hasChanged ? "warning" : "primary"}
             size={size}
           />
         );
@@ -281,16 +281,11 @@ export const SettingsForm: React.FC = () => {
                 handleSettingChange(setting.category, setting.key, value);
               }
             }}
-            slotProps={{
-              input: {
-                min: setting.minValue,
-                max: setting.maxValue,
-                step: setting.key.includes("duration") ? 0.1 : 1,
-              },
-            }}
-            color={hasChanged ? "warning" : "neutral"}
+            min={setting.minValue}
+            max={setting.maxValue}
+            step={setting.key.includes("duration") ? 0.1 : 1}
             size={size}
-            className="w-24"
+            className={`w-24${hasChanged ? " border-warning-500" : ""}`}
           />
         );
 
@@ -299,7 +294,7 @@ export const SettingsForm: React.FC = () => {
         if (setting.key === 'tier_info') {
           return null;
         }
-        
+
         return (
           <Input
             value={currentValue.toString()}
@@ -310,9 +305,8 @@ export const SettingsForm: React.FC = () => {
                 event.target.value
               )
             }
-            color={hasChanged ? "warning" : "neutral"}
             size={size}
-            className="w-24"
+            className={`w-24${hasChanged ? " border-warning-500" : ""}`}
           />
         );
     }
@@ -359,15 +353,14 @@ export const SettingsForm: React.FC = () => {
   };
 
   // Group icons
-  const getGroupIcon = (groupName: string) => {
+  const getGroupIcon = (groupName: string): IconComponent => {
     switch (groupName) {
       case "work_schedule":
-        return Clock01Icon;
+        return PiClock;
       case "task_assignment":
-        return BriefcaseIcon;
-        return Layers01Icon;
+        return PiBriefcase;
       default:
-        return Settings01Icon;
+        return PiGear;
     }
   };
 
@@ -384,10 +377,10 @@ export const SettingsForm: React.FC = () => {
     return (
       <div className="p-8 max-w-6xl mx-auto">
         <div className="flex items-center gap-2 mb-4">
-          <HugeiconsIcon icon={Settings01Icon} size={20} />
+          <Icon icon={PiGear} size={20} />
           <span className="text-lg font-medium">Loading Settings...</span>
         </div>
-        <LinearProgress />
+        <Progress />
       </div>
     );
   }
@@ -395,7 +388,7 @@ export const SettingsForm: React.FC = () => {
   if (error) {
     return (
       <div className="p-8 max-w-6xl mx-auto">
-        <Alert color="danger" variant="soft">
+        <Alert tone="error" variant="soft" icon={null}>
           <div className="text-sm font-medium">Failed to load settings</div>
           <div className="text-xs mt-1">
             {error instanceof Error ? error.message : "Unknown error occurred"}
@@ -408,7 +401,7 @@ export const SettingsForm: React.FC = () => {
   if (!settingsData?.settings) {
     return (
       <div className="p-8 max-w-6xl mx-auto">
-        <Alert color="neutral" variant="soft">
+        <Alert tone="info" variant="soft" icon={null}>
           <span>No settings available</span>
         </Alert>
       </div>
@@ -421,7 +414,7 @@ export const SettingsForm: React.FC = () => {
   );
 
   return (
-    <div className="p-8">      
+    <div className="p-8">
 
       {/* Settings Groups */}
       <div className="space-y-6">
@@ -438,10 +431,10 @@ export const SettingsForm: React.FC = () => {
           return (
             <div key={groupName}>
               <div className="flex items-center gap-2 mb-4">
-                <HugeiconsIcon
+                <Icon
                   icon={GroupIcon}
                   size={20}
-                  className="text-accent"
+                  className="text-primary-600"
                 />
                 <h2 className="text-lg font-medium">
                   {getGroupDisplayName(groupName)}
@@ -449,15 +442,15 @@ export const SettingsForm: React.FC = () => {
               </div>
 
               {settingsToShow.length > 0 && (
-                <div className="border border-white/10 rounded-lg overflow-y-hidden overflow-x-auto">
+                <div className="border border-(--color-border-default) rounded-lg overflow-y-hidden overflow-x-auto">
                   <table className="w-full">
-                    <thead className="bg-white/5">
+                    <thead className="bg-(--color-surface-hover)">
                       <tr>
                         {settingsToShow.map((setting) => {
                           const { label, tooltip } = getSettingDisplayInfo(setting);
                           const settingKey = `${setting.category}.${setting.key}`;
                           const hasChanged = settingValues[settingKey]?.hasChanged ?? false;
-                          
+
                           return (
                             <TableTh key={settingKey}>
                               <div className="flex items-center gap-2">
@@ -468,12 +461,13 @@ export const SettingsForm: React.FC = () => {
                                     title="Changed"
                                   />
                                 )}
-                                <Tooltip title={tooltip}>
-                                  <HugeiconsIcon
-                                    icon={InformationCircleIcon}
-                                    size={14}
-                                    className="text-gray-400 cursor-help"
-                                  />
+                                <Tooltip content={tooltip}>
+                                  <span className="inline-flex cursor-help text-(--color-text-subtle)">
+                                    <Icon
+                                      icon={PiInfo}
+                                      size={14}
+                                    />
+                                  </span>
                                 </Tooltip>
                               </div>
                             </TableTh>
@@ -485,13 +479,11 @@ export const SettingsForm: React.FC = () => {
                       <tr>
                         {settingsToShow.map((setting) => {
                           const settingKey = `${setting.category}.${setting.key}`;
-                          
+
                           return (
                             <TableTd key={settingKey}>
                               <div className="py-2 w-full">
-                                <FormControl className="w-full">
-                                  {renderSettingInput(setting)}
-                                </FormControl>
+                                {renderSettingInput(setting)}
                               </div>
                             </TableTd>
                           );
@@ -508,24 +500,24 @@ export const SettingsForm: React.FC = () => {
         {/* Tier Settings Table */}
         <div>
           <div className="flex items-center gap-2 mb-4">
-            <HugeiconsIcon
-              icon={Layers01Icon}
+            <Icon
+              icon={PiSquaresFour}
               size={20}
-              className="text-accent"
+              className="text-primary-600"
             />
             <h2 className="text-lg font-medium">Tier Durations</h2>
           </div>
 
           {loadingTiers ? (
-            <LinearProgress />
+            <Progress />
           ) : (
-            <div className="border border-white/10 rounded-lg overflow-y-hidden overflow-x-auto">
+            <div className="border border-(--color-border-default) rounded-lg overflow-y-hidden overflow-x-auto">
               <table className="w-full">
-                <thead className="bg-white/5">
+                <thead className="bg-(--color-surface-hover)">
                   <tr>
                     {tiers.map((tier) => {
                       const hasChanged = tierChanges[tier.id] !== undefined;
-                      
+
                       return (
                         <TableTh key={tier.id}>
                           <div className="flex items-center gap-2">
@@ -561,15 +553,10 @@ export const SettingsForm: React.FC = () => {
                                   handleTierDurationChange(tier.id, value);
                                 }
                               }}
-                              slotProps={{
-                                input: {
-                                  min: 0.1,
-                                  step: 0.1,
-                                },
-                              }}
-                              color={hasChanged ? "warning" : "neutral"}
+                              min={0.1}
+                              step={0.1}
                               size="sm"
-                              className="w-18"
+                              className={`w-18${hasChanged ? " border-warning-500" : ""}`}
                             />
                           </div>
                         </TableTd>
@@ -587,16 +574,21 @@ export const SettingsForm: React.FC = () => {
       <div className="flex items-center justify-between mt-8 mb-4">
         <div className="flex justify-end items-center gap-2">
           <IconButton
+            aria-label="Reset settings to defaults"
             variant="outlined"
-            color="danger"
+            color="error"
             onClick={handleReset}
-            loading={resetSettingsMutation.isPending}
+            disabled={resetSettingsMutation.isPending}
           >
-            <HugeiconsIcon icon={Rotate02Icon} size={16} />
+            {resetSettingsMutation.isPending ? (
+              <Spinner colorClassName="" />
+            ) : (
+              <Icon icon={PiArrowsClockwise} size={16} />
+            )}
           </IconButton>
 
           <Button
-            startDecorator={<HugeiconsIcon icon={Download04Icon} size={16} />}
+            startIcon={<Icon icon={PiDownloadSimple} size={16} />}
             onClick={handleSave}
             disabled={!hasChanges}
             loading={updateSettingsMutation.isPending || savingTiers}
@@ -609,9 +601,9 @@ export const SettingsForm: React.FC = () => {
 
       {/* Warning for changes */}
       {hasChanges && (
-        <Alert color="warning" variant="soft" className="mb-6">
+        <Alert tone="warning" variant="soft" icon={null} className="mb-6">
           <div className="flex items-center gap-2">
-            <HugeiconsIcon icon={Alert01Icon} size={16} />
+            <Icon icon={PiWarning} size={16} />
             <span className="text-sm">
               You have unsaved changes. Don't forget to save your settings.
             </span>
@@ -620,8 +612,8 @@ export const SettingsForm: React.FC = () => {
       )}
 
       {/* Footer Info */}
-      <div className="mt-8 pt-4 border-t border-white/10">
-        <p className="text-sm text-gray-500 text-center">
+      <div className="mt-8 pt-4 border-t border-(--color-border-default)">
+        <p className="text-sm text-(--color-text-muted) text-center">
           Changes will take effect immediately after saving
         </p>
       </div>

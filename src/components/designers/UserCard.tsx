@@ -1,13 +1,13 @@
 import React from "react";
-import { HugeiconsIcon } from "@hugeicons/react";
 import {
-  Mail01Icon,
-  VoiceIdIcon,
-  Edit02Icon,
-  DatabaseSync01Icon,
-  UserCheck01Icon,
-} from "@hugeicons/core-free-icons";
-import { Avatar, Checkbox, IconButton } from "@mui/joy";
+  Icon,
+  PiEnvelope,
+  PiIdentificationBadge,
+  PiPencilSimple,
+  PiArrowsClockwise,
+  PiUserCheck,
+} from "@/lib/icons";
+import { Avatar, Checkbox, IconButton } from "@/components/ui";
 
 interface UserCardProps {
   user: {
@@ -37,14 +37,14 @@ export const UserCard: React.FC<UserCardProps> = ({
   return (
     <div
       className={`
-      p-6 rounded-lg flex flex-col items-center relative text-center gap-4 
+      p-6 rounded-lg flex flex-col items-center relative text-center gap-4
       transition-all border-2
       ${
         user.existsInLocal
-          ? "bg-white/4 border-transparent"
+          ? "bg-(--color-surface-hover) border-transparent"
           : isSelected
-          ? "bg-accent/10 border-accent/30"
-          : "bg-accent/10 border-transparent hover:bg-accent/20"
+          ? "bg-primary-500/10 border-primary-500/30"
+          : "bg-primary-500/10 border-transparent hover:bg-primary-500/20"
       }
     `}
     >
@@ -61,19 +61,21 @@ export const UserCard: React.FC<UserCardProps> = ({
       {/* Edit button for existing users */}
       {user.existsInLocal && onEdit && (
         <div className="absolute top-4 right-4 z-20">
-          <IconButton size="sm" variant="soft" color="primary" onClick={onEdit}>
-            <HugeiconsIcon icon={Edit02Icon} size={16} />
+          <IconButton
+            aria-label="Edit user"
+            size="sm"
+            variant="soft"
+            color="primary"
+            onClick={onEdit}
+          >
+            <Icon icon={PiPencilSimple} size={16} />
           </IconButton>
         </div>
       )}
       <Avatar
         src={user.profilePicture}
-        sx={{
-          width: 80,
-          height: 80,
-          bgcolor: user.color || "primary.500",
-          fontSize: "1.5rem",
-        }}
+        className="!h-20 !w-20 text-2xl"
+        style={user.color ? { backgroundColor: user.color } : undefined}
       >
         {user.initials}
       </Avatar>
@@ -84,12 +86,12 @@ export const UserCard: React.FC<UserCardProps> = ({
           <h3 className="font-semibold text-lg">{user.name}</h3>
           {user.existsInLocal ? (
             <div className="flex items-center gap-1 justify-center text-xs uppercase text-yellow-400">
-              <HugeiconsIcon icon={DatabaseSync01Icon} size={16} />
+              <Icon icon={PiArrowsClockwise} size={16} />
               Synced
             </div>
           ) : (
             <div className="flex items-center gap-1 justify-center text-xs uppercase text-green-400">
-              <HugeiconsIcon icon={UserCheck01Icon} size={16} />
+              <Icon icon={PiUserCheck} size={16} />
               Available
             </div>
           )}
@@ -99,18 +101,18 @@ export const UserCard: React.FC<UserCardProps> = ({
       {/* User Details */}
       <div className="text-sm flex flex-col gap-1">
         <div className="flex items-center gap-1 justify-center">
-          <HugeiconsIcon icon={Mail01Icon} size={16} />
+          <Icon icon={PiEnvelope} size={16} />
           {user.email}
         </div>
         <div className="flex items-center gap-1 justify-center">
-          <HugeiconsIcon icon={VoiceIdIcon} size={16} />
+          <Icon icon={PiIdentificationBadge} size={16} />
           {user.clickupId}
         </div>
       </div>
 
       {/* Last Active */}
       {user.lastActive && (
-        <div className="text-sm text-gray-400">
+        <div className="text-sm text-(--color-text-subtle)">
           Active: {new Date(parseInt(user.lastActive)).toLocaleDateString()}
         </div>
       )}

@@ -4,10 +4,9 @@ import { UserRoleRow } from './UserRoleRow'
 import { UserVacationRow } from './UserVacationRow'
 import { AddRoleForm } from './AddRoleForm'
 import { AddVacationForm } from './AddVacationForm'
-import { HugeiconsIcon } from '@hugeicons/react'
-import { UserIcon, Calendar04Icon } from '@hugeicons/core-free-icons'
+import { Icon, PiUser, PiCalendarBlank } from '@/lib/icons'
 import { useUserDetails, useTaskTypes, useBrands } from '@/hooks/queries/useUsers'
-import { Alert } from '@mui/joy'
+import { Alert } from '@/components/ui'
 import { TableTh } from '@/components'
 
 interface UserEditModalProps {
@@ -32,22 +31,22 @@ export const UserEditModal: React.FC<UserEditModalProps> = ({
   onDeleteVacation,
   loadingStates = {}
 }) => {
-  const { 
-    data: user, 
-    isLoading: loadingUser, 
-    error: userError 
+  const {
+    data: user,
+    isLoading: loadingUser,
+    error: userError
   } = useUserDetails(userId)
-  
-  const { 
-    data: taskTypes = [], 
-    isLoading: loadingTypes, 
-    error: typesError 
+
+  const {
+    data: taskTypes = [],
+    isLoading: loadingTypes,
+    error: typesError
   } = useTaskTypes()
-  
-  const { 
-    data: brands = [], 
-    isLoading: loadingBrands, 
-    error: brandsError 
+
+  const {
+    data: brands = [],
+    isLoading: loadingBrands,
+    error: brandsError
   } = useBrands()
 
   // ✅ DEBUG: Log para verificar datos
@@ -66,7 +65,7 @@ export const UserEditModal: React.FC<UserEditModalProps> = ({
   if (userError || typesError || brandsError) {
     return (
       <div className="p-6">
-        <Alert color="danger" variant="soft">
+        <Alert tone="error" variant="soft">
           <div>
             <strong>Error loading data:</strong>
             <ul className="mt-2 text-sm">
@@ -82,7 +81,7 @@ export const UserEditModal: React.FC<UserEditModalProps> = ({
 
   if (!user && !loadingUser) {
     return (
-      <div className="p-8 text-center text-gray-400">
+      <div className="p-8 text-center text-(--color-text-subtle)">
         User not found
       </div>
     )
@@ -104,15 +103,15 @@ export const UserEditModal: React.FC<UserEditModalProps> = ({
     <div className="p-8 space-y-6">
       {/* User Roles Section */}
       <div>
-        <h3 className="text-lg font-medium text-white mb-2 flex items-center gap-2">
-          <HugeiconsIcon icon={UserIcon} size={20} />
+        <h3 className="text-lg font-medium text-(--color-text-strong) mb-2 flex items-center gap-2">
+          <Icon icon={PiUser} size={20} />
           User Roles
         </h3>
-        
+
         {/* Current Roles Table */}
-        <div className="border border-white/10 rounded-lg overflow-hidden mb-4">
+        <div className="border border-(--color-border-default) rounded-lg overflow-hidden mb-4">
           <table className="w-full">
-            <thead className="bg-white/5">
+            <thead className="bg-(--color-surface-hover)">
               <tr>
                 <TableTh>Type</TableTh>
                 <TableTh>Brand</TableTh>
@@ -131,7 +130,7 @@ export const UserEditModal: React.FC<UserEditModalProps> = ({
               ))}
               {(showRoleSkeleton || (user && user.roles.length === 0)) && (
                 <tr>
-                  <td colSpan={3} className="px-3 py-4 text-center text-gray-400">
+                  <td colSpan={3} className="px-3 py-4 text-center text-(--color-text-subtle)">
                     {showRoleSkeleton ? 'Loading roles...' : 'No roles assigned'}
                   </td>
                 </tr>
@@ -152,19 +151,19 @@ export const UserEditModal: React.FC<UserEditModalProps> = ({
       </div>
 
       {/* Divider */}
-      <div className="border-t border-white/10" />
+      <div className="border-t border-(--color-border-default)" />
 
       {/* User Vacations Section */}
       <div>
-        <h3 className="text-lg font-medium text-white mb-2 flex items-center gap-2">
-          <HugeiconsIcon icon={Calendar04Icon} size={20} />
+        <h3 className="text-lg font-medium text-(--color-text-strong) mb-2 flex items-center gap-2">
+          <Icon icon={PiCalendarBlank} size={20} />
           Vacations
         </h3>
-        
+
         {/* Current Vacations Table */}
-        <div className="border border-white/10 rounded-lg overflow-hidden mb-4">
+        <div className="border border-(--color-border-default) rounded-lg overflow-hidden mb-4">
           <table className="w-full">
-            <thead className="bg-white/5">
+            <thead className="bg-(--color-surface-hover)">
               <tr>
                 <TableTh>Start Date</TableTh>
                 <TableTh>End Date</TableTh>
@@ -184,7 +183,7 @@ export const UserEditModal: React.FC<UserEditModalProps> = ({
               ))}
               {(showVacationSkeleton || (user && user.vacations.length === 0)) && (
                 <tr>
-                  <td colSpan={4} className="px-3 py-4 text-center text-gray-400">
+                  <td colSpan={4} className="px-3 py-4 text-center text-(--color-text-subtle)">
                     {showVacationSkeleton ? 'Loading vacations...' : 'No vacations scheduled'}
                   </td>
                 </tr>

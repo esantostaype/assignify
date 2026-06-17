@@ -4,7 +4,7 @@
 'use client'
 
 import React, { useState, useMemo } from 'react'
-import { toast } from 'react-toastify'
+import toast from 'react-hot-toast'
 import { DesignersHeader } from './DesignersHeader'
 import { UsersList } from './UsersList'
 import { UserEditModal } from './UserEditModal'
@@ -52,12 +52,12 @@ export const ClickUpUsersSync: React.FC = () => {
       toast.success(successMessage)
 
       if (notFoundUsers && notFoundUsers.length > 0) {
-        toast.warning(`Users not found in teams: ${notFoundUsers.join(', ')}`)
+        toast(`Users not found in teams: ${notFoundUsers.join(', ')}`)
       }
 
       if (errors && errors.length > 0) {
         console.warn('Errors during sync:', errors)
-        toast.warning('Some users had errors. Check console for details.')
+        toast('Some users had errors. Check console for details.')
       }
 
       setSelectedUsers(new Set())
@@ -133,7 +133,7 @@ export const ClickUpUsersSync: React.FC = () => {
 
   const handleSync = () => {
     if (selectedUsers.size === 0) {
-      toast.warning('Select at least one user to sync')
+      toast('Select at least one user to sync')
       return
     }
 

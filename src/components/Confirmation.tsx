@@ -4,37 +4,32 @@
 
 import React, { useEffect } from 'react'
 import { useConfirmationStore } from '@/stores/confirmationStore'
-import { HugeiconsIcon } from '@hugeicons/react'
-import { 
-  Cancel01Icon, 
-  Delete02Icon, 
-  Alert01Icon, 
-  InformationCircleIcon 
-} from '@hugeicons/core-free-icons'
+import { Icon, PiX, PiTrash, PiWarning, PiInfo, type IconComponent } from '@/lib/icons'
 import { motion, AnimatePresence, Variants } from 'framer-motion'
-import { Button } from '@mui/joy'
+import { Button } from '@/components/ui'
+import type { ButtonColor } from '@/components/ui'
 
 const customEase = [0.32, 0.72, 0, 1] as const
 
 const backdropVariants: Variants = {
   hidden: { opacity: 0 },
-  visible: { 
+  visible: {
     opacity: 1,
     transition: { duration: 0.3, ease: customEase as any }
   },
-  exit: { 
+  exit: {
     opacity: 0,
     transition: { duration: 0.3, ease: customEase }
   }
 }
 
 const confirmationVariants: Variants = {
-  hidden: { 
+  hidden: {
     opacity: 0,
     scale: 0.95,
     y: 50
   },
-  visible: { 
+  visible: {
     opacity: 1,
     scale: 1,
     y: 0,
@@ -45,7 +40,7 @@ const confirmationVariants: Variants = {
       mass: 0.5
     }
   },
-  exit: { 
+  exit: {
     opacity: 0,
     scale: 0.95,
     y: 50,
@@ -54,12 +49,12 @@ const confirmationVariants: Variants = {
 }
 
 export const GlobalConfirmation: React.FC = () => {
-  const { 
-    isOpen, 
-    title, 
-    description, 
-    type, 
-    confirmText, 
+  const {
+    isOpen,
+    title,
+    description,
+    type,
+    confirmText,
     cancelText,
     onConfirm,
     loading,
@@ -97,30 +92,30 @@ export const GlobalConfirmation: React.FC = () => {
     }
   }
 
-  const getIcon = () => {
+  const getIcon = (): IconComponent => {
     switch (type) {
-      case 'danger': return Delete02Icon
-      case 'warning': return Alert01Icon
-      case 'info': return InformationCircleIcon
-      default: return Alert01Icon
+      case 'danger': return PiTrash
+      case 'warning': return PiWarning
+      case 'info': return PiInfo
+      default: return PiWarning
     }
   }
 
-  const getButtonColor = () => {
+  const getButtonColor = (): ButtonColor => {
     switch (type) {
-      case 'danger': return 'danger'
+      case 'danger': return 'error'
       case 'warning': return 'warning'
       case 'info': return 'primary'
-      default: return 'danger'
+      default: return 'error'
     }
   }
 
   const getIconColor = () => {
     switch (type) {
-      case 'danger': return 'text-red-400'
-      case 'warning': return 'text-yellow-400'
-      case 'info': return 'text-blue-400'
-      default: return 'text-red-400'
+      case 'danger': return 'text-error-500'
+      case 'warning': return 'text-warning-500'
+      case 'info': return 'text-primary-500'
+      default: return 'text-error-500'
     }
   }
 
@@ -130,17 +125,17 @@ export const GlobalConfirmation: React.FC = () => {
         <div className="fixed inset-0 z-[999] flex items-center justify-center">
           {/* Higher z-index backdrop */}
           <motion.div
-            className="absolute inset-0 bg-surface/60"
+            className="absolute inset-0 bg-black/60"
             variants={backdropVariants}
             initial="hidden"
             animate="visible"
             exit="exit"
             onClick={closeConfirmation}
           />
-          
+
           {/* Confirmation Dialog */}
           <motion.div
-            className="relative w-full max-w-md mx-4 bg-background rounded-xl shadow-2xl"
+            className="relative w-full max-w-md mx-4 bg-(--color-surface-raised) rounded-xl shadow-2xl"
             variants={confirmationVariants}
             initial="hidden"
             animate="visible"
@@ -150,19 +145,19 @@ export const GlobalConfirmation: React.FC = () => {
             <div className="p-6 space-y-4">
               {/* Icon and Title */}
               <div className="flex items-center gap-3">
-                <div className={`p-2 rounded-full bg-white/5 ${getIconColor()}`}>
-                  <HugeiconsIcon icon={getIcon()} size={24} />
+                <div className={`p-2 rounded-full bg-(--color-surface-hover) ${getIconColor()}`}>
+                  <Icon icon={getIcon()} size={24} />
                 </div>
-                <h3 className="text-lg font-semibold text-white">
+                <h3 className="text-lg font-semibold text-(--color-text-default)">
                   {title}
                 </h3>
               </div>
-              
+
               {/* Description */}
-              <p className="text-gray-300 leading-relaxed pl-11">
+              <p className="text-(--color-text-muted) leading-relaxed pl-11">
                 {description}
               </p>
-              
+
               {/* Actions */}
               <div className="flex justify-end gap-3 pt-4">
                 <Button
@@ -170,17 +165,17 @@ export const GlobalConfirmation: React.FC = () => {
                   color="neutral"
                   onClick={closeConfirmation}
                   disabled={loading}
-                  startDecorator={<HugeiconsIcon icon={Cancel01Icon} size={16} />}
+                  startIcon={<Icon icon={PiX} size={16} />}
                 >
                   {cancelText}
                 </Button>
                 <Button
-                  variant="solid"
-                  color={getButtonColor() as any}
+                  variant="filled"
+                  color={getButtonColor()}
                   onClick={handleConfirm}
                   loading={loading}
                   disabled={loading}
-                  startDecorator={<HugeiconsIcon icon={getIcon()} size={16} />}
+                  startIcon={<Icon icon={getIcon()} size={16} />}
                 >
                   {confirmText}
                 </Button>

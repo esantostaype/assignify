@@ -1,18 +1,20 @@
 /* eslint-disable react/no-unescaped-entities */
 "use client";
 
-import React, { useState, useEffect, useRef } from "react";
-import { Select, Option, Chip, FormLabel, Button, Alert } from "@mui/joy";
+import React, { useState, useEffect, useRef, useMemo } from "react";
+import { MultiSelect, Button, Alert } from "@/components/ui";
+import type { SelectOption } from "@/components/ui";
 import { User } from "@/interfaces";
-import { HugeiconsIcon } from "@hugeicons/react";
 import {
-  UserCheck01Icon,
-  RefreshIcon,
-  SparklesIcon,
-  Calendar04Icon,
-  Clock03Icon,
-  Brain02Icon,
-} from "@hugeicons/core-free-icons";
+  Icon,
+  PiUserCheck,
+  PiArrowsClockwise,
+  PiSparkle,
+  PiCalendarBlank,
+  PiClock,
+  PiLightning,
+} from "@/lib/icons";
+import type { IconComponent } from "@/lib/icons";
 import { TextFieldError } from "@/components";
 import { useEnhancedUsers } from "@/hooks";
 
@@ -52,10 +54,10 @@ export const UserAssignmentSelect: React.FC<UserAssignmentSelectProps> = ({
 }) => {
   // State for vacation warnings
   const [vacationWarnings, setVacationWarnings] = useState<string[]>([]);
-  
+
   // ✅ NUEVO: Ref para trackear la última sugerencia aplicada
   const lastAppliedSuggestionRef = useRef<string | null>(null);
-  
+
   // ✅ NUEVO: Ref para trackear si estamos en proceso de cambio de categoría
   const categoryChangeInProgressRef = useRef(false);
 
@@ -78,7 +80,7 @@ export const UserAssignmentSelect: React.FC<UserAssignmentSelectProps> = ({
   // Determine which users to show
   const usersToShow = hasRequiredParams ? allUsers : users;
   const isUsingEnhancedUsers = hasRequiredParams && !loadingEnhanced;
-  
+
   // Determine loading state
   const isLoading = loading || loadingEnhanced || fetchingSuggestion;
 
@@ -88,12 +90,12 @@ export const UserAssignmentSelect: React.FC<UserAssignmentSelectProps> = ({
       console.log('🔄 Detected category change - selection cleared');
       categoryChangeInProgressRef.current = true;
       lastAppliedSuggestionRef.current = null;
-      
+
       // Reset flag after a short delay to allow new suggestions to be applied
       const timeout = setTimeout(() => {
         categoryChangeInProgressRef.current = false;
       }, 200);
-      
+
       return () => clearTimeout(timeout);
     }
   }, [values.length, fetchingSuggestion]);
@@ -125,7 +127,7 @@ export const UserAssignmentSelect: React.FC<UserAssignmentSelectProps> = ({
     // 1. No hay selección actual (values.length === 0) O
     // 2. Estamos en proceso de cambio de categoría Y no hay cambios manuales
     const shouldAutoApply = (
-      values.length === 0 || 
+      values.length === 0 ||
       (categoryChangeInProgressRef.current && !userHasManuallyChanged)
     );
 
@@ -135,18 +137,18 @@ export const UserAssignmentSelect: React.FC<UserAssignmentSelectProps> = ({
 
     // ✅ APLICAR CON PROTECCIÓN CONTRA LOOPS
     console.log(`🤖 Auto-selecting suggested user: ${suggestedUser.name}`);
-    
+
     // Usar requestAnimationFrame para evitar loops sincrónicos
     requestAnimationFrame(() => {
       onChange([suggestedUser.id]);
       lastAppliedSuggestionRef.current = suggestedUser.id;
       categoryChangeInProgressRef.current = false;
     });
-    
+
   }, [
     suggestedUser?.id, // ✅ Solo el ID para evitar re-renders innecesarios
-    fetchingSuggestion, 
-    userHasManuallyChanged, 
+    fetchingSuggestion,
+    userHasManuallyChanged,
     values.length, // ✅ Solo la longitud, no el array completo
     onChange
   ]);
@@ -179,8 +181,8 @@ export const UserAssignmentSelect: React.FC<UserAssignmentSelectProps> = ({
   // Smart suggestion info
   const shouldShowSmartSuggestion = () => {
     return (
-      smartSuggestion && 
-      !fetchingSuggestion && 
+      smartSuggestion &&
+      !fetchingSuggestion &&
       !values.includes(smartSuggestion.userId) &&
       totalAvailable === 0 // Only show when no immediately available users
     );
@@ -189,8 +191,8 @@ export const UserAssignmentSelect: React.FC<UserAssignmentSelectProps> = ({
   // Regular suggestion info - only show if user has manually selected someone different
   const shouldShowRegularSuggestion = () => {
     return (
-      suggestedUser && 
-      !fetchingSuggestion && 
+      suggestedUser &&
+      !fetchingSuggestion &&
       values.length > 0 && // User has selected someone
       !values.includes(suggestedUser.id) && // But not the suggested user
       userHasManuallyChanged && // ✅ NUEVO: Solo mostrar si usuario ha hecho cambios manuales
@@ -211,52 +213,81 @@ export const UserAssignmentSelect: React.FC<UserAssignmentSelectProps> = ({
       // For fallback users, check if suggested
       return isUserSuggested(userId) ? { status: 'suggested' } : null;
     }
-    
+
     const userInfo = getUserById(userId);
-    
+
     // If user is suggested, override status
     if (isUserSuggested(userId)) {
       return { ...userInfo, status: 'suggested' };
     }
-    
+
     return userInfo;
   };
 
-  // Get status color for chips and options
-  const getStatusColor = (status?: string) => {
+  // Get status icon
+  const getStatusIcon = (status?: string): IconComponent => {
     switch (status) {
-      case 'available': return 'primary';
-      case 'suggested': return 'success';
-      case 'on_vacation': return 'warning';
-      case 'overloaded': return 'danger';
-      default: return 'neutral';
+      case 'suggested': return PiSparkle;
+      case 'on_vacation': return PiCalendarBlank;
+      case 'overloaded': return PiClock;
+      default: return PiUserCheck;
     }
   };
 
-  // Get status icon
-  const getStatusIcon = (status?: string) => {
-    switch (status) {
-      case 'suggested': return SparklesIcon;
-      case 'on_vacation': return Calendar04Icon;
-      case 'overloaded': return Clock03Icon;
-      default: return UserCheck01Icon;
-    }
-  };
+  // Build MultiSelect options from the users to show, embedding the rich
+  // status row (icon + name + status badge) as each option's label.
+  const options: SelectOption<string>[] = useMemo(() => {
+    return usersToShow.map((user) => {
+      const userStatus = getUserStatusInfo(user.id);
+      const StatusIcon = getStatusIcon(userStatus?.status);
+
+      return {
+        value: user.id,
+        searchValue: user.name,
+        label: (
+          <div className="flex items-center justify-between w-full">
+            <div className="flex items-center gap-2">
+              <Icon icon={StatusIcon} size={16} />
+              <span>{user.name}</span>
+            </div>
+
+            <div className="flex items-center gap-1 text-xs">
+              {/* Status badge */}
+              <span className={`px-2 py-1 rounded text-xs ${
+                userStatus?.status === 'suggested' ? 'bg-green-900 text-green-300' :
+                userStatus?.status === 'available' ? 'bg-primary-900 text-primary-300' :
+                userStatus?.status === 'on_vacation' ? 'bg-yellow-900 text-yellow-300' :
+                userStatus?.status === 'overloaded' ? 'bg-red-900 text-red-300' :
+                'bg-neutral-900 text-neutral-300'
+              }`}>
+                {userStatus?.status === 'suggested' ? 'Suggested' :
+                 userStatus?.status === 'available' ? 'Available' :
+                 userStatus?.status === 'on_vacation' ? 'On Vacation' :
+                 userStatus?.status === 'overloaded' ? 'Overloaded' :
+                 'Unknown'}
+              </span>
+            </div>
+          </div>
+        ),
+      };
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [usersToShow, suggestedUser?.id, smartSuggestion?.userId, isUsingEnhancedUsers, getUserById]);
 
   return (
     <div>
-      <FormLabel>
-        <HugeiconsIcon icon={UserCheck01Icon} size={20} strokeWidth={1.5} />
+      <label className="flex items-center gap-1.5 text-sm font-semibold text-(--color-text-default) mb-1.5">
+        <Icon icon={PiUserCheck} size={20} />
         Assignee
-      </FormLabel>
+      </label>
 
       {/* Smart Suggestion Alert */}
       {shouldShowSmartSuggestion() && smartSuggestion && (
-        <Alert 
-          variant="soft" 
-          color="primary" 
+        <Alert
+          tone="info"
+          variant="soft"
           className="mb-3"
-          startDecorator={<HugeiconsIcon icon={Brain02Icon} size={20} />}
+          icon={PiLightning}
         >
           <div>
             <div className="font-medium">💡 Smart Suggestion</div>
@@ -275,7 +306,7 @@ export const UserAssignmentSelect: React.FC<UserAssignmentSelectProps> = ({
                 lastAppliedSuggestionRef.current = smartSuggestion.userId;
                 if (onApplySuggestion) onApplySuggestion();
               }}
-              startDecorator={<HugeiconsIcon icon={Brain02Icon} size={16} />}
+              startIcon={<Icon icon={PiLightning} size={16} />}
             >
               Use Smart Suggestion
             </Button>
@@ -288,7 +319,7 @@ export const UserAssignmentSelect: React.FC<UserAssignmentSelectProps> = ({
         <div className="mb-3 p-3 bg-green-500/10 rounded-lg">
           <div>
             <div className="flex items-center gap-2 justify-between">
-              <span className="text-sm text-accent-200">
+              <span className="text-sm text-primary-200">
                 Suggested: <strong>{suggestedUser.name}</strong>
               </span>
 
@@ -302,11 +333,10 @@ export const UserAssignmentSelect: React.FC<UserAssignmentSelectProps> = ({
                     lastAppliedSuggestionRef.current = suggestedUser.id;
                     if (onApplySuggestion) onApplySuggestion();
                   }}
-                  startDecorator={
-                    <HugeiconsIcon
-                      icon={RefreshIcon}
+                  startIcon={
+                    <Icon
+                      icon={PiArrowsClockwise}
                       size={16}
-                      strokeWidth={2}
                     />
                   }
                 >
@@ -322,106 +352,29 @@ export const UserAssignmentSelect: React.FC<UserAssignmentSelectProps> = ({
       {vacationWarnings.length > 0 && (
         <div className="mb-3 space-y-2">
           {vacationWarnings.map((warning, index) => (
-            <Alert 
+            <Alert
               key={index}
-              variant="soft" 
-              color="warning" 
-              startDecorator={<HugeiconsIcon icon={Calendar04Icon} size={20} />}
-              sx={{ alignItems: 'flex-start' }}
+              tone="warning"
+              variant="soft"
+              icon={PiCalendarBlank}
             >
               <div className="text-xs">{warning}</div>
             </Alert>
           ))}
         </div>
       )}
-      <Select
+
+      <MultiSelect
         name="assignedUserIds"
-        multiple
+        searchable
         value={values}
-        key={values.join(",")}
-        onChange={(_, val) => onChange(val as string[])}
+        options={options}
+        onChange={(val) => onChange(val)}
         placeholder={getPlaceholder()}
         disabled={isLoading || !info?.tierId || !info?.brandId}
-        color={touched && error ? "danger" : "neutral"}
-        renderValue={(selected) => {
-          if (selected.length === 0) {
-            return (
-              <span style={{ color: 'var(--joy-palette-text-tertiary)' }}>
-                {getPlaceholder()}
-              </span>
-            );
-          }
-
-          const orderedSelected = [...selected].sort((a, b) => {
-            if (a.value === suggestedUser?.id) return -1;
-            if (b.value === suggestedUser?.id) return 1;
-            return 0;
-          });
-
-          return (
-            <div style={{ display: "flex", gap: "0.25rem", flexWrap: "wrap" }}>
-              {orderedSelected.map((selectedId) => {
-                const user = usersToShow.find((u) => u.id === selectedId.value);
-                const userStatus = getUserStatusInfo(user?.id || '');
-                const isSuggested = isUserSuggested(user?.id || '');
-
-                return user ? (
-                  <Chip
-                    key={user.id}
-                    color={isSuggested ? "success" : getStatusColor(userStatus?.status)}
-                    variant="soft"
-                  >
-                    {user.name}
-                  </Chip>
-                ) : null;
-              })}
-            </div>
-          );
-        }}
-      >
-        {isLoading ? (
-          <Option value="" disabled>
-            {getPlaceholder()}
-          </Option>
-        ) : usersToShow.length === 0 ? (
-          <Option value="" disabled>
-            No compatible designers found
-          </Option>
-        ) : (
-          usersToShow.map((user) => {
-            const userStatus = getUserStatusInfo(user.id);
-            const StatusIcon = getStatusIcon(userStatus?.status);
-
-            return (
-              <Option key={user.id} value={user.id}>
-                <div className="flex items-center justify-between w-full">
-                  <div className="flex items-center gap-2">
-                    <HugeiconsIcon icon={StatusIcon} size={16} />
-                    <span>{user.name}</span>
-                  </div>
-                  
-                  <div className="flex items-center gap-1 text-xs">
-                    {/* Status badge */}
-                    <span className={`px-2 py-1 rounded text-xs ${
-                      userStatus?.status === 'suggested' ? 'bg-green-900 text-green-300' :
-                      userStatus?.status === 'available' ? 'bg-accent-900 text-accent-300' :
-                      userStatus?.status === 'on_vacation' ? 'bg-yellow-900 text-yellow-300' :
-                      userStatus?.status === 'overloaded' ? 'bg-red-900 text-red-300' :
-                      'bg-gray-900 text-gray-300'
-                    }`}>
-                      {userStatus?.status === 'suggested' ? 'Suggested' :
-                       userStatus?.status === 'available' ? 'Available' :
-                       userStatus?.status === 'on_vacation' ? 'On Vacation' :
-                       userStatus?.status === 'overloaded' ? 'Overloaded' :
-                       'Unknown'}
-                    </span>
-                  </div>
-                </div>
-              </Option>
-            );
-          })
-        )}
-      </Select>
+        invalid={!!(touched && error)}
+        noResultsLabel="No compatible designers found"
+      />
 
       {/* Error display */}
       {touched && error && <TextFieldError label={error} />}

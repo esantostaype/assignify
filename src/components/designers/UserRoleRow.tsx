@@ -1,8 +1,7 @@
 // src/components/designers/UserRoleRow.tsx - FIXED VERSION
 import React from "react";
-import { IconButton } from "@mui/joy";
-import { HugeiconsIcon } from "@hugeicons/react";
-import { Delete02Icon } from "@hugeicons/core-free-icons";
+import { IconButton } from "@/components/ui";
+import { Icon, PiTrash } from "@/lib/icons";
 import { TableTd } from "@/components";
 import { useConfirmationStore } from "@/stores/confirmationStore";
 
@@ -26,7 +25,7 @@ export const UserRoleRow: React.FC<UserRoleRowProps> = ({
   const { openConfirmation } = useConfirmationStore()
 
   return (
-    <tr className="border-b border-white/10 text-sm">
+    <tr className="border-b border-(--color-border-default) text-sm">
       <TableTd>{loading ? "Loading..." : role.type.name}</TableTd>
       <TableTd>{loading ? "Loading..." : role.brand?.name || "Global"}</TableTd>
       <TableTd>
@@ -34,8 +33,9 @@ export const UserRoleRow: React.FC<UserRoleRowProps> = ({
           "Loading..."
         ) : (
           <IconButton
+            aria-label="Delete role"
             size="sm"
-            color="danger"
+            color="error"
             variant="soft"
             onClick={() => {
               openConfirmation({
@@ -53,7 +53,7 @@ export const UserRoleRow: React.FC<UserRoleRowProps> = ({
             }}
             disabled={deleting}
           >
-            <HugeiconsIcon icon={Delete02Icon} size={16} />
+            <Icon icon={PiTrash} size={16} />
           </IconButton>
         )}
       </TableTd>

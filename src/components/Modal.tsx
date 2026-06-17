@@ -4,10 +4,9 @@
 
 import React, { useEffect } from 'react'
 import { useModalStore, ModalSize } from '@/stores/modalStore'
-import { HugeiconsIcon } from '@hugeicons/react'
-import { Cancel01Icon } from '@hugeicons/core-free-icons'
+import { Icon, PiX } from '@/lib/icons'
 import { motion, AnimatePresence, Variants } from 'framer-motion'
-import { IconButton } from '@mui/joy'
+import { IconButton } from '@/components/ui'
 
 const sizeClasses: Record<ModalSize, string> = {
   sm: 'max-w-md',
@@ -19,17 +18,17 @@ const customEase = [0.32, 0.72, 0, 1] as const
 
 // Variantes de animación para el backdrop
 const backdropVariants: Variants = {
-  hidden: { 
+  hidden: {
     opacity: 0
   },
-  visible: { 
+  visible: {
     opacity: 1,
     transition: {
       duration: 0.4,
       ease: customEase as any
     }
   },
-  exit: { 
+  exit: {
     opacity: 0,
     transition: {
       duration: 0.4,
@@ -40,11 +39,11 @@ const backdropVariants: Variants = {
 
 // Variantes de animación para el modal
 const modalVariants: Variants = {
-  hidden: { 
+  hidden: {
     opacity: 0,
     y: 200
   },
-  visible: { 
+  visible: {
     opacity: 1,
     y: 0,
     transition: {
@@ -54,7 +53,7 @@ const modalVariants: Variants = {
       mass: 0.8
     }
   },
-  exit: { 
+  exit: {
     opacity: 0,
     y: 200,
     transition: {
@@ -92,19 +91,19 @@ export const GlobalModal: React.FC = () => {
         <div className="fixed inset-0 z-[99] flex items-center justify-center">
           {/* Backdrop animado */}
           <motion.div
-            className="absolute inset-0 bg-surface/90"
+            className="absolute inset-0 bg-black/65"
             variants={backdropVariants}
             initial="hidden"
             animate="visible"
             exit="exit"
             onClick={closeModal}
           />
-          
+
           {/* Modal animado */}
           <motion.div
             className={`
               relative w-full mx-4 max-h-[90vh] overflow-hidden
-              bg-background rounded-xl shadow-2xl
+              bg-(--color-surface-raised) rounded-xl shadow-2xl
               ${sizeClasses[size]}
             `}
             variants={modalVariants}
@@ -113,21 +112,21 @@ export const GlobalModal: React.FC = () => {
             exit="exit"
           >
             {/* Header */}
-            <div className="flex items-center justify-between px-8 py-4 pr-4 border-b border-white/10">
-              <h2 className="text-xl font-semibold text-white">
+            <div className="flex items-center justify-between px-8 py-4 pr-4 border-b border-(--color-border-default)">
+              <h2 className="text-xl font-semibold text-(--color-text-default)">
                 {title}
               </h2>
-              <IconButton variant='plain' size='sm' onClick={closeModal}>
-                <HugeiconsIcon icon={Cancel01Icon} size={20} />
+              <IconButton aria-label="Close" variant='ghost' color="neutral" size='sm' onClick={closeModal}>
+                <Icon icon={PiX} size={20} />
               </IconButton>
             </div>
-            
+
             {/* Content con animación de entrada */}
-            <motion.div 
+            <motion.div
               className="overflow-y-auto max-h-[calc(90vh-88px)]"
               initial={{ opacity: 0, y: 20 }}
-              animate={{ 
-                opacity: 1, 
+              animate={{
+                opacity: 1,
                 y: 0,
                 transition: { delay: 0.1, duration: 0.3 }
               }}

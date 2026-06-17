@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react'
 import axios from 'axios'
-import { toast } from 'react-toastify'
+import toast from 'react-hot-toast'
 import { SuggestedAssignment } from '@/interfaces'
 
 export const useTaskSuggestion = (

@@ -1,7 +1,6 @@
 import React from "react";
 import { UserCard } from "./UserCard";
-import { HugeiconsIcon } from "@hugeicons/react";
-import { SearchListIcon } from "@hugeicons/core-free-icons";
+import { Icon, PiFileMagnifyingGlass } from "@/lib/icons";
 import { DesignerCardSkeleton } from "./DesignerCardSkeleton";
 
 interface User {
@@ -47,13 +46,13 @@ export const UsersList: React.FC<UsersListProps> = ({
     return (
       <div className="h-full flex items-center justify-center">
         <div className="text-center">
-          <HugeiconsIcon
-            icon={SearchListIcon}
+          <Icon
+            icon={PiFileMagnifyingGlass}
             size={48}
-            className="mx-auto mb-4 text-gray-400"
+            className="mx-auto mb-4 text-(--color-text-subtle)"
           />
           <h3 className="text-2xl font-medium mb-2">No users found</h3>
-          <p className="text-gray-400">
+          <p className="text-(--color-text-subtle)">
             Check ClickUp API configuration or try refreshing
           </p>
         </div>

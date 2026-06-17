@@ -17,13 +17,13 @@ export const NavItem = ({ label, icon, href, onClick, isActive: providedIsActive
   const isActive = href ? pathname === href : (providedIsActive || false)
 
   const commonClasses = `
-    cursor-pointer flex gap-1 items-center rounded-md py-2 px-3 group-active:bg-accent/24 group-hover:bg-accent/12 transition-all
-    ${isActive ? 'text-white' : 'text-gray-500 group-hover:text-white'}
+    cursor-pointer flex gap-1 items-center rounded-md py-2 px-3 group-active:bg-primary-500/24 group-hover:bg-primary-500/12 transition-all
+    ${isActive ? 'text-white' : 'text-(--color-text-muted) group-hover:text-white'}
   `
 
   const liClasses = `group h-full py-3 border-t-2 ${
-    isActive 
-      ? 'border-b-2 border-b-accent border-t-transparent' 
+    isActive
+      ? 'border-b-2 border-b-primary-500 border-t-transparent'
       : 'border-b-2 border-b-transparent border-t-transparent'
   }`
 

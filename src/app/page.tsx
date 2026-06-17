@@ -3,7 +3,8 @@
 
 import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { Box, CircularProgress, Typography } from '@mui/joy';
+import { Spinner } from '@/components/ui';
+import { Typography } from '@/components/ui';
 
 export default function HomePage() {
   const router = useRouter();
@@ -15,20 +16,11 @@ export default function HomePage() {
   }, [router]);
 
   return (
-    <Box
-      sx={{
-        minHeight: "100vh",
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        flexDirection: "column",
-        gap: 2,
-      }}
-    >
-      <CircularProgress size="lg" />
-      <Typography level="body-md" color="neutral">
+    <div className="min-h-screen flex flex-col items-center justify-center gap-4">
+      <Spinner size={36} />
+      <Typography variant="body" color="neutral-500">
         Redirigiendo...
       </Typography>
-    </Box>
+    </div>
   );
 }

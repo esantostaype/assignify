@@ -4,8 +4,8 @@
 import React, { useState, useEffect, FC, Dispatch, SetStateAction } from "react";
 import axios from "axios";
 import { Formik, Form, useFormikContext } from "formik";
-import { Button, Typography } from "@mui/joy";
-import { toast } from "react-toastify";
+import { Button, Typography } from "@/components/ui";
+import toast from "react-hot-toast";
 import { useQueryClient } from "@tanstack/react-query";
 
 import { SpinnerCreatingTask, SpinnerSearching } from "@/components";
@@ -224,7 +224,7 @@ export const CreateTaskForm: FC = () => {
     tiers.find((t) => t.id.toString() === tierId)?.duration;
 
   return (
-    <aside className="bg-background sticky w-[28rem] p-10 h-dvh overflow-y-auto top-0 border-l border-l-white/10">
+    <aside className="bg-(--color-surface-app) sticky w-[28rem] p-10 h-dvh overflow-y-auto top-0 border-l border-l-(--color-border-default)">
       <SpinnerCreatingTask isActive={loading} />
       <SpinnerSearching isActive={fetchingSuggestion} />
       <Formik
@@ -343,13 +343,13 @@ export const CreateTaskForm: FC = () => {
                 fullWidth
                 disabled={loading || isSubmitting || (brands.length === 0 && !dataLoading)}
                 size="lg"
-                sx={{ marginTop: "1rem" }}
+                className="mt-4"
               >
                 {isSubmitting ? "Creating..." : "Create Task"}
               </Button>
 
               {brands.length === 0 && !dataLoading && (
-                <Typography level="body-xs" color="warning" textAlign="center">
+                <Typography variant="caption" color="warning-600" className="text-center">
                   No hay brands activos disponibles
                 </Typography>
               )}

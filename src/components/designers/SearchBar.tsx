@@ -1,7 +1,6 @@
 import React from 'react';
-import { Input } from '@mui/joy';
-import { HugeiconsIcon } from '@hugeicons/react';
-import { SearchListIcon } from '@hugeicons/core-free-icons';
+import { Input } from '@/components/ui';
+import { Icon, PiMagnifyingGlass } from '@/lib/icons';
 
 interface SearchBarProps {
   value: string;
@@ -22,7 +21,7 @@ export const SearchBar: React.FC<SearchBarProps> = ({
         value={value}
         onChange={(event) => onChange(event.target.value)}
         placeholder={placeholder}
-        startDecorator={<HugeiconsIcon icon={SearchListIcon} size={16} />}
+        startAdornment={<Icon icon={PiMagnifyingGlass} size={16} />}
         size="sm"
         fullWidth
       />

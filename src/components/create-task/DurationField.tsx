@@ -2,9 +2,9 @@
 
 import React from 'react'
 import { useFormikContext } from 'formik'
-import { FormLabel, Input } from '@mui/joy'
-import { HugeiconsIcon } from '@hugeicons/react'
-import { DateTimeIcon } from '@hugeicons/core-free-icons'
+import { Input } from '@/components/ui'
+import { Typography } from '@/components/ui/typography'
+import { Icon, PiClock } from '@/lib/icons'
 import { FormValues } from '@/interfaces'
 import { formatDaysToReadable } from '@/utils/duration-utils'
 import { TextFieldError, TextFieldHelp } from '@/components'
@@ -53,11 +53,11 @@ export const DurationField: React.FC<DurationFieldProps> = ({
   }, [values.tierId])
 
   const getStatusIndicator = () => {
-    if (isApplyingAutomatic) return { text: '(Applying...)', color: 'var(--joy-palette-primary-400)' }
-    if (hasManualEdit) return { text: '(Manual)', color: 'var(--joy-palette-warning-500)' }
-    if (fetchingSuggestion) return { text: '(Calculating...)', color: 'var(--joy-palette-primary-500)' }
+    if (isApplyingAutomatic) return { text: '(Applying...)', color: 'var(--color-primary-400)' }
+    if (hasManualEdit) return { text: '(Manual)', color: 'var(--color-warning-500)' }
+    if (fetchingSuggestion) return { text: '(Calculating...)', color: 'var(--color-primary-500)' }
     if (localInputValue && tierDuration !== undefined && tierDuration.toString() === localInputValue) {
-      return { text: '(From Tier)', color: 'var(--joy-palette-success-500)' }
+      return { text: '(From Tier)', color: 'var(--color-success-500)' }
     }
     return null
   }
@@ -92,15 +92,15 @@ export const DurationField: React.FC<DurationFieldProps> = ({
 
   return (
     <div>
-      <FormLabel>
-        <HugeiconsIcon icon={DateTimeIcon} size={20} strokeWidth={1.5} />
+      <Typography variant="label" className="flex items-center gap-1.5 mb-1.5">
+        <Icon icon={PiClock} size={18} />
         Duration
         {statusIndicator && (
           <span style={{ color: statusIndicator.color, marginLeft: '4px' }}>
             {statusIndicator.text}
           </span>
         )}
-      </FormLabel>
+      </Typography>
 
       <Input
         name="durationDays"
@@ -109,8 +109,8 @@ export const DurationField: React.FC<DurationFieldProps> = ({
         onChange={handleInputChange}
         onBlur={handleBlur}
         placeholder={fetchingSuggestion ? 'Calculating suggested duration...' : 'Duration in days'}
-        error={touched && !!error}
-        slotProps={{ input: { step: 0.1 } }}
+        invalid={touched && !!error}
+        step={0.1}
       />
 
       {numberOfAssignees > 1 && originalDuration > 0 && (

@@ -3,16 +3,11 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 "use client";
 import React, { useState, useEffect } from "react";
-import { Button, Input, IconButton, LinearProgress, Alert } from "@mui/joy";
-import { HugeiconsIcon } from "@hugeicons/react";
-import {
-  Download04Icon,
-  Alert01Icon,
-  Layers01Icon,
-} from "@hugeicons/core-free-icons";
+import { Button, Input, Alert } from "@/components/ui";
+import { Icon, PiDownloadSimple, PiWarning } from "@/lib/icons";
 import { useTaskDataInvalidation } from "@/hooks/useTaskData";
 import axios from "axios";
-import { toast } from "react-toastify";
+import toast from "react-hot-toast";
 import { TableTd, TableTh } from "@/components";
 
 interface TierData {
@@ -28,7 +23,7 @@ const TierSkeleton: React.FC = () => {
   const skeletonColumns = Array.from({ length: 6 }, (_, index) => (
     <TableTh key={index}>
       <div className="flex items-center gap-2 justify-center animate-pulse">
-        <div className="h-4 bg-white/10 rounded w-16"></div>
+        <div className="h-4 bg-(--color-surface-hover) rounded w-16"></div>
       </div>
     </TableTh>
   ));
@@ -37,8 +32,8 @@ const TierSkeleton: React.FC = () => {
     <TableTd key={index}>
       <div className="pt-2 w-full flex justify-center animate-pulse">
         <div className="flex flex-col items-center gap-1">
-          <div className="h-10 bg-white/10 rounded w-24"></div>
-          <div className="h-3 bg-white/5 rounded w-8"></div>
+          <div className="h-10 bg-(--color-surface-hover) rounded w-24"></div>
+          <div className="h-3 bg-(--color-surface-hover) rounded w-8"></div>
         </div>
       </div>
     </TableTd>
@@ -46,7 +41,7 @@ const TierSkeleton: React.FC = () => {
 
   return (
     <>
-      <thead className="bg-white/5">
+      <thead className="bg-(--color-surface-hover)">
         <tr>{skeletonColumns}</tr>
       </thead>
       <tbody>
@@ -138,9 +133,9 @@ export const TierListForm: React.FC = () => {
   return (
     <div className="p-8">
       {!loadingTiers && hasChanges && (
-        <Alert color="warning" variant="soft" className="mb-4">
+        <Alert tone="warning" variant="soft" icon={null} className="mb-4">
           <div className="flex items-center gap-2">
-            <HugeiconsIcon icon={Alert01Icon} size={16} />
+            <Icon icon={PiWarning} size={16} />
             <span className="text-sm">
               You have unsaved changes. Don't forget to save your settings.
             </span>
@@ -148,7 +143,7 @@ export const TierListForm: React.FC = () => {
         </Alert>
       )}
 
-      <div className="border border-white/10 rounded-lg overflow-y-hidden overflow-x-auto">
+      <div className="border border-(--color-border-default) rounded-lg overflow-y-hidden overflow-x-auto">
         <table className="w-full">
           {loadingTiers ? (
             // Skeleton mientras carga
@@ -156,7 +151,7 @@ export const TierListForm: React.FC = () => {
           ) : (
             // Contenido real
             <>
-              <thead className="bg-white/5">
+              <thead className="bg-(--color-surface-hover)">
                 <tr>
                   {tiers.map((tier) => {
                     const hasChanged = tierChanges[tier.id] !== undefined;
@@ -197,22 +192,14 @@ export const TierListForm: React.FC = () => {
                                   handleTierDurationChange(tier.id, value);
                                 }
                               }}
-                              sx={{
-                                "& input": {
-                                  textAlign: "center",
-                                },
-                              }}
-                              slotProps={{
-                                input: {
-                                  min: 0.1,
-                                  step: 0.1,
-                                },
-                              }}
-                              color={hasChanged ? "warning" : "neutral"}
+                              min={0.1}
+                              step={0.1}
                               size="md"
-                              className="w-24"
+                              className={`w-24 [&_input]:text-center${
+                                hasChanged ? " border-warning-500" : ""
+                              }`}
                             />
-                            <span className="text-xs text-gray-500">days</span>
+                            <span className="text-xs text-(--color-text-muted)">days</span>
                           </div>
                         </div>
                       </TableTd>
@@ -226,9 +213,9 @@ export const TierListForm: React.FC = () => {
       </div>
       <div className="flex items-center justify-end mt-4">
         <Button
-          startDecorator={<HugeiconsIcon icon={Download04Icon} size={16} />}
+          startIcon={<Icon icon={PiDownloadSimple} size={16} />}
           onClick={handleSave}
-          disabled={loadingTiers || !hasChanges} // ✅ Agregar loadingTiers
+          disabled={loadingTiers || !hasChanges}
           loading={savingTiers}
           color={hasChanges ? "warning" : "primary"}
         >
