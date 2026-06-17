@@ -1,7 +1,7 @@
 'use client'
-import { Layers01Icon, Queue01Icon, SwatchIcon, UserGroup03Icon } from '@hugeicons/core-free-icons'
+import { Layers01Icon, Queue01Icon, Settings01Icon, SwatchIcon, UserGroup03Icon } from '@hugeicons/core-free-icons'
 import Image from 'next/image'
-import { NavItem, TaskTypesForm, TierListForm } from '@/components'
+import { NavItem, SettingsForm, TaskTypesForm, TierListForm } from '@/components'
 import { Button } from '@/components/ui'
 import { Icon, PiUser, PiSignOut } from '@/lib/icons'
 import { useModalStore } from '@/stores/modalStore'
@@ -27,6 +27,14 @@ export const Header = () => {
     })
   }
 
+  const handleSettingsClick = () => {
+    openModal({
+      title: 'Settings',
+      content: <SettingsForm />,
+      size: 'lg'
+    })
+  }
+
   const handleLogoutClick = () => {
     openConfirmation({
       title: 'Sign Out',
@@ -49,7 +57,8 @@ export const Header = () => {
     { href: '/tasks', label: 'Tasks', icon: Queue01Icon },
     { href: '/designers', label: 'Designers', icon: UserGroup03Icon },
     { onClick: handleTypesClick, label: 'Types', icon: SwatchIcon },
-    { onClick: handleTiersClick, label: 'Tiers', icon: Layers01Icon }
+    { onClick: handleTiersClick, label: 'Tiers', icon: Layers01Icon },
+    { onClick: handleSettingsClick, label: 'Settings', icon: Settings01Icon }
   ]
 
   return (

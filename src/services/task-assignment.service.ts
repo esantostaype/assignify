@@ -8,7 +8,8 @@ import { eq, or, isNull, gte } from 'drizzle-orm';
 import { Priority, Status } from '@/db/enums';
 import { UserSlot, UserWithRoles, Task, TaskTimingResult, UserVacation, VacationAwareUserSlot } from '@/interfaces';
 import { getNextAvailableStart, calculateWorkingDeadline, OCCUPYING_STATUSES } from '@/utils/task-calculation-utils';
-import { TASK_ASSIGNMENT_THRESHOLDS, CACHE_KEYS } from '@/config';
+import { CACHE_KEYS } from '@/config';
+import { getAppSettings } from '@/services/app-settings.service';
 import { getFromCache, setInCache } from '@/utils/cache';
 import { fetchActiveClickUpTasks, type ActiveClickUpTask } from '@/services/clickup-tasks.service';
 import usHolidays from '@/data/usHolidays.json'
@@ -299,7 +300,8 @@ async function selectBestUserWithVacationLogic(
     const daysLater =
       (bestSpecialist.availableDate.getTime() - bestGeneralist.availableDate.getTime()) / (1000 * 60 * 60 * 24);
 
-    if (daysLater > TASK_ASSIGNMENT_THRESHOLDS.DEADLINE_DIFFERENCE_TO_FORCE_GENERALIST) {
+    const { DEADLINE_DIFFERENCE_TO_FORCE_GENERALIST } = (await getAppSettings()).thresholds;
+    if (daysLater > DEADLINE_DIFFERENCE_TO_FORCE_GENERALIST) {
       console.log(`🔧 Especialista disponible ${daysLater.toFixed(1)}d más tarde → generalista ${bestGeneralist.userName}`);
       return bestGeneralist;
     }

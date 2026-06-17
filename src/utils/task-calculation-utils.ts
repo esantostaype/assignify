@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/no-unused-vars */
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { Status } from '@/db/enums';
-import { WORK_HOURS } from '@/config';
+import { getAppSettings } from '@/services/app-settings.service';
 import usHolidays from '@/data/usHolidays.json';
 
 /**
@@ -53,6 +53,7 @@ export function roundUpToNextHalfHour(date: Date): Date {
  */
 export async function getNextAvailableStart(date: Date): Promise<Date> {
   const result = new Date(date);
+  const WH = (await getAppSettings()).workHours; // Horario laboral en UTC
 
   while (true) {
     const hour = result.getUTCHours(); // Hora UTC
@@ -60,18 +61,18 @@ export async function getNextAvailableStart(date: Date): Promise<Date> {
     // Saltar fines de semana y días festivos
     if (isNonWorkingDay(result)) {
       result.setUTCDate(result.getUTCDate() + 1);
-      result.setUTCHours(WORK_HOURS.START, 0, 0, 0);
+      result.setUTCHours(WH.START, 0, 0, 0);
       continue;
     }
 
     // Ajustar a horario laboral si está fuera de él
-    if (hour < WORK_HOURS.START) {
-      result.setUTCHours(WORK_HOURS.START, 0, 0, 0);
-    } else if (hour >= WORK_HOURS.LUNCH_START && hour < WORK_HOURS.LUNCH_END) {
-      result.setUTCHours(WORK_HOURS.LUNCH_END, 0, 0, 0);
-    } else if (hour >= WORK_HOURS.END) {
+    if (hour < WH.START) {
+      result.setUTCHours(WH.START, 0, 0, 0);
+    } else if (hour >= WH.LUNCH_START && hour < WH.LUNCH_END) {
+      result.setUTCHours(WH.LUNCH_END, 0, 0, 0);
+    } else if (hour >= WH.END) {
       result.setUTCDate(result.getUTCDate() + 1);
-      result.setUTCHours(WORK_HOURS.START, 0, 0, 0);
+      result.setUTCHours(WH.START, 0, 0, 0);
       continue;
     }
 
@@ -86,16 +87,18 @@ export async function calculateWorkingDeadline(start: Date, hoursNeeded: number)
   let remaining = hoursNeeded;
   let current = new Date(start);
 
+  const WH = (await getAppSettings()).workHours; // Horario laboral en UTC
+
   const workBlocks = [
-    { from: WORK_HOURS.START, to: WORK_HOURS.LUNCH_START },
-    { from: WORK_HOURS.LUNCH_END, to: WORK_HOURS.END },
+    { from: WH.START, to: WH.LUNCH_START },
+    { from: WH.LUNCH_END, to: WH.END },
   ];
 
   while (remaining > 0) {
     // Saltar fines de semana y días festivos
     if (isNonWorkingDay(current)) {
       current.setUTCDate(current.getUTCDate() + 1);
-      current.setUTCHours(WORK_HOURS.START, 0, 0, 0);
+      current.setUTCHours(WH.START, 0, 0, 0);
       continue;
     }
 
@@ -141,7 +144,7 @@ export async function calculateWorkingDeadline(start: Date, hoursNeeded: number)
       if (!crossedIntoNextDay) {
         current.setUTCDate(current.getUTCDate() + 1);
       }
-      current.setUTCHours(WORK_HOURS.START, 0, 0, 0);
+      current.setUTCHours(WH.START, 0, 0, 0);
     }
   }
 

@@ -310,43 +310,18 @@ export const SettingsForm: React.FC = () => {
     }
   };
 
-  // Get setting display info
+  // Get setting display info: usa el label/description del catálogo (en español)
+  // y añade el rango permitido al tooltip cuando existe.
   const getSettingDisplayInfo = (setting: any) => {
-    // Mapeo de keys a labels más cortos y tooltips
-    const displayMap: Record<string, { label: string; tooltip: string }> = {
-      'start_hour': {
-        label: 'Start Hour',
-        tooltip: `${setting.label}: ${setting.description} (Range: ${setting.minValue}-${setting.maxValue})`
-      },
-      'lunch_start': {
-        label: 'Lunch Start Hour',
-        tooltip: `${setting.label}: ${setting.description} (Range: ${setting.minValue}-${setting.maxValue})`
-      },
-      'lunch_end': {
-        label: 'Lunch End Hour',
-        tooltip: `${setting.label}: ${setting.description} (Range: ${setting.minValue}-${setting.maxValue}h)`
-      },
-      'end_hour': {
-        label: 'End Hour',
-        tooltip: `${setting.label}: ${setting.description} (Range: ${setting.minValue}-${setting.maxValue})`
-      },
-      'normal_before_low_threshold': {
-        label: 'Normal before Low',
-        tooltip: `${setting.label}: ${setting.description} (Range: ${setting.minValue}-${setting.maxValue})`
-      },
-      'consecutive_low_threshold': {
-        label: 'Max Low Tasks',
-        tooltip: `${setting.label}: ${setting.description} (Range: ${setting.minValue}-${setting.maxValue})`
-      },
-      'deadline_difference_threshold': {
-        label: 'Deadline Diff',
-        tooltip: `${setting.label}: ${setting.description} (Range: ${setting.minValue}-${setting.maxValue} days)`
-      }
-    };
+    const range =
+      setting.minValue !== undefined && setting.minValue !== null &&
+      setting.maxValue !== undefined && setting.maxValue !== null
+        ? ` (Rango: ${setting.minValue}-${setting.maxValue})`
+        : '';
 
-    return displayMap[setting.key] || {
+    return {
       label: setting.label,
-      tooltip: setting.description || setting.label
+      tooltip: `${setting.description || setting.label}${range}`
     };
   };
 
@@ -365,8 +340,8 @@ export const SettingsForm: React.FC = () => {
   // Group name mapping
   const getGroupDisplayName = (groupName: string) => {
     const mapping: Record<string, string> = {
-      work_schedule: "Work Schedule",
-      task_assignment: "Task Assignment"
+      work_schedule: "Horario laboral",
+      task_assignment: "Asignación de tareas"
     };
     return mapping[groupName] || groupName;
   };
