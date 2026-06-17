@@ -141,13 +141,32 @@ async function getVacationAwareUserSlots(
     },
   });
 
-  const compatibleUsers = allUsersWithRoles.filter(user =>
-    user.roles.some(role => role.typeId === typeId)
+  // Afinidad de CARGO respecto al tipo pedido (análogo al escalado por nivel):
+  //   1 = tiene un rol para este tipo con isPrimary=true  → cargo PRIMARIO
+  //   2 = tiene un rol para este tipo con isPrimary=false → cargo SECUNDARIO
+  //   3 = NO tiene rol para este tipo                     → otro cargo (FALLBACK)
+  // Antes se filtraba a solo los compatibles; ahora se incluye a TODOS los activos
+  // y la afinidad ordena la preferencia (primarios → secundarios → otros).
+  // El match por brand ya viene aplicado en la query de `roles` (brandId = brand o NULL).
+  const roleAffinityOf = (u: (typeof allUsersWithRoles)[number]): 1 | 2 | 3 => {
+    const rolesForType = u.roles.filter(role => role.typeId === typeId);
+    if (rolesForType.length === 0) return 3;
+    return rolesForType.some(role => role.isPrimary) ? 1 : 2;
+  };
+
+  const candidateUsers = allUsersWithRoles.map(user => ({
+    user,
+    roleAffinity: roleAffinityOf(user),
+  }));
+
+  const primaryCount = candidateUsers.filter(c => c.roleAffinity === 1).length;
+  const secondaryCount = candidateUsers.filter(c => c.roleAffinity === 2).length;
+  const fallbackCount = candidateUsers.filter(c => c.roleAffinity === 3).length;
+  console.log(
+    `👥 Candidatos para tipo ${typeId}: ${primaryCount} primarios, ${secondaryCount} secundarios, ${fallbackCount} otros cargos (fallback)`
   );
 
-  console.log(`👥 Found ${compatibleUsers.length} compatible users for type ${typeId}`);
-
-  const userIds = compatibleUsers.map(user => user.id);
+  const userIds = candidateUsers.map(c => c.user.id);
 
   // Las tareas se leen EN VIVO de ClickUp (misma fuente que el tablero), no de la DB.
   // La disponibilidad y la carga de un diseñador dependen de TODAS sus tareas
@@ -176,8 +195,8 @@ async function getVacationAwareUserSlots(
   const eligibleSlots: VacationAwareUserSlot[] = [];
   const excludedUsers: Array<{ name: string, reason: string, vacations: string[] }> = [];
 
-  for (const user of compatibleUsers) {
-    console.log(`\n👤 Evaluating ${user.name} (${user.id})`);
+  for (const { user, roleAffinity } of candidateUsers) {
+    console.log(`\n👤 Evaluating ${user.name} (${user.id}) — afinidad de cargo ${roleAffinity}`);
 
     const userTasks = tasksByUser[user.id] || [];
     const upcomingVacations: UserVacation[] = user.vacations.map(v => ({
@@ -251,9 +270,12 @@ async function getVacationAwareUserSlots(
       workingDaysUntilAvailable,
       vacationConflictDetails: undefined,
       totalAssignedDurationDays,
+      // Afinidad de cargo (1 primario / 2 secundario / 3 otro): eje superior al de nivel.
+      roleAffinity,
     });
 
-    console.log(`   ✅ ${user.name}: nivel ${user.level}, disponible ${availableDate.toISOString().split('T')[0]}, carga ${totalAssignedDurationDays}d, ${isSpecialist ? 'especialista' : 'generalista'}`);
+    const affinityLabel = roleAffinity === 1 ? 'primario' : roleAffinity === 2 ? 'secundario' : 'otro cargo';
+    console.log(`   ✅ ${user.name}: cargo ${affinityLabel}, nivel ${user.level}, disponible ${availableDate.toISOString().split('T')[0]}, carga ${totalAssignedDurationDays}d, ${isSpecialist ? 'especialista' : 'generalista'}`);
   }
 
   console.log(`\n🚫 === USERS EXCLUDED DUE TO VACATIONS ===`);
@@ -323,7 +345,9 @@ function pickBestInLevel(
 }
 
 /**
- * Selección con ESCALADO POR NIVEL.
+ * Mejor candidato de un conjunto de slots aplicando el ESCALADO POR NIVEL.
+ * (Antes era el cuerpo de `selectBestUserWithVacationLogic`; se extrajo para poder
+ *  reutilizarlo dentro de cada grupo de afinidad de cargo.)
  * - Solo se consideran candidatos de nivel >= reqLevel (nunca uno inferior en automático).
  * - Se toma el mejor candidato de cada nivel (antes-disponible / menos-carga, con el
  *   desempate especialista/generalista interno).
@@ -331,20 +355,13 @@ function pickBestInLevel(
  *   si el mejor del nivel actual se libera MÁS de `levelEscalationDays` días DESPUÉS
  *   que el mejor del nivel superior, se escala al superior. Se repite hacia SENIOR.
  */
-async function selectBestUserWithVacationLogic(
-  userSlots: VacationAwareUserSlot[],
-  reqLevel: Level
-): Promise<VacationAwareUserSlot | null> {
-  if (userSlots.length === 0) {
-    console.log(`❌ No users available - all users excluded due to vacation conflicts`);
-    return null;
-  }
-
-  console.log(`\n🏆 === SELECTING BEST USER (escalado por nivel, pedido: ${reqLevel}) ===`);
-
-  const settings = await getAppSettings();
-  const forceGeneralistThreshold = settings.thresholds.DEADLINE_DIFFERENCE_TO_FORCE_GENERALIST;
-  const levelEscalationDays = settings.levelEscalationDays;
+function pickBestByLevelEscalation(
+  slots: VacationAwareUserSlot[],
+  reqLevel: Level,
+  levelEscalationDays: number,
+  forceGeneralistThreshold: number
+): VacationAwareUserSlot | null {
+  if (slots.length === 0) return null;
 
   const reqRank = LEVEL_RANK[reqLevel];
 
@@ -354,15 +371,15 @@ async function selectBestUserWithVacationLogic(
   // Mejor candidato por nivel (los niveles sin candidatos quedan en null).
   const bestByLevel: Partial<Record<Level, VacationAwareUserSlot>> = {};
   for (const lvl of candidateLevels) {
-    const slotsOfLevel = userSlots.filter((s) => s.level === lvl);
+    const slotsOfLevel = slots.filter((s) => s.level === lvl);
     const best = pickBestInLevel(slotsOfLevel, forceGeneralistThreshold);
     if (best) {
       bestByLevel[lvl] = best;
       console.log(
-        `   • Nivel ${lvl}: mejor = ${best.userName} (libre ${best.availableDate.toISOString().split('T')[0]}, carga ${best.totalAssignedDurationDays}d)`
+        `      • Nivel ${lvl}: mejor = ${best.userName} (libre ${best.availableDate.toISOString().split('T')[0]}, carga ${best.totalAssignedDurationDays}d)`
       );
     } else {
-      console.log(`   • Nivel ${lvl}: sin candidatos`);
+      console.log(`      • Nivel ${lvl}: sin candidatos`);
     }
   }
 
@@ -384,19 +401,116 @@ async function selectBestUserWithVacationLogic(
 
     if (daysLater > levelEscalationDays) {
       console.log(
-        `   ⬆️ ${chosen.userName} (${chosen.level}) libre ${daysLater.toFixed(1)}d más tarde que ${current.userName} (${lvl}) → escala a ${lvl}`
+        `      ⬆️ ${chosen.userName} (${chosen.level}) libre ${daysLater.toFixed(1)}d más tarde que ${current.userName} (${lvl}) → escala a ${lvl}`
       );
       chosen = current;
     } else {
       console.log(
-        `   ⏹️ ${chosen.userName} (${chosen.level}) NO supera el umbral (${daysLater.toFixed(1)}d <= ${levelEscalationDays}d) vs ${lvl}: se mantiene`
+        `      ⏹️ ${chosen.userName} (${chosen.level}) NO supera el umbral (${daysLater.toFixed(1)}d <= ${levelEscalationDays}d) vs ${lvl}: se mantiene`
+      );
+    }
+  }
+
+  return chosen;
+}
+
+// Grupos de afinidad de cargo, de mayor preferencia a menor: 1 primario → 2 secundario → 3 otro.
+const ROLE_AFFINITY_ASCENDING: Array<1 | 2 | 3> = [1, 2, 3];
+const AFFINITY_LABEL: Record<1 | 2 | 3, string> = {
+  1: 'primario',
+  2: 'secundario',
+  3: 'otro cargo',
+};
+
+/**
+ * Selección con DOBLE ESCALADO: CARGO por encima de NIVEL.
+ *
+ * Eje de CARGO (nuevo, análogo al de nivel):
+ * - Los slots se agrupan por `roleAffinity` (1 primario → 2 secundario → 3 otro cargo).
+ * - Se arranca en el grupo de MENOR affinity con candidatos (1, normalmente los primarios)
+ *   y se elige su mejor candidato con la lógica de nivel ya existente.
+ * - ESCALADO entre cargos: si el mejor del grupo actual se libera MÁS de
+ *   `DEADLINE_DIFFERENCE_TO_FORCE_GENERALIST` días DESPUÉS que el mejor del siguiente grupo
+ *   (affinity superior), se considera también ese grupo (1→2→3). Es el MISMO umbral que
+ *   separa especialista de generalista: "ve a otros cargos cuando los preferidos están saturados".
+ *
+ * Eje de NIVEL (sin cambios): dentro de cada grupo se aplica `pickBestByLevelEscalation`
+ * (nivel >= reqLevel, quien se libera antes / menos carga, desempate especialista/generalista).
+ *
+ * El override MANUAL (asignar a mano) sigue ignorando cargo y nivel: no pasa por aquí.
+ */
+async function selectBestUserWithVacationLogic(
+  userSlots: VacationAwareUserSlot[],
+  reqLevel: Level
+): Promise<VacationAwareUserSlot | null> {
+  if (userSlots.length === 0) {
+    console.log(`❌ No users available - all users excluded due to vacation conflicts`);
+    return null;
+  }
+
+  console.log(`\n🏆 === SELECTING BEST USER (escalado por cargo + nivel, pedido: ${reqLevel}) ===`);
+
+  const settings = await getAppSettings();
+  const forceGeneralistThreshold = settings.thresholds.DEADLINE_DIFFERENCE_TO_FORCE_GENERALIST;
+  const levelEscalationDays = settings.levelEscalationDays;
+
+  // Mejor candidato por grupo de afinidad de cargo (resolviendo el nivel internamente).
+  // Los slots sin `roleAffinity` (datos antiguos) se tratan como afinidad 3 (fallback).
+  const bestByAffinity: Partial<Record<1 | 2 | 3, VacationAwareUserSlot>> = {};
+  for (const affinity of ROLE_AFFINITY_ASCENDING) {
+    const slotsOfAffinity = userSlots.filter((s) => (s.roleAffinity ?? 3) === affinity);
+    if (slotsOfAffinity.length === 0) {
+      console.log(`   • Cargo ${AFFINITY_LABEL[affinity]} (${affinity}): sin candidatos`);
+      continue;
+    }
+    console.log(`   • Cargo ${AFFINITY_LABEL[affinity]} (${affinity}): ${slotsOfAffinity.length} candidato(s)`);
+    const best = pickBestByLevelEscalation(
+      slotsOfAffinity,
+      reqLevel,
+      levelEscalationDays,
+      forceGeneralistThreshold
+    );
+    if (best) {
+      bestByAffinity[affinity] = best;
+      console.log(
+        `     ↳ mejor de cargo ${AFFINITY_LABEL[affinity]}: ${best.userName} (nivel ${best.level}, libre ${best.availableDate.toISOString().split('T')[0]})`
+      );
+    } else {
+      console.log(`     ↳ cargo ${AFFINITY_LABEL[affinity]}: nadie cumple nivel >= ${reqLevel}`);
+    }
+  }
+
+  // Escalado entre cargos: arrancamos en el primer grupo con candidato y subimos de affinity.
+  let chosen: VacationAwareUserSlot | null = null;
+
+  for (const affinity of ROLE_AFFINITY_ASCENDING) {
+    const current = bestByAffinity[affinity];
+    if (!current) continue; // este cargo no tiene a nadie (con nivel suficiente); seguimos
+
+    if (!chosen) {
+      chosen = current;
+      continue;
+    }
+
+    // `chosen` es el mejor de cargos preferidos; `current` es el del cargo de menor preferencia.
+    const daysLater =
+      (chosen.availableDate.getTime() - current.availableDate.getTime()) / (1000 * 60 * 60 * 24);
+
+    if (daysLater > forceGeneralistThreshold) {
+      console.log(
+        `   ⬆️ Cargo: ${chosen.userName} (${AFFINITY_LABEL[chosen.roleAffinity ?? 3]}) libre ${daysLater.toFixed(1)}d más tarde que ${current.userName} (${AFFINITY_LABEL[affinity]}) → escala a ${AFFINITY_LABEL[affinity]}`
+      );
+      chosen = current;
+    } else {
+      console.log(
+        `   ⏹️ Cargo: ${chosen.userName} (${AFFINITY_LABEL[chosen.roleAffinity ?? 3]}) NO supera el umbral (${daysLater.toFixed(1)}d <= ${forceGeneralistThreshold}d) vs ${AFFINITY_LABEL[affinity]}: se mantiene`
       );
     }
   }
 
   if (chosen) {
     console.log(
-      `🏆 Seleccionado: ${chosen.userName} (nivel ${chosen.level}, disponible ${chosen.availableDate.toISOString().split('T')[0]})`
+      `🏆 Seleccionado: ${chosen.userName} (cargo ${AFFINITY_LABEL[chosen.roleAffinity ?? 3]}, nivel ${chosen.level}, disponible ${chosen.availableDate.toISOString().split('T')[0]})`
     );
   } else {
     console.log(`❌ No hay candidatos de nivel >= ${reqLevel} disponibles`);

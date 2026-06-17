@@ -43,6 +43,8 @@ interface DetailedUser {
     userId: string
     typeId: number
     brandId?: string | null
+    // Cargo primario (true) vs secundario (false) para este tipo de tarea.
+    isPrimary: boolean
     type: {
       id: number
       name: string
@@ -150,7 +152,7 @@ export const useAddUserRole = (options?: {
   const queryClient = useQueryClient()
   
   return useMutation({
-    mutationFn: async (payload: { userId: string; typeId: number; brandId?: string | null }) => {
+    mutationFn: async (payload: { userId: string; typeId: number; brandId?: string | null; isPrimary?: boolean }) => {
       const { data } = await axios.post('/api/users/roles', payload)
       return data
     },
@@ -198,6 +200,36 @@ export const useDeleteUserRole = (userId: string, options?: {
       queryClient.invalidateQueries({ queryKey: ['task-data'] })
       
       console.log('🔄 Cache invalidated after role deletion - task suggestions will be recalculated')
+      options?.onSuccess?.()
+    },
+    onError: options?.onError,
+  })
+}
+
+// Alterna (o fija) el flag `isPrimary` de un rol. Como afecta a qué diseñador
+// prefiere el motor, invalida también los caches de asignación.
+export const useToggleUserRolePrimary = (userId: string, options?: {
+  onSuccess?: () => void
+  onError?: () => void
+}) => {
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: async (payload: { roleId: number; isPrimary: boolean }) => {
+      const { data } = await axios.patch(`/api/users/roles/${payload.roleId}`, {
+        isPrimary: payload.isPrimary,
+      })
+      return data
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: userKeys.details(userId) })
+      queryClient.invalidateQueries({ queryKey: ['task-suggestion'] })
+      queryClient.invalidateQueries({ queryKey: ['compatible-users'] })
+      queryClient.invalidateQueries({ queryKey: ['user-slots'] })
+      queryClient.invalidateQueries({ queryKey: ['best-user-selection'] })
+      queryClient.invalidateQueries({ queryKey: ['task-data'] })
+
+      console.log('🔄 Cache invalidated after role primary toggle - task suggestions will be recalculated')
       options?.onSuccess?.()
     },
     onError: options?.onError,

@@ -11,6 +11,8 @@ interface CreateRoleRequest {
   userId: string;
   typeId: number;
   brandId?: string | null;
+  // Cargo primario (true) vs secundario (false). Opcional; por defecto secundario.
+  isPrimary?: boolean;
 }
 
 /**
@@ -20,7 +22,7 @@ interface CreateRoleRequest {
 export async function POST(req: Request) {
   try {
     const body: CreateRoleRequest = await req.json();
-    const { userId, typeId, brandId } = body;
+    const { userId, typeId, brandId, isPrimary } = body;
 
     // Validar campos requeridos
     if (!userId || !typeId) {
@@ -30,7 +32,7 @@ export async function POST(req: Request) {
       }, { status: 400 });
     }
 
-    console.log(`🔄 Adding role to user ${userId}: typeId=${typeId}, brandId=${brandId || 'null'}`);
+    console.log(`🔄 Adding role to user ${userId}: typeId=${typeId}, brandId=${brandId || 'null'}, isPrimary=${isPrimary ? 'true' : 'false'}`);
 
     // Verificar que el usuario existe
     const existingUser = await db.query.user.findFirst({
@@ -88,7 +90,8 @@ export async function POST(req: Request) {
       .values({
         userId: userId,
         typeId: typeId,
-        brandId: brandId || null
+        brandId: brandId || null,
+        isPrimary: isPrimary ?? false
       })
       .returning();
 

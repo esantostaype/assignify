@@ -53,6 +53,12 @@ export interface VacationAwareUserSlot extends UserSlot {
     conflictingVacation: UserVacation
     daysSavedByWaiting: number
   }
+  /**
+   * Afinidad de CARGO respecto al tipo de tarea pedido (escalado primario/secundario):
+   * 1 = cargo PRIMARIO para el tipo, 2 = SECUNDARIO, 3 = otro cargo (fallback).
+   * Opcional para retrocompatibilidad con consumidores existentes.
+   */
+  roleAffinity?: 1 | 2 | 3
 }
 
 export interface AssignmentCandidate {

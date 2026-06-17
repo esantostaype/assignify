@@ -84,6 +84,10 @@ export const userRole = sqliteTable(
       .notNull()
       .references(() => taskType.id),
     brandId: text('brand_id').references(() => brand.id),
+    // Cargo PRIMARIO (true) vs SECUNDARIO (false) para este tipo de tarea.
+    // Los roles existentes quedan en false (secundario); los primarios se marcan desde la UI.
+    // El motor de asignación prefiere primarios y escala a secundarios / otros cargos si están saturados.
+    isPrimary: integer('is_primary', { mode: 'boolean' }).notNull().default(false),
   },
   (t) => ({ uniq: unique().on(t.userId, t.typeId, t.brandId) })
 )

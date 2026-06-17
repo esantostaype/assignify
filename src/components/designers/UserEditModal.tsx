@@ -6,7 +6,7 @@ import { UserVacationRow } from './UserVacationRow'
 import { AddRoleForm } from './AddRoleForm'
 import { AddVacationForm } from './AddVacationForm'
 import { Icon, PiUser, PiCalendarBlank, PiMedal } from '@/lib/icons'
-import { useUserDetails, useTaskTypes, useBrands, useUpdateUserLevel } from '@/hooks/queries/useUsers'
+import { useUserDetails, useTaskTypes, useBrands, useUpdateUserLevel, useAddUserRole, useToggleUserRolePrimary } from '@/hooks/queries/useUsers'
 import { Alert, Select, type SelectOption } from '@/components/ui'
 
 type UserLevel = 'JUNIOR' | 'MID' | 'SENIOR'
@@ -19,7 +19,12 @@ const LEVEL_OPTIONS: SelectOption<UserLevel>[] = [
 
 interface UserEditModalProps {
   userId: string
-  onAddRole: (typeId: number, brandId?: string) => void
+  /**
+   * Compatibilidad con el wrapper de Designers. El alta de rol se gestiona
+   * internamente (vía useAddUserRole) para poder enviar también `isPrimary`,
+   * así que esta prop ya no se usa directamente para crear el rol.
+   */
+  onAddRole?: (typeId: number, brandId?: string, isPrimary?: boolean) => void
   onDeleteRole: (roleId: number) => void
   onAddVacation: (startDate: string, endDate: string) => void
   onDeleteVacation: (vacationId: number) => void
@@ -33,7 +38,6 @@ interface UserEditModalProps {
 
 export const UserEditModal: React.FC<UserEditModalProps> = ({
   userId,
-  onAddRole,
   onDeleteRole,
   onAddVacation,
   onDeleteVacation,
@@ -61,6 +65,18 @@ export const UserEditModal: React.FC<UserEditModalProps> = ({
     onSuccess: () => toast.success('Nivel actualizado'),
     onError: () => toast.error('Error al actualizar el nivel'),
   })
+
+  // Alta de rol gestionada aquí para poder enviar también `isPrimary`.
+  const { mutate: addRole, isPending: addingRole } = useAddUserRole({
+    onSuccess: () => toast.success('Role added successfully'),
+    onError: () => toast.error('Error adding role'),
+  })
+
+  // Alterna el cargo primario/secundario de un rol existente.
+  const { mutate: togglePrimary, isPending: togglingPrimary, variables: togglingVars } =
+    useToggleUserRolePrimary(userId, {
+      onError: () => toast.error('Error al actualizar el cargo'),
+    })
 
   // ✅ DEBUG: Log para verificar datos
   React.useEffect(() => {
@@ -152,6 +168,7 @@ export const UserEditModal: React.FC<UserEditModalProps> = ({
               <tr>
                 <th className="p-2 first:pl-4 last:pr-4 text-left text-sm font-medium text-gray-300">Type</th>
                 <th className="p-2 first:pl-4 last:pr-4 text-left text-sm font-medium text-gray-300">Brand</th>
+                <th className="p-2 first:pl-4 last:pr-4 text-left text-sm font-medium text-gray-300">Cargo</th>
                 <th className="p-2 first:pl-4 last:pr-4 text-left text-sm font-medium text-gray-300 w-[5rem]">Actions</th>
               </tr>
             </thead>
@@ -161,13 +178,15 @@ export const UserEditModal: React.FC<UserEditModalProps> = ({
                   key={role.id}
                   role={role}
                   onDelete={onDeleteRole}
+                  onTogglePrimary={(roleId, isPrimary) => togglePrimary({ roleId, isPrimary })}
                   deleting={loadingStates.deletingRole === role.id}
+                  togglingPrimary={togglingPrimary && togglingVars?.roleId === role.id}
                   loading={loadingUser}
                 />
               ))}
               {(showRoleSkeleton || (user && user.roles.length === 0)) && (
                 <tr>
-                  <td colSpan={3} className="px-3 py-4 text-center text-(--color-text-subtle)">
+                  <td colSpan={4} className="px-3 py-4 text-center text-(--color-text-subtle)">
                     {showRoleSkeleton ? 'Loading roles...' : 'No roles assigned'}
                   </td>
                 </tr>
@@ -180,8 +199,10 @@ export const UserEditModal: React.FC<UserEditModalProps> = ({
         <AddRoleForm
           taskTypes={taskTypes}
           brands={brands}
-          onAdd={onAddRole}
-          loading={loadingStates.addingRole}
+          onAdd={(typeId, brandId, isPrimary) =>
+            addRole({ userId, typeId, brandId: brandId || null, isPrimary })
+          }
+          loading={addingRole || loadingStates.addingRole}
           loadingTypes={loadingTypes}
           loadingBrands={loadingBrands}
         />

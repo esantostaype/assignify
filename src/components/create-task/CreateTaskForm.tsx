@@ -1,7 +1,15 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 "use client";
 
-import React, { useState, useEffect, FC, Dispatch, SetStateAction } from "react";
+import React, {
+  useState,
+  useEffect,
+  useRef,
+  useCallback,
+  FC,
+  Dispatch,
+  SetStateAction,
+} from "react";
 import axios from "axios";
 import { Formik, Form, useFormikContext } from "formik";
 import { Button, Typography, LoadingOverlay, Spinner } from "@/components/ui";
@@ -104,6 +112,45 @@ const FormikSuggestionLogic: FC<FormikSuggestionLogicProps> = ({
   return null;
 };
 
+// Tiempo de inactividad tras el cual el formulario se reinicia solo (2 min).
+const INACTIVITY_RESET_MS = 120000;
+
+interface FormikInactivityResetProps {
+  isSubmitting: boolean;
+  onInactivityReset: () => void;
+}
+
+// Reinicia el formulario por inactividad: si está "sucio" (dirty) y pasan
+// 2 minutos sin cambios ni submit, dispara onInactivityReset. El temporizador
+// se REINICIA cada vez que cambian los valores del form. No corre si el form
+// está limpio ni mientras se está enviando.
+const FormikInactivityReset: FC<FormikInactivityResetProps> = ({
+  isSubmitting,
+  onInactivityReset,
+}) => {
+  const { values, dirty } = useFormikContext<FormValues>();
+  // Guardamos el callback en un ref para que el efecto pueda depender solo de
+  // los valores del form (y reinicie el timer al teclear) sin recrearse por
+  // cambios de identidad del callback.
+  const resetRef = useRef(onInactivityReset);
+  resetRef.current = onInactivityReset;
+
+  useEffect(() => {
+    // No arrancar el temporizador si el form está limpio o se está enviando.
+    if (!dirty || isSubmitting) return;
+
+    const timeoutId = setTimeout(() => {
+      resetRef.current();
+    }, INACTIVITY_RESET_MS);
+
+    // Limpia al desmontar, al enviar, al dejar de estar dirty y en cada cambio
+    // de valores (lo que efectivamente REINICIA la cuenta de 2 minutos).
+    return () => clearTimeout(timeoutId);
+  }, [values, dirty, isSubmitting]);
+
+  return null;
+};
+
 export const CreateTaskForm: FC = () => {
   const queryClient = useQueryClient();
 
@@ -119,6 +166,17 @@ export const CreateTaskForm: FC = () => {
   const [fetchingSuggestion, setFetchingSuggestion] = useState(false);
   const [userHasManuallyChanged, setUserHasManuallyChanged] = useState(false);
   const [suggestionChanged, setSuggestionChanged] = useState(false);
+
+  // Reinicia TODO el estado local del formulario a su valor inicial. Se usa
+  // tanto tras crear con éxito como en la auto-limpieza por inactividad.
+  // (Los valores de Formik —name, tierId, level, etc.— los reinicia resetForm.)
+  const resetLocalState = useCallback(() => {
+    setSelectedKind("UX/UI");
+    setTriggerSuggestion(0);
+    setSuggestedAssignment(null);
+    setUserHasManuallyChanged(false);
+    setSuggestionChanged(false);
+  }, []);
 
   const suggestedUser = suggestedAssignment
     ? users.find((u) => u.id === suggestedAssignment.userId)
@@ -201,9 +259,9 @@ export const CreateTaskForm: FC = () => {
         />
       );
 
-      setUserHasManuallyChanged(false);
-      setSuggestionChanged(false);
+      // Limpia el formulario por completo: valores de Formik + estado local.
       resetForm();
+      resetLocalState();
     } catch (error: unknown) {
       setLoading(false);
       if (axios.isAxiosError(error) && error.response?.data?.error) {
@@ -245,12 +303,19 @@ export const CreateTaskForm: FC = () => {
         onSubmit={handleSubmit}
         enableReinitialize={true}
       >
-        {({ values, errors, touched, setFieldValue, isSubmitting }) => {
+        {({ values, errors, touched, setFieldValue, isSubmitting, resetForm }) => {
           const resetDependentFields = () => {
             setFieldValue("assignedUserIds", []);
             setSuggestedAssignment(null);
             setUserHasManuallyChanged(false);
             setSuggestionChanged(false);
+          };
+
+          // Auto-limpieza por inactividad: reinicia Formik + estado local y avisa.
+          const handleInactivityReset = () => {
+            resetForm();
+            resetLocalState();
+            toast("Formulario reiniciado por inactividad", { icon: "🕒" });
           };
 
           return (
@@ -264,6 +329,11 @@ export const CreateTaskForm: FC = () => {
                 isSubmitting={isSubmitting}
                 setFieldValue={setFieldValue}
                 setSuggestionChanged={setSuggestionChanged}
+              />
+
+              <FormikInactivityReset
+                isSubmitting={isSubmitting}
+                onInactivityReset={handleInactivityReset}
               />
 
               <TaskKindSwitch

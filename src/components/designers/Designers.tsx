@@ -7,7 +7,6 @@ import React, { useState, useMemo } from 'react'
 import toast from 'react-hot-toast'
 import { DesignersHeader } from './DesignersHeader'
 import { UsersList } from './UsersList'
-import { TeamWorkload } from './TeamWorkload'
 import { UserEditModal } from './UserEditModal'
 import { useModalStore } from '@/stores/modalStore'
 import {
@@ -18,6 +17,7 @@ import {
   useAddUserVacation,
   useDeleteUserVacation,
 } from '@/hooks/queries/useUsers'
+import { useUsersWorkload } from '@/hooks/queries/useWorkload'
 
 export const ClickUpUsersSync: React.FC = () => {
   // State
@@ -29,11 +29,14 @@ export const ClickUpUsersSync: React.FC = () => {
   const { openModal, closeModal } = useModalStore()
 
   // Queries
-  const { 
-    data: usersData, 
-    isLoading, 
-    refetch: refreshUsers 
+  const {
+    data: usersData,
+    isLoading,
+    refetch: refreshUsers
   } = useClickUpUsers()
+
+  // Carga de trabajo de los diseñadores sincronizados (se cruza por id en UsersList).
+  const { data: workload = [], isLoading: workloadLoading } = useUsersWorkload()
 
   // Mutations
   const { mutate: syncUsers, isPending: syncing } = useSyncUsers({
@@ -189,20 +192,15 @@ export const ClickUpUsersSync: React.FC = () => {
       />
 
       <div className="p-6 flex-1 flex flex-col gap-8">
-        <section>
-          <h2 className="mb-4 text-lg font-semibold text-(--color-text-strong)">Carga del equipo</h2>
-          <TeamWorkload />
-        </section>
-        <section>
-          <h2 className="mb-4 text-lg font-semibold text-(--color-text-strong)">Diseñadores</h2>
-          <UsersList
-            users={filteredUsers}
-            selectedUsers={selectedUsers}
-            onUserSelect={handleUserSelection}
-            onUserEdit={handleEditUser}
-            loading={isLoading}
-          />
-        </section>
+        <UsersList
+          users={filteredUsers}
+          selectedUsers={selectedUsers}
+          onUserSelect={handleUserSelection}
+          onUserEdit={handleEditUser}
+          loading={isLoading}
+          workload={workload}
+          workloadLoading={workloadLoading}
+        />
       </div>
     </>
   )

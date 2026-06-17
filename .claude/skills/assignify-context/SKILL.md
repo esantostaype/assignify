@@ -47,11 +47,12 @@ Separa dos preguntas:
 `CreateTaskForm` → `useTaskSuggestion` → `GET /api/tasks/suggestion/simple` →
 `getBestUserWithCache` → `getVacationAwareUserSlots` + `selectBestUserWithVacationLogic`
 (en `src/services/task-assignment.service.ts`).
-- Candidatos = usuarios con **rol** para ese **tipo + brand**.
+- Candidatos = **TODOS** los diseñadores activos, clasificados por **afinidad de cargo** al tipo (con match de brand): `roleAffinity` = **1** si tienen rol para el tipo con `isPrimary=true` (cargo PRIMARIO), **2** si lo tienen con `isPrimary=false` (SECUNDARIO), **3** si NO tienen rol para el tipo (otro cargo, fallback).
 - Disponibilidad y carga = **TODAS** sus tareas pendientes (`TO_DO`/`IN_PROGRESS`; **`ON_APPROVAL` NO cuenta**), leídas de ClickUp.
 - Orden: **quien se libera antes** → desempate por **menos carga**.
-- Especialista vs generalista: si el especialista se libera mucho más tarde (umbral `DEADLINE_DIFFERENCE_TO_FORCE_GENERALIST`), va el generalista.
-- La **prioridad NO cambia quién**.
+- **Escalado por cargo (eje superior al de nivel)**: se elige el mejor de los PRIMARIOS; si se libera más de `DEADLINE_DIFFERENCE_TO_FORCE_GENERALIST` días después que el mejor de los SECUNDARIOS, escala a secundarios; y si esos también están saturados, a otros cargos (1→2→3). Reusa el **mismo** umbral que separa especialista/generalista.
+- Dentro de cada grupo de cargo se aplica el **escalado por nivel** (nivel ≥ requerido; si el del nivel pedido se libera mucho más tarde, escala a uno superior) y, como desempate final, especialista vs generalista (umbral `DEADLINE_DIFFERENCE_TO_FORCE_GENERALIST`).
+- El override **manual** ignora cargo y nivel. La **prioridad NO cambia quién**.
 
 ### 2) ¿CUÁNDO? — fechas (modelo de carriles por prioridad)
 `POST /api/tasks/parallel` → `calculateParallelPriorityInsertion`
