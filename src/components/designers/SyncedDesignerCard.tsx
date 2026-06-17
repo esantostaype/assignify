@@ -1,18 +1,12 @@
 "use client";
 // src/components/designers/SyncedDesignerCard.tsx
-// Tarjeta COMPLETA de un diseñador sincronizado: fusiona la identidad
-// (foto, nombre, puesto, email, botón editar) con su carga de trabajo
-// (barra, "Frees up on…", "N in approval", vacaciones). El chip de estado va
-// abajo a la derecha.
+// Tarjeta COMPLETA de un diseñador sincronizado: identidad (foto, nombre, puesto,
+// botón editar) + carga de trabajo (barra, "Frees up on…", aprobación, vacaciones),
+// con el chip de estado abajo a la derecha. Mientras la carga no está disponible
+// se muestra UN ÚNICO skeleton de toda la tarjeta (DesignerCardSkeleton), no
+// skeletons sueltos por partes.
 import React from "react";
-import {
-  Card,
-  Chip,
-  Progress,
-  Avatar,
-  Tooltip,
-  Skeleton,
-} from "@/components/ui";
+import { Card, Chip, Progress, Avatar, Tooltip } from "@/components/ui";
 import {
   Icon,
   PiCalendarBlank,
@@ -20,12 +14,12 @@ import {
   PiCheckCircle,
   PiSparkle,
   PiArrowsClockwise,
-  PiEnvelope,
   PiPencilSimple,
 } from "@/lib/icons";
 import { IconButton } from "@/components/ui";
 import type { UserWorkload, WorkloadStatus } from "@/hooks/queries/useWorkload";
 import { levelLabel, primaryRole, typeToJobTitle } from "./designerUtils";
+import { DesignerCardSkeleton } from "./DesignerCardSkeleton";
 
 // Estado de carga: labels y colores (compartidos con la vista de "team workload").
 const STATUS: Record<
@@ -64,7 +58,7 @@ interface SyncedDesignerCardProps {
   user: DesignerUser;
   /** Carga de trabajo cruzada por id (workload.id === user.clickupId). */
   workload?: UserWorkload;
-  /** True mientras la query de carga está cargando (muestra esqueleto de carga). */
+  /** True mientras la query de carga está cargando. */
   workloadLoading?: boolean;
   onEdit?: () => void;
 }
@@ -75,24 +69,29 @@ export const SyncedDesignerCard: React.FC<SyncedDesignerCardProps> = ({
   workloadLoading = false,
   onEdit,
 }) => {
-  const st = workload ? STATUS[workload.status] : null;
+  // Mientras la carga no está disponible, UN solo skeleton de toda la tarjeta
+  // (evita mostrar identidad real + skeleton parcial, que se veía "por partes").
+  if (workloadLoading || !workload) return <DesignerCardSkeleton />;
+
+  const st = STATUS[workload.status];
 
   // Puesto: "{Level} {JobTitle}" (nivel en negrita), derivado del cargo primario.
-  const level = levelLabel(workload?.level);
-  const role = primaryRole(workload?.roleDetails ?? []);
+  const level = levelLabel(workload.level);
+  const role = primaryRole(workload.roleDetails ?? []);
   const jobTitle = role ? typeToJobTitle(role.typeName) : null;
 
   // La barra representa cuán lejos está su fecha de disponibilidad (0 = libre hoy,
   // 100% = a 2 semanas o más → overloaded).
-  const loadPct = workload
-    ? Math.min(100, Math.round((workload.availableInDays / HORIZON_DAYS) * 100))
-    : 0;
+  const loadPct = Math.min(
+    100,
+    Math.round((workload.availableInDays / HORIZON_DAYS) * 100)
+  );
   const barColor =
-    workload?.status === "overloaded"
+    workload.status === "overloaded"
       ? "error"
-      : workload?.status === "on_vacation"
+      : workload.status === "on_vacation"
         ? "warning"
-        : workload?.status === "busy"
+        : workload.status === "busy"
           ? "primary"
           : "success";
 
@@ -113,14 +112,10 @@ export const SyncedDesignerCard: React.FC<SyncedDesignerCardProps> = ({
             <p className="truncate font-semibold text-(--color-text-strong)">
               {user.name}
             </p>
-            {workload?.isSpecialist && (
+            {workload.isSpecialist && (
               <Tooltip content="Specialist">
                 <span className="inline-flex">
-                  <Icon
-                    icon={PiSparkle}
-                    size={14}
-                    className="text-primary-500"
-                  />
+                  <Icon icon={PiSparkle} size={14} className="text-primary-500" />
                 </span>
               </Tooltip>
             )}
@@ -157,78 +152,64 @@ export const SyncedDesignerCard: React.FC<SyncedDesignerCardProps> = ({
         )}
       </div>
 
-      {/* Email */}
-      <div className="flex items-center gap-1.5 text-xs text-neutral-600">
-        <Icon icon={PiEnvelope} size={14} />
-        <span className="truncate">{user.email}</span>
+      {/* Email oculto a propósito */}
+
+      {/* Barra de carga (tareas pendientes: TO_DO / In progress) */}
+      <div className="flex flex-col gap-1">
+        <div className="flex items-center justify-between text-xs text-neutral-600">
+          <span>Load</span>
+          <span className="font-medium text-(--color-text-default)">
+            {workload.taskCount}{" "}
+            {workload.taskCount === 1 ? "pending task" : "pending tasks"}
+          </span>
+        </div>
+        <Progress value={loadPct} color={barColor} />
       </div>
 
-      {workloadLoading || !workload ? (
-        // Carga aún no disponible → esqueleto sin romper el layout.
-        <div className="flex flex-col gap-2">
-          <Skeleton variant="rect" height={8} className="rounded-full" />
-          <Skeleton variant="text" width="50%" />
+      {/* Disponibilidad / vacaciones + estado */}
+      <div className="flex justify-between gap-1 text-xs">
+        <div className="space-y-1">
+          {workload.status === "on_vacation" && workload.currentVacation ? (
+            <div className="flex items-center gap-1.5 text-warning-600">
+              <Icon icon={PiCalendarBlank} size={14} />
+              On vacation until {fmtDate(workload.currentVacation.endDate)}
+            </div>
+          ) : (
+            <div className="flex items-center gap-1.5 text-neutral-600">
+              <Icon
+                icon={workload.taskCount === 0 ? PiCheckCircle : PiClock}
+                size={14}
+              />
+              {workload.taskCount === 0
+                ? "Free now"
+                : `Frees up on ${fmtDate(workload.availableFrom)}`}
+            </div>
+          )}
+          {workload.approvalCount > 0 && (
+            <div className="flex items-center gap-1.5 text-(--color-text-subtle)">
+              <Icon icon={PiArrowsClockwise} size={14} />
+              {workload.approvalCount} in approval
+            </div>
+          )}
+          {workload.upcomingVacations.length > 0 && (
+            <div className="flex items-center gap-1.5 text-(--color-text-subtle)">
+              <Icon icon={PiCalendarBlank} size={14} />
+              Next vacation:{" "}
+              {fmtDate(workload.upcomingVacations[0].startDate)} –{" "}
+              {fmtDate(workload.upcomingVacations[0].endDate)}
+            </div>
+          )}
         </div>
-      ) : (
-        <>
-          {/* Barra de carga (tareas pendientes: TO_DO / In progress) */}
-          <div className="flex flex-col gap-1">
-            <div className="flex items-center justify-between text-xs text-neutral-600">
-              <span>Load</span>
-              <span className="font-medium text-(--color-text-default)">
-                {workload.taskCount}{" "}
-                {workload.taskCount === 1 ? "pending task" : "pending tasks"}
-              </span>
-            </div>
-            <Progress value={loadPct} color={barColor} />
-          </div>
 
-          {/* Disponibilidad / vacaciones */}
-          <div className="flex justify-between gap-1 text-xs">
-            <div>
-              {workload.status === "on_vacation" && workload.currentVacation ? (
-                <div className="flex items-center gap-1.5 text-warning-600">
-                  <Icon icon={PiCalendarBlank} size={14} />
-                  On vacation until {fmtDate(workload.currentVacation.endDate)}
-                </div>
-              ) : (
-                <div className="flex items-center gap-1.5 text-neutral-600">
-                  <Icon
-                    icon={workload.taskCount === 0 ? PiCheckCircle : PiClock}
-                    size={14}
-                  />
-                  {workload.taskCount === 0
-                    ? "Free now"
-                    : `Frees up on ${fmtDate(workload.availableFrom)}`}
-                </div>
-              )}
-              {workload.approvalCount > 0 && (
-                <div className="flex items-center gap-1.5 text-(--color-text-subtle)">
-                  <Icon icon={PiArrowsClockwise} size={14} />
-                  {workload.approvalCount} in approval
-                </div>
-              )}
-              {workload.upcomingVacations.length > 0 && (
-                <div className="flex items-center gap-1.5 text-(--color-text-subtle)">
-                  <Icon icon={PiCalendarBlank} size={14} />
-                  Next vacation:{" "}
-                  {fmtDate(workload.upcomingVacations[0].startDate)} –{" "}
-                  {fmtDate(workload.upcomingVacations[0].endDate)}
-                </div>
-              )}
-            </div>
-
-            {/* Estado: abajo a la derecha */}
-            {st && (
-              <div className="mt-auto flex justify-end pt-1">
-                <Chip color={st.color} variant="soft" size="sm">
-                  {st.label}
-                </Chip>
-              </div>
-            )}
+        {/* Estado: abajo a la derecha */}
+        {st && (
+          <div className="mt-auto flex justify-end pt-1">
+            <Chip color={st.color} variant="soft" size="sm">
+              {st.label}
+            </Chip>
           </div>
-        </>
-      )}
+        )}
+      </div>
     </Card>
   );
 };
