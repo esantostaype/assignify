@@ -5,6 +5,21 @@ import { emitTaskUpdateEvent, updateTaskInClickUp } from '@/services/clickup.ser
 import { prisma } from '@/utils/prisma';
 import { Status } from '@prisma/client';
 import { WORK_HOURS } from '@/config';
+import usHolidays from '@/data/usHolidays.json';
+
+// Set de festivos (YYYY-MM-DD en UTC) para lookup O(1).
+const HOLIDAY_SET = new Set((usHolidays as Array<{ date: string }>).map((h) => h.date));
+
+/** ¿La fecha (en UTC) cae en un día festivo? */
+function isHoliday(date: Date): boolean {
+  return HOLIDAY_SET.has(date.toISOString().split('T')[0]);
+}
+
+/** ¿La fecha (en UTC) es fin de semana o festivo (día no laborable)? */
+export function isNonWorkingDay(date: Date): boolean {
+  const day = date.getUTCDay();
+  return day === 0 || day === 6 || isHoliday(date);
+}
 
 /**
  * ✅ CONSERVADOR: Redondea una fecha a la siguiente media hora
@@ -31,13 +46,11 @@ export async function getNextAvailableStart(date: Date): Promise<Date> {
   const result = new Date(date);
 
   while (true) {
-    const day = result.getUTCDay(); // Día de la semana (0-6, Domingo-Sábado)
     const hour = result.getUTCHours(); // Hora UTC
 
-    // Saltar fines de semana
-    if (day === 0 || day === 6) {
-      const daysToAdd = day === 0 ? 1 : 2;
-      result.setUTCDate(result.getUTCDate() + daysToAdd);
+    // Saltar fines de semana y días festivos
+    if (isNonWorkingDay(result)) {
+      result.setUTCDate(result.getUTCDate() + 1);
       result.setUTCHours(WORK_HOURS.START, 0, 0, 0);
       continue;
     }
@@ -70,11 +83,9 @@ export async function calculateWorkingDeadline(start: Date, hoursNeeded: number)
   ];
 
   while (remaining > 0) {
-    const day = current.getUTCDay();
-
-    if (day === 0 || day === 6) {
-      const daysToAdd = day === 0 ? 1 : 2;
-      current.setUTCDate(current.getUTCDate() + daysToAdd);
+    // Saltar fines de semana y días festivos
+    if (isNonWorkingDay(current)) {
+      current.setUTCDate(current.getUTCDate() + 1);
       current.setUTCHours(WORK_HOURS.START, 0, 0, 0);
       continue;
     }

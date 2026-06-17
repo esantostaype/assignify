@@ -459,78 +459,43 @@ async function getVacationAwareUserSlots(
       console.log(`   ✅ User is currently free, available from: ${baseAvailableDate.toISOString().split('T')[0]}`);
     }
 
+    // Ajustar la fecha de inicio para SALTAR las vacaciones (en lugar de excluir al usuario).
+    // Si la tarea —empezando cuando el usuario se libera de su cola— choca con una vacación,
+    // se mueve el inicio a después de la vacación. Si para entonces ya volvió, se asigna normal.
+    const availableDate = upcomingVacations.length > 0
+      ? await getNextAvailableStartAfterVacations(baseAvailableDate, upcomingVacations, taskDurationDays)
+      : baseAvailableDate;
+
     const taskHours = taskDurationDays * 8;
-    const potentialTaskEnd = await calculateWorkingDeadline(baseAvailableDate, taskHours);
-
-    console.log(`   🎯 Potential task timeline (before vacation check):`);
-    console.log(`     Start: ${baseAvailableDate.toISOString().split('T')[0]}`);
-    console.log(`     End: ${potentialTaskEnd.toISOString().split('T')[0]}`);
-    console.log(`     Duration: ${taskDurationDays} days`);
-
-    let hasAnyVacationConflict = false;
-    let conflictDetails: string[] = [];
-
-    for (const vacation of upcomingVacations) {
-      const vacStart = new Date(vacation.startDate);
-      const vacEnd = new Date(vacation.endDate);
-
-      const hasConflict = baseAvailableDate <= vacEnd && potentialTaskEnd >= vacStart;
-
-      if (hasConflict) {
-        hasAnyVacationConflict = true;
-        conflictDetails.push(`${vacStart.toISOString().split('T')[0]} to ${vacEnd.toISOString().split('T')[0]}`);
-        console.log(`   ❌ VACATION CONFLICT: Task (${baseAvailableDate.toISOString().split('T')[0]} to ${potentialTaskEnd.toISOString().split('T')[0]}) overlaps with vacation (${vacStart.toISOString().split('T')[0]} to ${vacEnd.toISOString().split('T')[0]})`);
-      }
-    }
-
-    if (hasAnyVacationConflict) {
-      const matchingRoles = user.roles.filter(role => role.typeId === typeId);
-      const isSpecialist = matchingRoles.length === 1 && user.roles.length === 1;
-
-      excludedUsers.push({
-        name: user.name,
-        reason: `Vacation conflict - ${isSpecialist ? 'Specialist' : 'Generalist'}`,
-        vacations: conflictDetails
-      });
-
-      console.log(`   🚫 EXCLUDED: ${user.name} due to vacation conflicts`);
-      continue;
-    }
-
-    console.log(`   ✅ ELIGIBLE: ${user.name} - no vacation conflicts detected`);
+    const potentialTaskEnd = await calculateWorkingDeadline(availableDate, taskHours);
 
     const workingDaysUntilAvailable = calculateWorkingDaysBetween(
       new Date(),
-      baseAvailableDate,
+      availableDate,
       upcomingVacations
     );
 
     const matchingRoles = user.roles.filter(role => role.typeId === typeId);
     const isSpecialist = matchingRoles.length === 1 && user.roles.length === 1;
 
-    const vacationAwareSlot: VacationAwareUserSlot = {
+    eligibleSlots.push({
       userId: user.id,
       userName: user.name,
-      availableDate: baseAvailableDate,
+      availableDate,
       tasks: userTasks,
       cargaTotal: userTasks.length,
       isSpecialist,
       lastTaskDeadline: userTasks.length > 0 ? new Date(userTasks[userTasks.length - 1].deadline) : undefined,
       upcomingVacations,
-      potentialTaskStart: baseAvailableDate,
-      potentialTaskEnd: potentialTaskEnd,
+      potentialTaskStart: availableDate,
+      potentialTaskEnd,
       hasVacationConflict: false,
       workingDaysUntilAvailable,
       vacationConflictDetails: undefined,
       totalAssignedDurationDays,
-    };
+    });
 
-    console.log(`   📊 Final assessment for ${user.name}:`);
-    console.log(`     🎯 Specialist: ${isSpecialist ? 'YES' : 'NO'}`);
-    console.log(`     ⚖️ Duration load: ${totalAssignedDurationDays} days`);
-    console.log(`     📅 Available: ${baseAvailableDate.toISOString().split('T')[0]}`);
-
-    eligibleSlots.push(vacationAwareSlot);
+    console.log(`   ✅ ${user.name}: disponible ${availableDate.toISOString().split('T')[0]}, carga ${totalAssignedDurationDays}d, ${isSpecialist ? 'especialista' : 'generalista'}`);
   }
 
   console.log(`\n🚫 === USERS EXCLUDED DUE TO VACATIONS ===`);
@@ -569,12 +534,13 @@ async function selectBestUserWithVacationLogic(
   console.log(`   🎯 Specialists available: ${specialists.length}`);
   console.log(`   🔧 Generalists available: ${generalists.length}`);
 
+  // Disponible antes primero (fecha ya ajustada por cola + vacaciones + festivos);
+  // a igualdad de fecha, el de menor carga acumulada.
   const sortUsers = (users: VacationAwareUserSlot[]) => {
-    return users.sort((a, b) => {
-      if (a.totalAssignedDurationDays !== b.totalAssignedDurationDays) {
-        return a.totalAssignedDurationDays - b.totalAssignedDurationDays;
-      }
-      return a.workingDaysUntilAvailable - b.workingDaysUntilAvailable;
+    return [...users].sort((a, b) => {
+      const dateDiff = a.availableDate.getTime() - b.availableDate.getTime();
+      if (dateDiff !== 0) return dateDiff;
+      return a.totalAssignedDurationDays - b.totalAssignedDurationDays;
     });
   };
 
@@ -585,17 +551,16 @@ async function selectBestUserWithVacationLogic(
   const bestGeneralist = sortedGeneralists.length > 0 ? sortedGeneralists[0] : null;
 
   if (bestSpecialist && bestGeneralist) {
-    const durationDifference = bestSpecialist.totalAssignedDurationDays - bestGeneralist.totalAssignedDurationDays;
+    // Si el especialista estaría disponible bastante más tarde que el generalista, usar el generalista.
+    const daysLater =
+      (bestSpecialist.availableDate.getTime() - bestGeneralist.availableDate.getTime()) / (1000 * 60 * 60 * 24);
 
-    if (durationDifference > TASK_ASSIGNMENT_THRESHOLDS.DEADLINE_DIFFERENCE_TO_FORCE_GENERALIST) {
-      console.log(`🔧 Selecting generalist due to specialist overload (${durationDifference} days difference)`);
-      console.log(`   Selected: ${bestGeneralist.userName} (${bestGeneralist.totalAssignedDurationDays} days load)`);
+    if (daysLater > TASK_ASSIGNMENT_THRESHOLDS.DEADLINE_DIFFERENCE_TO_FORCE_GENERALIST) {
+      console.log(`🔧 Especialista disponible ${daysLater.toFixed(1)}d más tarde → generalista ${bestGeneralist.userName}`);
       return bestGeneralist;
-    } else {
-      console.log(`🎯 Selecting specialist with manageable load`);
-      console.log(`   Selected: ${bestSpecialist.userName} (${bestSpecialist.totalAssignedDurationDays} days load)`);
-      return bestSpecialist;
     }
+    console.log(`🎯 Especialista ${bestSpecialist.userName} (disponible ${bestSpecialist.availableDate.toISOString().split('T')[0]})`);
+    return bestSpecialist;
   }
 
   if (bestSpecialist) {

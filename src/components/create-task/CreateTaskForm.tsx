@@ -56,6 +56,7 @@ const FormikSuggestionLogic: FC<FormikSuggestionLogicProps> = ({
     isSubmitting ? undefined : currentTypeId,
     isSubmitting ? "" : (values.durationDays as string),
     isSubmitting ? undefined : values.brandId || undefined,
+    isSubmitting ? undefined : values.priority,
     isSubmitting ? 0 : triggerSuggestion
   );
 

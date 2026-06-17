@@ -1,5 +1,6 @@
 // src/app/api/tasks/suggestion/simple/route.ts
 import { NextResponse } from 'next/server';
+import { Priority } from '@prisma/client';
 import { getBestUserWithCache } from '@/services/task-assignment.service';
 import { prisma } from '@/utils/prisma';
 
@@ -9,6 +10,10 @@ export async function GET(req: Request) {
     const typeId = parseInt(searchParams.get('typeId') || '0');
     const durationDays = parseFloat(searchParams.get('durationDays') || '0');
     const brandId = searchParams.get('brandId'); // ✅ OPCIONAL
+    const priorityParam = (searchParams.get('priority') || 'NORMAL').toUpperCase();
+    const priority: Priority = (['LOW', 'NORMAL', 'HIGH', 'URGENT'].includes(priorityParam)
+      ? priorityParam
+      : 'NORMAL') as Priority;
 
     // ✅ VALIDACIÓN SOLO DE PARÁMETROS ESENCIALES
     if (!typeId || typeId <= 0) {
@@ -38,9 +43,9 @@ export async function GET(req: Request) {
       // Con brand específico
       console.log(`🎯 Buscando usuario para brand específico: ${brandId}`);
       bestSlot = await getBestUserWithCache(
-        typeId, 
-        brandId, 
-        'NORMAL', // Priority fija
+        typeId,
+        brandId,
+        priority,
         durationDays
       );
     } else {
@@ -60,9 +65,9 @@ export async function GET(req: Request) {
         console.log(`   🔍 Intentando con brand: ${brand.name} (${brand.id})`);
         
         const candidateSlot = await getBestUserWithCache(
-          typeId, 
-          brand.id, 
-          'NORMAL',
+          typeId,
+          brand.id,
+          priority,
           durationDays
         );
 
