@@ -7,19 +7,18 @@ import * as schema from './schema'
 
 type DB = LibSQLDatabase<typeof schema>
 
-const globalForDb = globalThis as unknown as { __db?: DB }
-
-function createDb(): DB {
+// IMPORTANTE: NO reutilizar el cliente entre llamadas. libSQL es HTTP (stateless),
+// así que recrearlo es barato y NO acumula conexiones. Un cliente de LARGA VIDA
+// (el que antes se cacheaba en globalThis durante el dev server) devolvía
+// RESULTADOS RANCIOS para ciertas consultas (p.ej. SELECT sin WHERE y queries
+// relacionales `with`): el modal/tarjeta mostraban nivel/roles/vacaciones viejos
+// aunque la DB estuviera correcta. Un cliente FRESCO por operación siempre lee el
+// estado actual. (En producción ya se comportaba así; esto alinea el dev.)
+function getDb(): DB {
   const url = process.env.TURSO_DATABASE_URL
   if (!url) throw new Error('TURSO_DATABASE_URL no está configurado')
   const client = createClient({ url, authToken: process.env.TURSO_AUTH_TOKEN })
-  const instance = drizzle(client, { schema })
-  if (process.env.NODE_ENV !== 'production') globalForDb.__db = instance
-  return instance
-}
-
-function getDb(): DB {
-  return globalForDb.__db ?? createDb()
+  return drizzle(client, { schema })
 }
 
 // Proxy transparente: `db.select()...` funciona igual, pero el cliente real solo
