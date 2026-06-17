@@ -1,11 +1,16 @@
 // src/app/api/brands/route.ts
 import { NextResponse } from 'next/server';
-import { prisma } from '@/utils/prisma';
+import { db } from '@/db';
+import { brand } from '@/db/schema';
+import { asc } from 'drizzle-orm';
+
+// Lee datos en vivo de la DB: nunca pre-renderizar/cachear en build.
+export const dynamic = 'force-dynamic';
 
 export async function GET() {
   try {
-    const brands = await prisma.brand.findMany({
-      select: {
+    const brands = await db.query.brand.findMany({
+      columns: {
         id: true,
         name: true,
         isActive: true,
@@ -17,9 +22,7 @@ export async function GET() {
         createdAt: true,
         updatedAt: true
       },
-      orderBy: {
-        name: 'asc'
-      }
+      orderBy: [asc(brand.name)]
     });
 
     return NextResponse.json(brands);

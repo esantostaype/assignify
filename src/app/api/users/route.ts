@@ -1,11 +1,16 @@
 // app/api/users/route.ts
 import { NextResponse } from 'next/server';
-import { prisma } from '@/utils/prisma';
+import { db } from '@/db';
+import { user } from '@/db/schema';
+import { eq } from 'drizzle-orm';
+
+// Lee datos en vivo de la DB: nunca pre-renderizar/cachear en build.
+export const dynamic = 'force-dynamic';
 
 export async function GET() {
   try {
-    const users = await prisma.user.findMany({
-      where: { active: true }, // O cualquier otra condición de filtrado
+    const users = await db.query.user.findMany({
+      where: eq(user.active, true), // O cualquier otra condición de filtrado
     });
     return NextResponse.json(users);
   } catch (error) {

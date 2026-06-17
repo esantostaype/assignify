@@ -2,7 +2,9 @@
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import axios from 'axios'
-import { prisma } from '@/utils/prisma'
+import { db } from '@/db'
+import { user as userTable, brand as brandTable } from '@/db/schema'
+import { eq } from 'drizzle-orm'
 import { createSyncLog } from '@/utils/sync-log-utils'
 import {
   ClickUpTaskCreationParams,
@@ -287,7 +289,7 @@ export async function createTaskInClickUp(params: ClickUpTaskCreationParams & { 
   const assigneeDebugInfo: AssigneeDebugInfo[] = []
 
   for (const userId of usersToAssign) {
-    const user = await prisma.user.findUnique({ where: { id: userId } })
+    const user = await db.query.user.findFirst({ where: eq(userTable.id, userId) })
     const debugInfo: AssigneeDebugInfo = {
       userId,
       userName: user?.name,
@@ -415,7 +417,7 @@ export async function updateTaskInClickUp(taskId: string, updatedTaskData: Task)
     throw new Error('CLICKUP_API_TOKEN no configurado.')
   }
 
-  const brand = await prisma.brand.findUnique({ where: { id: updatedTaskData.brandId } });
+  const brand = await db.query.brand.findFirst({ where: eq(brandTable.id, updatedTaskData.brandId) });
   if (!brand) {
     console.warn(`Brand no encontrado para la tarea ${taskId}. No se puede actualizar el estado en ClickUp.`);
     await createSyncLog('Task', null, taskId, 'UPDATE_CLICKUP', 'WARNING', 'Brand no encontrado para mapeo de estado.');

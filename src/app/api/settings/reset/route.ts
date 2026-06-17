@@ -1,5 +1,10 @@
 import { NextResponse } from 'next/server';
-import { prisma } from '@/utils/prisma';
+import { db } from '@/db';
+import { systemSettings } from '@/db/schema';
+import { asc } from 'drizzle-orm';
+
+// Escribe datos en vivo de la DB: nunca pre-renderizar/cachear en build.
+export const dynamic = 'force-dynamic';
 
 const DEFAULT_SETTINGS = [
   // Work Schedule
@@ -115,20 +120,15 @@ export async function POST() {
     console.log('🔄 Resetting settings to defaults...');
 
     // Eliminar todos los settings actuales
-    await prisma.systemSettings.deleteMany();
+    await db.delete(systemSettings);
 
     // Recrear con valores por defecto
     for (const defaultSetting of DEFAULT_SETTINGS) {
-      await prisma.systemSettings.create({
-        data: defaultSetting
-      });
+      await db.insert(systemSettings).values(defaultSetting);
     }
 
-    const settings = await prisma.systemSettings.findMany({
-      orderBy: [
-        { group: 'asc' },
-        { order: 'asc' }
-      ]
+    const settings = await db.query.systemSettings.findMany({
+      orderBy: [asc(systemSettings.group), asc(systemSettings.order)]
     });
 
     console.log('✅ Settings reset to defaults');

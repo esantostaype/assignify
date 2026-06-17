@@ -21,7 +21,10 @@ import {
 
 import { useTaskData, useTaskSuggestion } from "@/hooks";
 import { taskKeys } from "@/hooks/queries/useTasks";
-import { getTypeKind } from "@/utils";
+// Importa directo del módulo (no del barrel @/utils): el barrel arrastra
+// utilidades que tocan la DB (@/db) y contaminaría este bundle de cliente,
+// rompiendo el prerender (Element type is invalid).
+import { getTypeKind } from "@/utils/taskUtils";
 import { validationSchema } from "@/validation/taskValidation";
 import { FormValues, User, TaskType } from "@/interfaces";
 

@@ -1,5 +1,10 @@
 import { NextResponse } from 'next/server';
-import { prisma } from '@/utils/prisma';
+import { db } from '@/db';
+import { tierList } from '@/db/schema';
+import { asc } from 'drizzle-orm';
+
+// Lee datos en vivo de la DB: nunca pre-renderizar/cachear en build.
+export const dynamic = 'force-dynamic';
 
 /**
  * GET /api/tiers
@@ -8,11 +13,9 @@ import { prisma } from '@/utils/prisma';
 export async function GET() {
   try {
     console.log('🎯 Fetching all tiers...');
-    
-    const tiers = await prisma.tierList.findMany({
-      orderBy: {
-        name: 'asc' // Esto ordenará S, A, B, C, D, E
-      }
+
+    const tiers = await db.query.tierList.findMany({
+      orderBy: [asc(tierList.name)] // Esto ordenará S, A, B, C, D, E
     });
 
     // Mapear para incluir información adicional útil

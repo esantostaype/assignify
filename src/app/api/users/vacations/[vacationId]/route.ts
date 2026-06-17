@@ -1,6 +1,11 @@
 // src/app/api/users/vacations/[vacationId]/route.ts
 import { NextResponse } from 'next/server';
-import { prisma } from '@/utils/prisma';
+import { db } from '@/db';
+import { userVacation } from '@/db/schema';
+import { eq } from 'drizzle-orm';
+
+// Escribe datos en vivo de la DB: nunca pre-renderizar/cachear en build.
+export const dynamic = 'force-dynamic';
 
 interface RouteParams {
   params: {
@@ -23,7 +28,7 @@ export async function DELETE(req: Request, { params }: RouteParams) {
     }
 
     const vacationIdInt = parseInt(vacationId);
-    
+
     if (isNaN(vacationIdInt)) {
       return NextResponse.json({
         error: 'Vacation ID must be a valid number'
@@ -33,11 +38,11 @@ export async function DELETE(req: Request, { params }: RouteParams) {
     console.log(`🔄 Deleting vacation: ${vacationIdInt}`);
 
     // Verificar que la vacación existe y obtener información para logging
-    const existingVacation = await prisma.userVacation.findUnique({
-      where: { id: vacationIdInt },
-      include: {
+    const existingVacation = await db.query.userVacation.findFirst({
+      where: eq(userVacation.id, vacationIdInt),
+      with: {
         user: {
-          select: {
+          columns: {
             id: true,
             name: true
           }
@@ -54,15 +59,13 @@ export async function DELETE(req: Request, { params }: RouteParams) {
     // Verificar si la vacación ya ha comenzado (opcional: prevenir eliminación de vacaciones en curso)
     const now = new Date();
     const isOngoing = existingVacation.startDate <= now && existingVacation.endDate >= now;
-    
+
     if (isOngoing) {
       console.log(`⚠️ Warning: Deleting ongoing vacation for user ${existingVacation.user.name}`);
     }
 
     // Eliminar la vacación
-    await prisma.userVacation.delete({
-      where: { id: vacationIdInt }
-    });
+    await db.delete(userVacation).where(eq(userVacation.id, vacationIdInt));
 
     const durationDays = Math.ceil(
       (existingVacation.endDate.getTime() - existingVacation.startDate.getTime()) / (1000 * 60 * 60 * 24)
@@ -84,7 +87,7 @@ export async function DELETE(req: Request, { params }: RouteParams) {
 
   } catch (error) {
     console.error('❌ Error deleting user vacation:', error);
-    
+
     return NextResponse.json({
       error: 'Internal server error deleting vacation',
       details: error instanceof Error ? error.message : 'Unknown error'

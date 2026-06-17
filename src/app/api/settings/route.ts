@@ -1,5 +1,10 @@
 import { NextResponse } from 'next/server';
-import { prisma } from '@/utils/prisma';
+import { db } from '@/db';
+import { systemSettings } from '@/db/schema';
+import { and, asc, eq } from 'drizzle-orm';
+
+// Lee/escribe datos en vivo de la DB: nunca pre-renderizar/cachear en build.
+export const dynamic = 'force-dynamic';
 
 // Settings predefinidos con sus valores por defecto
 const DEFAULT_SETTINGS = [
@@ -114,28 +119,20 @@ const DEFAULT_SETTINGS = [
 export async function GET() {
   try {
     // Obtener settings de la base de datos
-    let settings = await prisma.systemSettings.findMany({
-      orderBy: [
-        { group: 'asc' },
-        { order: 'asc' }
-      ]
+    let settings = await db.query.systemSettings.findMany({
+      orderBy: [asc(systemSettings.group), asc(systemSettings.order)]
     });
 
     // Si no hay settings, crear los por defecto
     if (settings.length === 0) {
       console.log('🔄 Creating default settings...');
-      
+
       for (const defaultSetting of DEFAULT_SETTINGS) {
-        await prisma.systemSettings.create({
-          data: defaultSetting
-        });
+        await db.insert(systemSettings).values(defaultSetting);
       }
-      
-      settings = await prisma.systemSettings.findMany({
-        orderBy: [
-          { group: 'asc' },
-          { order: 'asc' }
-        ]
+
+      settings = await db.query.systemSettings.findMany({
+        orderBy: [asc(systemSettings.group), asc(systemSettings.order)]
       });
     }
 
@@ -173,20 +170,16 @@ export async function PATCH(req: Request) {
         continue;
       }
 
-      const updated = await prisma.systemSettings.updateMany({
-        where: {
-          category,
-          key
-        },
-        data: {
-          value: value
-        }
-      });
+      const updated = await db
+        .update(systemSettings)
+        .set({ value })
+        .where(and(eq(systemSettings.category, category), eq(systemSettings.key, key)))
+        .returning({ id: systemSettings.id });
 
       results.push({
         category,
         key,
-        updated: updated.count > 0
+        updated: updated.length > 0
       });
     }
 

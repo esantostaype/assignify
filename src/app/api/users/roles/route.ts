@@ -1,6 +1,11 @@
 // src/app/api/users/roles/route.ts
 import { NextResponse } from 'next/server';
-import { prisma } from '@/utils/prisma';
+import { db } from '@/db';
+import { user, taskType, brand, userRole } from '@/db/schema';
+import { eq, and, isNull } from 'drizzle-orm';
+
+// Lee/escribe datos en vivo de la DB: nunca pre-renderizar/cachear en build.
+export const dynamic = 'force-dynamic';
 
 interface CreateRoleRequest {
   userId: string;
@@ -28,22 +33,22 @@ export async function POST(req: Request) {
     console.log(`🔄 Adding role to user ${userId}: typeId=${typeId}, brandId=${brandId || 'null'}`);
 
     // Verificar que el usuario existe
-    const user = await prisma.user.findUnique({
-      where: { id: userId }
+    const existingUser = await db.query.user.findFirst({
+      where: eq(user.id, userId)
     });
 
-    if (!user) {
+    if (!existingUser) {
       return NextResponse.json({
         error: 'User not found'
       }, { status: 404 });
     }
 
     // Verificar que el tipo existe
-    const taskType = await prisma.taskType.findUnique({
-      where: { id: typeId }
+    const existingType = await db.query.taskType.findFirst({
+      where: eq(taskType.id, typeId)
     });
 
-    if (!taskType) {
+    if (!existingType) {
       return NextResponse.json({
         error: 'Task type not found'
       }, { status: 404 });
@@ -51,11 +56,11 @@ export async function POST(req: Request) {
 
     // Verificar que el brand existe si se proporciona
     if (brandId) {
-      const brand = await prisma.brand.findUnique({
-        where: { id: brandId }
+      const existingBrand = await db.query.brand.findFirst({
+        where: eq(brand.id, brandId)
       });
 
-      if (!brand) {
+      if (!existingBrand) {
         return NextResponse.json({
           error: 'Brand not found'
         }, { status: 404 });
@@ -63,12 +68,12 @@ export async function POST(req: Request) {
     }
 
     // Verificar que el rol no existe ya
-    const existingRole = await prisma.userRole.findFirst({
-      where: {
-        userId: userId,
-        typeId: typeId,
-        brandId: brandId || null
-      }
+    const existingRole = await db.query.userRole.findFirst({
+      where: and(
+        eq(userRole.userId, userId),
+        eq(userRole.typeId, typeId),
+        brandId ? eq(userRole.brandId, brandId) : isNull(userRole.brandId)
+      )
     });
 
     if (existingRole) {
@@ -78,21 +83,27 @@ export async function POST(req: Request) {
     }
 
     // Crear el rol
-    const newRole = await prisma.userRole.create({
-      data: {
+    const [created] = await db
+      .insert(userRole)
+      .values({
         userId: userId,
         typeId: typeId,
         brandId: brandId || null
-      },
-      include: {
+      })
+      .returning();
+
+    // Releer con sus relaciones (type/brand) para mantener la forma de la respuesta
+    const newRole = await db.query.userRole.findFirst({
+      where: eq(userRole.id, created.id),
+      with: {
         type: {
-          select: {
+          columns: {
             id: true,
             name: true
           }
         },
         brand: {
-          select: {
+          columns: {
             id: true,
             name: true
           }
@@ -100,13 +111,13 @@ export async function POST(req: Request) {
       }
     });
 
-    console.log(`✅ Role created successfully: ${newRole.type.name} ${newRole.brand ? `for ${newRole.brand.name}` : '(Global)'}`);
+    console.log(`✅ Role created successfully: ${newRole!.type.name} ${newRole!.brand ? `for ${newRole!.brand.name}` : '(Global)'}`);
 
     return NextResponse.json(newRole, { status: 201 });
 
   } catch (error) {
     console.error('❌ Error creating user role:', error);
-    
+
     return NextResponse.json({
       error: 'Internal server error creating role',
       details: error instanceof Error ? error.message : 'Unknown error'

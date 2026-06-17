@@ -1,6 +1,11 @@
 // src/app/api/users/[userId]/details/route.ts
 import { NextResponse } from 'next/server';
-import { prisma } from '@/utils/prisma';
+import { db } from '@/db';
+import { user, userVacation } from '@/db/schema';
+import { eq, asc } from 'drizzle-orm';
+
+// Lee datos en vivo de la DB: nunca pre-renderizar/cachear en build.
+export const dynamic = 'force-dynamic';
 
 interface RouteParams {
   params: {
@@ -23,19 +28,19 @@ export async function GET(req: Request, { params }: RouteParams) {
     }
 
     // Obtener usuario con roles y vacaciones
-    const user = await prisma.user.findUnique({
-      where: { id: userId },
-      include: {
+    const user_ = await db.query.user.findFirst({
+      where: eq(user.id, userId),
+      with: {
         roles: {
-          include: {
+          with: {
             type: {
-              select: {
+              columns: {
                 id: true,
                 name: true
               }
             },
             brand: {
-              select: {
+              columns: {
                 id: true,
                 name: true
               }
@@ -43,28 +48,26 @@ export async function GET(req: Request, { params }: RouteParams) {
           }
         },
         vacations: {
-          orderBy: {
-            startDate: 'asc'
-          }
+          orderBy: asc(userVacation.startDate)
         }
       }
     });
 
-    if (!user) {
+    if (!user_) {
       return NextResponse.json({
         error: 'User not found'
       }, { status: 404 });
     }
 
-    console.log(`✅ User details loaded for: ${user.name} (${user.id})`);
-    console.log(`   - Roles: ${user.roles.length}`);
-    console.log(`   - Vacations: ${user.vacations.length}`);
+    console.log(`✅ User details loaded for: ${user_.name} (${user_.id})`);
+    console.log(`   - Roles: ${user_.roles.length}`);
+    console.log(`   - Vacations: ${user_.vacations.length}`);
 
-    return NextResponse.json(user);
+    return NextResponse.json(user_);
 
   } catch (error) {
     console.error('❌ Error loading user details:', error);
-    
+
     return NextResponse.json({
       error: 'Internal server error loading user details',
       details: error instanceof Error ? error.message : 'Unknown error'

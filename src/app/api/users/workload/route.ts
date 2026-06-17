@@ -4,7 +4,9 @@
 // con los usuarios/roles/vacaciones locales. Así el panel siempre coincide con el
 // kanban, sin depender de la copia local (que puede estar desincronizada).
 import { NextResponse } from 'next/server'
-import { prisma } from '@/utils/prisma'
+import { db } from '@/db'
+import { user, userVacation } from '@/db/schema'
+import { eq, asc, gte } from 'drizzle-orm'
 import { fetchActiveClickUpTasks, type ActiveClickUpTask } from '@/services/clickup-tasks.service'
 
 // Lee ClickUp en vivo: nunca pre-renderizar/cachear en build.
@@ -26,13 +28,13 @@ export async function GET() {
 
     // Usuarios locales (roles, vacaciones) + tareas en vivo de ClickUp, en paralelo.
     const [users, tasks] = await Promise.all([
-      prisma.user.findMany({
-        where: { active: true },
-        include: {
-          roles: { include: { type: true } },
-          vacations: { where: { endDate: { gte: now } }, orderBy: { startDate: 'asc' } },
+      db.query.user.findMany({
+        where: eq(user.active, true),
+        with: {
+          roles: { with: { type: true } },
+          vacations: { where: gte(userVacation.endDate, now), orderBy: asc(userVacation.startDate) },
         },
-        orderBy: { name: 'asc' },
+        orderBy: asc(user.name),
       }),
       fetchActiveClickUpTasks(),
     ])

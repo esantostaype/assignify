@@ -1,10 +1,24 @@
-// src/app/api/users/enhanced/route.ts - VERSIÓN CORREGIDA
+// src/app/api/users/enhanced/route.ts
+// Usuarios con análisis de disponibilidad y recomendaciones. Los usuarios/roles/
+// vacaciones vienen de la DB (Drizzle), pero la CARGA se calcula EN VIVO de
+// ClickUp (igual que /api/users/workload): se cuentan las tareas pendientes
+// (TO_DO/IN_PROGRESS) por assignee.id. Así el panel coincide con el tablero.
 import { NextResponse } from 'next/server';
-import { prisma } from '@/utils/prisma';
+import { db } from '@/db';
+import { user as userTable, userRole, userVacation } from '@/db/schema';
+import { eq, and, or, isNull, gte } from 'drizzle-orm';
 import {
   getNextAvailableStart,
   calculateWorkingDeadline
 } from '@/utils/task-calculation-utils';
+import { fetchActiveClickUpTasks, type ActiveClickUpTask } from '@/services/clickup-tasks.service';
+
+// Lee ClickUp en vivo: nunca pre-renderizar/cachear en build.
+export const dynamic = 'force-dynamic';
+
+// Estados de ClickUp que cuentan como trabajo pendiente (ocupan al diseñador).
+// ON_APPROVAL ya está entregado: no cuenta como carga.
+const PENDING_STATUSES = new Set<ActiveClickUpTask['status']>(['TO_DO', 'IN_PROGRESS']);
 
 interface EnhancedUser {
   id: string;
@@ -87,35 +101,44 @@ export async function GET(req: Request) {
     const now = new Date();
     console.log(`📅 Current date for filtering: ${now.toISOString()}`);
 
-    // Obtener usuarios compatibles con datos completos
-    const allUsersWithData = await prisma.user.findMany({
-      where: { active: true },
-      include: {
-        roles: {
-          where: {
-            typeId: typeId,
-            OR: [
-              { brandId: brandId },
-              { brandId: null }
-            ]
-          }
-        },
-        vacations: {
-          where: {
-            endDate: {
-              gte: now // Solo vacaciones futuras/actuales
-            }
-          }
-        }
-      }
-    });
+    // Rol compatible: del tipo pedido y del brand (o global, brandId null).
+    const brandCondition = brandId
+      ? or(eq(userRole.brandId, brandId), isNull(userRole.brandId))
+      : isNull(userRole.brandId);
 
-    // Filtrar solo usuarios compatibles
+    // Usuarios locales (roles, vacaciones) + tareas en vivo de ClickUp, en paralelo.
+    const [allUsersWithData, allClickUpTasks] = await Promise.all([
+      db.query.user.findMany({
+        where: eq(userTable.active, true),
+        with: {
+          roles: {
+            where: and(eq(userRole.typeId, typeId), brandCondition),
+          },
+          vacations: {
+            where: gte(userVacation.endDate, now),
+          },
+        },
+      }),
+      fetchActiveClickUpTasks(),
+    ]);
+
+    // Filtrar solo usuarios compatibles (con algún rol que coincida con el tipo).
     const compatibleUsers = allUsersWithData.filter(user =>
       user.roles.some(role => role.typeId === typeId)
     );
 
     console.log(`👥 Found ${compatibleUsers.length} compatible users for type ${typeId}`);
+
+    // Agrupar tareas PENDIENTES por asignado. El id de ClickUp == user.id local.
+    const tasksByUser = new Map<string, ActiveClickUpTask[]>();
+    for (const t of allClickUpTasks) {
+      if (!PENDING_STATUSES.has(t.status)) continue;
+      for (const a of t.assignees) {
+        const arr = tasksByUser.get(a.id) ?? [];
+        arr.push(t);
+        tasksByUser.set(a.id, arr);
+      }
+    }
 
     const availableUsers: EnhancedUser[] = [];
     const usersOnVacation: EnhancedUser[] = [];
@@ -128,69 +151,31 @@ export async function GET(req: Request) {
       const matchingRoles = user.roles.filter(role => role.typeId === typeId);
       const isSpecialist = matchingRoles.length === 1 && user.roles.length === 1;
 
-      // ✅ CORRECCIÓN: Obtener SOLO tareas relevantes (actuales y futuras)
-      const userTasks = await prisma.task.findMany({
-        where: {
-          assignees: { some: { userId: user.id } },
-          status: { notIn: ['COMPLETE'] },
-          // ✅ NUEVO: Filtrar tareas que aún son relevantes
-          OR: [
-            // Tareas en progreso (empezaron pero no han terminado)
-            {
-              startDate: { lte: now },
-              deadline: { gte: now }
-            },
-            // Tareas futuras (aún no han empezado)
-            {
-              startDate: { gt: now }
-            }
-          ]
-        },
-        orderBy: { startDate: 'asc' },
-        include: {
-          tier: true
-        }
-      });
+      // ✅ Carga en vivo desde ClickUp: tareas pendientes del usuario.
+      const userTasks = tasksByUser.get(user.id) ?? [];
 
-      // ✅ NUEVO: Separar tareas para mejor análisis
-      const tasksInProgress = userTasks.filter(task => 
-        task.startDate <= now && task.deadline >= now
-      );
-      const futureTasks = userTasks.filter(task => 
-        task.startDate > now
-      );
+      // ClickUp no trae tier: 1 día por tarea pendiente (igual que el motor de asignación).
+      const lastDeadlineMs = userTasks.length > 0
+        ? Math.max(...userTasks.map(t => new Date(t.dueDate).getTime()))
+        : null;
 
-      console.log(`   📊 Relevant tasks breakdown:`);
-      console.log(`      - In progress: ${tasksInProgress.length}`);
-      console.log(`      - Future: ${futureTasks.length}`);
-      console.log(`      - Total relevant: ${userTasks.length}`);
+      console.log(`   📊 Pending ClickUp tasks: ${userTasks.length}`);
 
-      // ✅ CORRECCIÓN: Calcular carga de trabajo solo con tareas relevantes
+      // ✅ Carga de trabajo (días) y deadline de la última tarea pendiente.
       const currentWorkload = {
         taskCount: userTasks.length,
-        durationDays: userTasks.reduce((sum, task) => {
-          // Para tareas en progreso, calcular solo los días restantes
-          if (task.startDate <= now && task.deadline >= now) {
-            const remainingDays = Math.ceil(
-              (task.deadline.getTime() - now.getTime()) / (1000 * 60 * 60 * 24)
-            );
-            console.log(`      - Task "${task.name}": ${remainingDays} days remaining`);
-            return sum + remainingDays;
-          }
-          // Para tareas futuras, usar duración completa
-          const duration = task.customDuration ?? task.tier.duration;
-          return sum + duration;
-        }, 0),
-        lastTaskDeadline: userTasks.length > 0 ? userTasks[userTasks.length - 1].deadline.toISOString().split('T')[0] : undefined
+        durationDays: userTasks.length,
+        lastTaskDeadline: lastDeadlineMs !== null
+          ? new Date(lastDeadlineMs).toISOString().split('T')[0]
+          : undefined
       };
 
       console.log(`   📈 Calculated workload: ${currentWorkload.durationDays} days`);
 
       // Calcular disponibilidad base
       let baseAvailableDate: Date;
-      if (userTasks.length > 0) {
-        const lastTask = userTasks[userTasks.length - 1];
-        baseAvailableDate = await getNextAvailableStart(new Date(lastTask.deadline));
+      if (lastDeadlineMs !== null) {
+        baseAvailableDate = await getNextAvailableStart(new Date(lastDeadlineMs));
       } else {
         baseAvailableDate = await getNextAvailableStart(now);
       }
@@ -254,8 +239,8 @@ export async function GET(req: Request) {
         }
       }
 
-      // ✅ CORRECCIÓN: Ajustar umbral de overload basado en tareas relevantes
-      // Considerar overloaded si tiene más de 10 días de trabajo relevante pendiente
+      // ✅ Ajustar umbral de overload basado en carga pendiente.
+      // Considerar overloaded si tiene más de 10 días de trabajo pendiente.
       const OVERLOAD_THRESHOLD = 10; // Puedes ajustar este valor
 
       // Crear objeto de usuario mejorado
@@ -295,7 +280,7 @@ export async function GET(req: Request) {
         overloadedUsers.push(enhancedUser);
       }
 
-      console.log(`   📊 ${user.name}: ${enhancedUser.status} | Relevant workload: ${currentWorkload.durationDays}d | Available: ${enhancedUser.availableFrom}`);
+      console.log(`   📊 ${user.name}: ${enhancedUser.status} | Workload: ${currentWorkload.durationDays}d | Available: ${enhancedUser.availableFrom}`);
       if (recommendation) {
         console.log(`   💡 Recommendation: Wait for return (saves ${recommendation.daysSavedByWaiting} days)`);
       }

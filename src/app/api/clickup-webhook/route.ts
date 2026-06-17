@@ -6,6 +6,9 @@ import { NextResponse } from 'next/server'
 import crypto from 'crypto'
 import { publishTaskUpdate } from '@/lib/pusher'
 
+// Recibe webhooks y usa request.url (challenge): nunca pre-renderizar/cachear en build.
+export const dynamic = 'force-dynamic'
+
 const WEBHOOK_SECRET = process.env.CLICKUP_WEBHOOK_SECRET
 // Rechaza webhooks con firma inválida. Déjalo en 'false' hasta confirmar en logs
 // que la firma coincide; luego pon CLICKUP_VERIFY_SIGNATURE=true en producción.

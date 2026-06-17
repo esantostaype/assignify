@@ -1,4 +1,6 @@
-import { prisma } from '@/utils/prisma'
+import { db } from '@/db'
+import { syncLog } from '@/db/schema'
+
 export async function createSyncLog(
   entityType: string,
   entityIntId: number | null,
@@ -10,17 +12,15 @@ export async function createSyncLog(
   clickupResponse?: any
 ) {
   try {
-    await prisma.syncLog.create({
-      data: {
-        entityType,
-        entityIntId,
-        entityStringId,
-        action,
-        status,
-        errorMessage,
-        clickupResponse: clickupResponse ? clickupResponse : undefined
-      }
-    });
+    await db.insert(syncLog).values({
+      entityType,
+      entityIntId,
+      entityStringId,
+      action,
+      status,
+      errorMessage,
+      clickupResponse: clickupResponse ? clickupResponse : undefined,
+    })
   } catch (error) {
     console.error('Error creating sync log:', error);
   }

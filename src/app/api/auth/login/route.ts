@@ -7,6 +7,9 @@ const JWT_SECRET = new TextEncoder().encode(
   process.env.JWT_SECRET || 'your-super-secret-key-change-in-production'
 );
 
+// Maneja login/logout (cookies de sesión): nunca pre-renderizar/cachear en build.
+export const dynamic = 'force-dynamic';
+
 // Credenciales hardcodeadas
 const VALID_CREDENTIALS = {
   email: 'esantos@inszoneins.com',

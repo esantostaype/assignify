@@ -1,4 +1,4 @@
-import { Priority, Status, Tier } from '@prisma/client'
+import { Priority, Status, Tier } from '@/db/enums'
 
 export interface TaskType {
   id: number

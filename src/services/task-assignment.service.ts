@@ -2,8 +2,10 @@
 // src/services/task-assignment.service.ts - SIN queuePosition
 /* eslint-disable @typescript-eslint/no-unused-vars */
 /* eslint-disable prefer-const */
-import { prisma } from '@/utils/prisma';
-import { Priority, Status } from '@prisma/client';
+import { db } from '@/db';
+import { user as userTable, userRole, userVacation } from '@/db/schema';
+import { eq, or, isNull, gte } from 'drizzle-orm';
+import { Priority, Status } from '@/db/enums';
 import { UserSlot, UserWithRoles, Task, TaskTimingResult, UserVacation, VacationAwareUserSlot } from '@/interfaces';
 import { getNextAvailableStart, calculateWorkingDeadline, OCCUPYING_STATUSES } from '@/utils/task-calculation-utils';
 import { TASK_ASSIGNMENT_THRESHOLDS, CACHE_KEYS } from '@/config';
@@ -115,24 +117,15 @@ async function getVacationAwareUserSlots(
   console.log(`🏖️ === VACATION FILTERING FOR ${taskDurationDays}-DAY TASK ===`);
   console.log(`📋 Will EXCLUDE users with vacation conflicts instead of adjusting dates`);
 
-  const allUsersWithRoles = await prisma.user.findMany({
-    where: { active: true },
-    include: {
+  const allUsersWithRoles = await db.query.user.findMany({
+    where: eq(userTable.active, true),
+    with: {
       roles: {
-        where: {
-          OR: [
-            { brandId: brandId },
-            { brandId: null }
-          ]
-        }
+        where: or(eq(userRole.brandId, brandId), isNull(userRole.brandId)),
       },
       vacations: {
-        where: {
-          endDate: {
-            gte: new Date()
-          }
-        }
-      }
+        where: gte(userVacation.endDate, new Date()),
+      },
     },
   });
 

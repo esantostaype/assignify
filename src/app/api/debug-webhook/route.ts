@@ -1,6 +1,9 @@
 // src/app/api/webhook-debug/route.ts
 import { NextResponse } from 'next/server'
 
+// Usa request.url (challenge/debug): nunca pre-renderizar/cachear en build.
+export const dynamic = 'force-dynamic'
+
 export async function POST(req: Request) {
   const timestamp = new Date().toISOString();
   

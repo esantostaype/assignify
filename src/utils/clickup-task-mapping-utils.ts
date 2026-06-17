@@ -2,8 +2,10 @@
 // src/utils/clickup-task-mapping-utils.ts - VERSIÓN ACTUALIZADA PARA DONE
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import { prisma } from '@/utils/prisma';
-import { Priority, Status, Tier } from '@prisma/client';
+import { db } from '@/db';
+import { taskType as taskTypeTable, tierList } from '@/db/schema';
+import { eq } from 'drizzle-orm';
+import { Priority, Status, Tier } from '@/db/enums';
 
 /**
  * ✅ MAPA DE PRIORIDADES: Mapea prioridades locales a valores de ClickUp
@@ -283,20 +285,20 @@ export async function inferTaskTypeAndTier(taskName: string, clickupTags: string
   if (!inferredCategoryName) inferredCategoryName = 'Miscellaneous';
 
   // Busca o crea el TaskType
-  let taskType = await prisma.taskType.findUnique({ where: { name: inferredTypeName } });
+  let taskType = await db.query.taskType.findFirst({ where: eq(taskTypeTable.name, inferredTypeName) });
   if (!taskType) {
-    taskType = await prisma.taskType.create({ data: { name: inferredTypeName } });
+    [taskType] = await db.insert(taskTypeTable).values({ name: inferredTypeName }).returning();
     console.log(`  -> Creado nuevo TaskType: ${taskType.name}`);
   }
 
   // ✅ Resolver el tier inferido. Si no existe, usar el tier por defecto 'D'.
-  let tierRecord = await prisma.tierList.findFirst({
-    where: { name: inferredTier }
+  let tierRecord = await db.query.tierList.findFirst({
+    where: eq(tierList.name, inferredTier)
   });
 
   if (!tierRecord) {
     console.warn(`⚠️ Tier ${inferredTier} no encontrado, usando tier por defecto 'D'`);
-    tierRecord = await prisma.tierList.findFirst({ where: { name: Tier.D } });
+    tierRecord = await db.query.tierList.findFirst({ where: eq(tierList.name, Tier.D) });
   }
 
   if (!tierRecord) {

@@ -1,5 +1,10 @@
 import { NextResponse } from 'next/server'
-import { prisma } from '@/utils/prisma'
+import { db } from '@/db'
+import { taskType } from '@/db/schema'
+import { eq } from 'drizzle-orm'
+
+// Lee/escribe datos en vivo de la DB: nunca pre-renderizar/cachear en build.
+export const dynamic = 'force-dynamic'
 
 export async function PATCH(
   request: Request,
@@ -27,8 +32,8 @@ export async function PATCH(
     }
 
     // Verificar que el task type existe
-    const existingTaskType = await prisma.taskType.findUnique({
-      where: { id: Number(id) }
+    const existingTaskType = await db.query.taskType.findFirst({
+      where: eq(taskType.id, Number(id))
     })
 
     if (!existingTaskType) {
@@ -39,12 +44,11 @@ export async function PATCH(
     }
 
     // Actualizar el task type
-    const updatedTaskType = await prisma.taskType.update({
-      where: { id: Number(id) },
-      data: {
-        name: name.trim()
-      }
-    })
+    const [updatedTaskType] = await db
+      .update(taskType)
+      .set({ name: name.trim() })
+      .where(eq(taskType.id, Number(id)))
+      .returning()
 
     return NextResponse.json(updatedTaskType)
   } catch (error) {
@@ -80,8 +84,8 @@ export async function DELETE(
     }
 
     // Verificar que el task type existe
-    const existingTaskType = await prisma.taskType.findUnique({
-      where: { id: Number(id) }
+    const existingTaskType = await db.query.taskType.findFirst({
+      where: eq(taskType.id, Number(id))
     })
 
     if (!existingTaskType) {
@@ -92,9 +96,7 @@ export async function DELETE(
     }
 
     // Eliminar el task type
-    await prisma.taskType.delete({
-      where: { id: Number(id) }
-    })
+    await db.delete(taskType).where(eq(taskType.id, Number(id)))
 
     return NextResponse.json({ message: 'Task type deleted successfully' })
   } catch (error) {

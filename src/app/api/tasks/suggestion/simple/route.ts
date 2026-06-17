@@ -1,8 +1,13 @@
 // src/app/api/tasks/suggestion/simple/route.ts
 import { NextResponse } from 'next/server';
-import { Priority } from '@prisma/client';
+import { Priority } from '@/db/enums';
 import { getBestUserWithCache } from '@/services/task-assignment.service';
-import { prisma } from '@/utils/prisma';
+import { db } from '@/db';
+import { brand as brandTable } from '@/db/schema';
+import { eq } from 'drizzle-orm';
+
+// Lee DB y ClickUp en vivo, usa request.url: nunca pre-renderizar/cachear en build.
+export const dynamic = 'force-dynamic';
 
 export async function GET(req: Request) {
   try {
@@ -53,9 +58,9 @@ export async function GET(req: Request) {
       console.log(`🌍 Buscando usuario globalmente (sin brand específico)`);
       
       // Obtener todos los brands activos
-      const activeBrands = await prisma.brand.findMany({
-        where: { isActive: true },
-        select: { id: true, name: true }
+      const activeBrands = await db.query.brand.findMany({
+        where: eq(brandTable.isActive, true),
+        columns: { id: true, name: true }
       });
 
       console.log(`📊 Brands activos encontrados: ${activeBrands.length}`);

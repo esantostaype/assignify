@@ -1,5 +1,10 @@
 import { NextResponse } from 'next/server';
-import { prisma } from '@/utils/prisma';
+import { db } from '@/db';
+import { tierList } from '@/db/schema';
+import { eq } from 'drizzle-orm';
+
+// Lee/escribe datos en vivo de la DB: nunca pre-renderizar/cachear en build.
+export const dynamic = 'force-dynamic';
 
 interface RouteParams {
   params: {
@@ -25,8 +30,8 @@ export async function PATCH(req: Request, { params }: RouteParams) {
     }
 
     // Verificar que el tier existe
-    const existingTier = await prisma.tierList.findUnique({
-      where: { id: parseInt(id) }
+    const existingTier = await db.query.tierList.findFirst({
+      where: eq(tierList.id, parseInt(id))
     });
 
     if (!existingTier) {
@@ -36,10 +41,11 @@ export async function PATCH(req: Request, { params }: RouteParams) {
     }
 
     // Actualizar la duración
-    const updatedTier = await prisma.tierList.update({
-      where: { id: parseInt(id) },
-      data: { duration }
-    });
+    const [updatedTier] = await db
+      .update(tierList)
+      .set({ duration })
+      .where(eq(tierList.id, parseInt(id)))
+      .returning();
 
     console.log(`✅ Updated tier ${updatedTier.name}: duration ${existingTier.duration} → ${duration}`);
 

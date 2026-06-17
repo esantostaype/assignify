@@ -5,13 +5,18 @@
 // de ClickUp; aquí solo se valida config, se elige diseñador y se crea en ClickUp.
 
 import { NextResponse } from 'next/server'
-import { prisma } from '@/utils/prisma'
+import { db } from '@/db'
+import { tierList, taskType as taskTypeTable, brand as brandTable, user as userTable, userRole } from '@/db/schema'
+import { eq, inArray, or, isNull } from 'drizzle-orm'
 import { getBestUserWithCache } from '@/services/task-assignment.service'
 import { createTaskInClickUp } from '@/services/clickup.service'
 import { TaskCreationParams, UserWithRoles, ClickUpBrand } from '@/interfaces'
 import { calculateParallelPriorityInsertion } from '@/services/parallel-priority-insertion.service'
 import { invalidateAllCache } from '@/utils/cache'
 import { publishTaskUpdate } from '@/lib/pusher'
+
+// Lee DB y crea tareas en ClickUp en vivo: nunca pre-renderizar/cachear en build.
+export const dynamic = 'force-dynamic'
 
 const CLICKUP_TOKEN = process.env.CLICKUP_API_TOKEN
 
@@ -47,11 +52,11 @@ export async function POST(req: Request) {
     console.log(`   - Type ID: ${typeId} | Tier ID: ${tierId} | Brand ID: ${brandId}`)
     console.log(`   - Users: ${assignedUserIds || 'AUTO-ASSIGNMENT'}`)
 
-    // Config desde la DB (esto SÍ sigue viviendo en Prisma).
+    // Config desde la DB (Drizzle/Turso).
     const [tier, type, brand] = await Promise.all([
-      prisma.tierList.findUnique({ where: { id: tierId } }),
-      prisma.taskType.findUnique({ where: { id: typeId } }),
-      prisma.brand.findUnique({ where: { id: brandId } }),
+      db.query.tierList.findFirst({ where: eq(tierList.id, tierId) }),
+      db.query.taskType.findFirst({ where: eq(taskTypeTable.id, typeId) }),
+      db.query.brand.findFirst({ where: eq(brandTable.id, brandId) }),
     ])
 
     if (!tier) return NextResponse.json({ error: 'Tier no encontrado' }, { status: 404 })
@@ -71,10 +76,10 @@ export async function POST(req: Request) {
 
       const specificUsersResults = await Promise.all(
         assignedUserIds.map(userId =>
-          prisma.user.findUnique({
-            where: { id: userId },
-            include: {
-              roles: { where: { OR: [{ brandId: brandId }, { brandId: null }] } },
+          db.query.user.findFirst({
+            where: eq(userTable.id, userId),
+            with: {
+              roles: { where: or(eq(userRole.brandId, brandId), isNull(userRole.brandId)) },
             },
           })
         )
@@ -82,7 +87,7 @@ export async function POST(req: Request) {
 
       const validUsers: UserWithRoles[] = specificUsersResults.filter(
         (user): user is NonNullable<typeof user> =>
-          user !== null &&
+          user != null &&
           user.active &&
           user.roles.some(role => role.typeId === typeId)
       ) as UserWithRoles[]
@@ -172,9 +177,9 @@ export async function POST(req: Request) {
     console.log('🗑️ Cache invalidado después de crear tarea')
 
     // Datos de los asignados desde la DB (config), sin leer la tarea de la DB.
-    const assigneeUsers = await prisma.user.findMany({
-      where: { id: { in: usersToAssign } },
-      select: { id: true, name: true, email: true },
+    const assigneeUsers = await db.query.user.findMany({
+      where: inArray(userTable.id, usersToAssign),
+      columns: { id: true, name: true, email: true },
     })
 
     console.log(`🎉 === TAREA "${name}" CREADA EN CLICKUP ===`)

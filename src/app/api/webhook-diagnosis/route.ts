@@ -2,6 +2,9 @@
 import { NextResponse } from 'next/server'
 import axios from 'axios'
 
+// Consulta ClickUp en vivo: nunca pre-renderizar/cachear en build.
+export const dynamic = 'force-dynamic'
+
 const CLICKUP_TOKEN = process.env.CLICKUP_API_TOKEN
 
 interface WebhookAnalysis {

@@ -1,6 +1,11 @@
 // src/app/api/users/vacations/route.ts
 import { NextResponse } from 'next/server';
-import { prisma } from '@/utils/prisma';
+import { db } from '@/db';
+import { user, userVacation } from '@/db/schema';
+import { eq, and, or, lte, gte } from 'drizzle-orm';
+
+// Lee/escribe datos en vivo de la DB: nunca pre-renderizar/cachear en build.
+export const dynamic = 'force-dynamic';
 
 interface CreateVacationRequest {
   userId: string;
@@ -55,42 +60,36 @@ export async function POST(req: Request) {
     }
 
     // Verificar que el usuario existe
-    const user = await prisma.user.findUnique({
-      where: { id: userId },
-      select: { id: true, name: true }
+    const existingUser = await db.query.user.findFirst({
+      where: eq(user.id, userId),
+      columns: { id: true, name: true }
     });
 
-    if (!user) {
+    if (!existingUser) {
       return NextResponse.json({
         error: 'User not found'
       }, { status: 404 });
     }
 
     // Verificar conflictos con vacaciones existentes
-    const conflictingVacations = await prisma.userVacation.findMany({
-      where: {
-        userId: userId,
-        OR: [
-          {
-            AND: [
-              { startDate: { lte: startDateObj } },
-              { endDate: { gte: startDateObj } }
-            ]
-          },
-          {
-            AND: [
-              { startDate: { lte: endDateObj } },
-              { endDate: { gte: endDateObj } }
-            ]
-          },
-          {
-            AND: [
-              { startDate: { gte: startDateObj } },
-              { endDate: { lte: endDateObj } }
-            ]
-          }
-        ]
-      }
+    const conflictingVacations = await db.query.userVacation.findMany({
+      where: and(
+        eq(userVacation.userId, userId),
+        or(
+          and(
+            lte(userVacation.startDate, startDateObj),
+            gte(userVacation.endDate, startDateObj)
+          ),
+          and(
+            lte(userVacation.startDate, endDateObj),
+            gte(userVacation.endDate, endDateObj)
+          ),
+          and(
+            gte(userVacation.startDate, startDateObj),
+            lte(userVacation.endDate, endDateObj)
+          )
+        )
+      )
     });
 
     if (conflictingVacations.length > 0) {
@@ -105,17 +104,18 @@ export async function POST(req: Request) {
     }
 
     // Crear la vacación
-    const newVacation = await prisma.userVacation.create({
-      data: {
+    const [newVacation] = await db
+      .insert(userVacation)
+      .values({
         userId: userId,
         startDate: startDateObj,
         endDate: endDateObj
-      }
-    });
+      })
+      .returning();
 
     const durationDays = Math.ceil((endDateObj.getTime() - startDateObj.getTime()) / (1000 * 60 * 60 * 24));
 
-    console.log(`✅ Vacation created successfully: ${durationDays} days for user ${user.name}`);
+    console.log(`✅ Vacation created successfully: ${durationDays} days for user ${existingUser.name}`);
 
     return NextResponse.json({
       ...newVacation,
@@ -126,7 +126,7 @@ export async function POST(req: Request) {
 
   } catch (error) {
     console.error('❌ Error creating user vacation:', error);
-    
+
     return NextResponse.json({
       error: 'Internal server error creating vacation',
       details: error instanceof Error ? error.message : 'Unknown error'

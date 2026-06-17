@@ -7,6 +7,9 @@ const JWT_SECRET = new TextEncoder().encode(
   process.env.JWT_SECRET || 'your-super-secret-key-change-in-production'
 );
 
+// Lee request.cookies: nunca pre-renderizar/cachear en build.
+export const dynamic = 'force-dynamic';
+
 export async function GET(request: NextRequest) {
   try {
     console.log('🔍 Verify endpoint called');

@@ -9,8 +9,10 @@
 //   HIGH    → en cola tras la última URGENT/HIGH (en paralelo con NORMAL/LOW).
 //   NORMAL  → en cola tras la última URGENT/HIGH/NORMAL (en paralelo con LOW).
 //   LOW     → al final (en cola tras todas).
-import { prisma } from '@/utils/prisma';
-import { Priority } from '@prisma/client';
+import { db } from '@/db';
+import { user as userTable, userVacation } from '@/db/schema';
+import { eq, gte } from 'drizzle-orm';
+import { Priority } from '@/db/enums';
 import { getNextAvailableStart, calculateWorkingDeadline } from '@/utils/task-calculation-utils';
 import { UserVacation } from '@/interfaces';
 import { getActiveClickUpTasksByUser } from '@/services/clickup-tasks.service';
@@ -90,9 +92,9 @@ async function applyVacationLogic(
   result: ParallelInsertionResult,
   taskDurationDays: number
 ): Promise<ParallelInsertionResult> {
-  const userWithVacations = await prisma.user.findUnique({
-    where: { id: userId },
-    include: { vacations: { where: { endDate: { gte: new Date() } } } },
+  const userWithVacations = await db.query.user.findFirst({
+    where: eq(userTable.id, userId),
+    with: { vacations: { where: gte(userVacation.endDate, new Date()) } },
   });
 
   const upcomingVacations: UserVacation[] = (userWithVacations?.vacations ?? []).map((v) => ({
