@@ -14,10 +14,22 @@ type DB = LibSQLDatabase<typeof schema>
 // relacionales `with`): el modal/tarjeta mostraban nivel/roles/vacaciones viejos
 // aunque la DB estuviera correcta. Un cliente FRESCO por operación siempre lee el
 // estado actual. (En producción ya se comportaba así; esto alinea el dev.)
+// Next.js cachea las llamadas `fetch` del lado servidor por DEFECTO, y
+// @libsql/client usa `fetch` para hablar con Turso. Sin esto, Next devolvía
+// respuestas HTTP CACHEADAS de la DB → datos RANCIOS (el modal/tarjeta mostraban
+// nivel/roles/vacaciones viejos aunque la DB ya estuviera actualizada). Forzar
+// `cache: 'no-store'` en el fetch de libSQL hace que cada lectura sea fresca.
+const noStoreFetch = ((input: RequestInfo | URL, init?: RequestInit) =>
+  fetch(input, { ...(init ?? {}), cache: 'no-store' })) as typeof fetch
+
 function getDb(): DB {
   const url = process.env.TURSO_DATABASE_URL
   if (!url) throw new Error('TURSO_DATABASE_URL no está configurado')
-  const client = createClient({ url, authToken: process.env.TURSO_AUTH_TOKEN })
+  const client = createClient({
+    url,
+    authToken: process.env.TURSO_AUTH_TOKEN,
+    fetch: noStoreFetch,
+  })
   return drizzle(client, { schema })
 }
 
