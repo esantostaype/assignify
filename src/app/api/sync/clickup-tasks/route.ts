@@ -16,6 +16,9 @@ import {
 
 const CLICKUP_TOKEN = process.env.CLICKUP_API_TOKEN;
 
+// El tablero se lee en vivo de ClickUp: nunca pre-renderizar/cachear en build.
+export const dynamic = 'force-dynamic';
+
 // ✅ SIMPLIFICADO: Ya no calculamos posiciones, solo validamos fechas
 async function validateTaskDatesForSync(
   userId: string, 
@@ -277,25 +280,8 @@ export async function GET() {
 
     console.log(`🎯 Total de tareas activas con fechas válidas en ClickUp: ${allTasks.length}`);
 
-    // Obtener tareas existentes en la DB local (solo activas)
-    const localTasks = await prisma.task.findMany({
-      where: {
-        status: { notIn: ['COMPLETE'] } // ✅ MEJORADO: Excluir completadas de DB local también
-      },
-      select: { 
-        id: true, 
-        name: true, 
-        status: true, 
-        url: true
-      }
-    });
-
-    console.log(`💾 Tareas activas en DB local: ${localTasks.length}`);
-
-    const localTaskIds = new Set(localTasks.map(task => task.id));
-    const localTaskUrls = new Set(localTasks.map(task => task.url).filter(Boolean));
-
-    const clickupTasksWithSyncStatus = allTasks
+    // El tablero se alimenta EN VIVO de ClickUp: ya no se compara con la DB local.
+    const clickupTasks = allTasks
       .filter(clickupTask => {
         if (!clickupTask.id || !clickupTask.name) {
           console.warn(`⚠️ Tarea sin ID/nombre omitida:`, clickupTask.id);
@@ -304,14 +290,10 @@ export async function GET() {
         return true;
       })
       .map(clickupTask => {
-        const taskId = clickupTask.id;
-        const taskUrl = clickupTask.url;
-        
-        const existsByQuery = localTaskIds.has(taskId) || localTaskUrls.has(taskUrl);
         const mappedStatus = mapClickUpStatusToLocal(clickupTask.status?.status || '');
-        
+
         return {
-          clickupId: taskId,
+          clickupId: clickupTask.id,
           customId: clickupTask.custom_id,
           name: clickupTask.name,
           description: clickupTask.description || clickupTask.text_content || '',
@@ -348,32 +330,25 @@ export async function GET() {
           dateCreated: new Date(parseInt(clickupTask.date_created)).toISOString(),
           dateUpdated: new Date(parseInt(clickupTask.date_updated)).toISOString(),
           dateClosed: clickupTask.date_closed ? new Date(parseInt(clickupTask.date_closed)).toISOString() : null,
-          existsInLocal: existsByQuery,
-          canSync: !existsByQuery,
+          // El tablero ya no sincroniza con la DB: estos flags se quedan en false.
+          existsInLocal: false,
+          canSync: false,
         };
       });
 
-    const existingCount = clickupTasksWithSyncStatus.filter(t => t.existsInLocal).length;
-    const newCount = clickupTasksWithSyncStatus.filter(t => t.canSync).length;
-
-    console.log(`📈 Estadísticas de sincronización (solo tareas activas):`);
-    console.log(`   - Ya existen en local: ${existingCount}`);
-    console.log(`   - Nuevas por sincronizar: ${newCount}`);
-
     return NextResponse.json({
-      clickupTasks: clickupTasksWithSyncStatus,
-      localTasks: localTasks,
+      clickupTasks,
       statistics: {
         totalClickUpTasks: allTasks.length,
-        existingInLocal: existingCount,
-        availableToSync: newCount,
-        totalLocalTasks: localTasks.length
+        existingInLocal: 0,
+        availableToSync: 0,
+        totalLocalTasks: 0
       },
       spaces: allSpaces.map(space => ({
         id: space.id,
         name: space.name,
         private: space.private,
-        taskCount: clickupTasksWithSyncStatus.filter(t => t.space.id === space.id).length
+        taskCount: clickupTasks.filter(t => t.space.id === space.id).length
       }))
     });
 

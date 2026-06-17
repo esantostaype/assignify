@@ -8,7 +8,12 @@ import { UserSlot, UserWithRoles, Task, TaskTimingResult, UserVacation, Vacation
 import { getNextAvailableStart, calculateWorkingDeadline, OCCUPYING_STATUSES } from '@/utils/task-calculation-utils';
 import { TASK_ASSIGNMENT_THRESHOLDS, CACHE_KEYS } from '@/config';
 import { getFromCache, setInCache } from '@/utils/cache';
+import { fetchActiveClickUpTasks, type ActiveClickUpTask } from '@/services/clickup-tasks.service';
 import usHolidays from '@/data/usHolidays.json'
+
+// Estados de ClickUp que cuentan como trabajo pendiente (ocupan al diseñador).
+// ON_APPROVAL ya está entregado: no cuenta ni para carga ni para disponibilidad.
+const PENDING_CLICKUP_STATUSES: ActiveClickUpTask['status'][] = ['TO_DO', 'IN_PROGRESS'];
 
 function getUSHolidays(startDate: Date, endDate: Date): Date[] {
   const holidays: Date[] = [];
@@ -138,37 +143,27 @@ async function getVacationAwareUserSlots(
   console.log(`👥 Found ${compatibleUsers.length} compatible users for type ${typeId}`);
 
   const userIds = compatibleUsers.map(user => user.id);
-  
-  const allRelevantTasks = await prisma.task.findMany({
-    where: {
-      // No filtramos por typeId: la disponibilidad y la carga de un diseñador
-      // dependen de TODAS sus tareas pendientes (está ocupado sin importar el tipo
-      // de la tarea nueva). Filtrar por tipo subestimaba la carga real.
-      status: { in: OCCUPYING_STATUSES },
-      assignees: { some: { userId: { in: userIds } } }
-    },
-    orderBy: { startDate: 'asc' }, // ✅ ORDENAR POR FECHA, NO POR queuePosition
-    include: {
-      tier: true,
-      type: true,
-      brand: true,
-      assignees: { include: { user: true } }
-    },
-  }) as unknown as Task[];
 
-  const tasksByUser: Record<string, Task[]> = {};
-  for (const task of allRelevantTasks) {
+  // Las tareas se leen EN VIVO de ClickUp (misma fuente que el tablero), no de la DB.
+  // La disponibilidad y la carga de un diseñador dependen de TODAS sus tareas
+  // pendientes (TO_DO/IN_PROGRESS) sin importar el tipo de la tarea nueva.
+  // ON_APPROVAL se excluye: ya está entregado y no ocupa al diseñador.
+  const allClickUpTasks = await fetchActiveClickUpTasks();
+
+  const tasksByUser: Record<string, ActiveClickUpTask[]> = {};
+  for (const task of allClickUpTasks) {
+    if (!PENDING_CLICKUP_STATUSES.includes(task.status)) continue;
     for (const assignee of task.assignees) {
-      if (userIds.includes(assignee.userId)) {
-        if (!tasksByUser[assignee.userId]) {
-          tasksByUser[assignee.userId] = [];
+      if (userIds.includes(assignee.id)) {
+        if (!tasksByUser[assignee.id]) {
+          tasksByUser[assignee.id] = [];
         }
-        tasksByUser[assignee.userId].push(task);
+        tasksByUser[assignee.id].push(task);
       }
     }
   }
 
-  // ✅ ORDENAR TAREAS POR FECHA, NO POR queuePosition
+  // Ordenar tareas por fecha de inicio.
   for (const userId in tasksByUser) {
     tasksByUser[userId].sort((a, b) => new Date(a.startDate).getTime() - new Date(b.startDate).getTime());
   }
@@ -200,17 +195,12 @@ async function getVacationAwareUserSlots(
 
     if (userTasks.length > 0) {
       // Se libera tras su última entrega pendiente (la deadline MÁS lejana de su cola).
-      lastDeadline = new Date(Math.max(...userTasks.map((t) => new Date(t.deadline).getTime())));
+      lastDeadline = new Date(Math.max(...userTasks.map((t) => new Date(t.dueDate).getTime())));
       baseAvailableDate = await getNextAvailableStart(lastDeadline);
 
-      totalAssignedDurationDays = userTasks.reduce((sum, task) => {
-        if (!task.tier) {
-          console.warn(`⚠️ Task ${task.id} missing tier, using default duration`);
-          return sum + (task.customDuration !== null ? task.customDuration : 1);
-        }
-        return sum + (task.customDuration !== null ? task.customDuration : task.tier.duration);
-      }, 0);
-      
+      // ClickUp no trae tier: 1 día por tarea pendiente es suficiente para el desempate.
+      totalAssignedDurationDays = userTasks.length;
+
       console.log(`   📊 Current workload: ${userTasks.length} tasks, ${totalAssignedDurationDays} days total`);
       console.log(`   📅 Available after current tasks: ${baseAvailableDate.toISOString().split('T')[0]}`);
     } else {
@@ -241,7 +231,9 @@ async function getVacationAwareUserSlots(
       userId: user.id,
       userName: user.name,
       availableDate,
-      tasks: userTasks,
+      // El detalle de tareas no se usa para la decisión (que se basa en
+      // availableDate + totalAssignedDurationDays). Se deja vacío para mantener el tipo.
+      tasks: [],
       cargaTotal: userTasks.length,
       isSpecialist,
       lastTaskDeadline: lastDeadline,

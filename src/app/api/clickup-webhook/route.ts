@@ -1,10 +1,9 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 // src/app/api/clickup-webhook/route.ts
-// Recibe eventos de ClickUp, sincroniza la tarea en la DB local y notifica a los
-// clientes en tiempo real (Pusher). La lógica de sync vive en clickup-sync.service.
+// Recibe eventos de ClickUp y notifica a los clientes en tiempo real (Pusher).
+// La DB ya no se sincroniza: el tablero y el motor leen las tareas en vivo de ClickUp.
 import { NextResponse } from 'next/server'
 import crypto from 'crypto'
-import { upsertTaskFromClickUp, markTaskDeleted } from '@/services/clickup-sync.service'
 import { publishTaskUpdate } from '@/lib/pusher'
 
 const WEBHOOK_SECRET = process.env.CLICKUP_WEBHOOK_SECRET
@@ -75,28 +74,18 @@ export async function POST(req: Request) {
       return NextResponse.json({ success: true, message: 'sin event/task_id (probable test de ClickUp)' })
     }
 
-    let result: any = { skipped: true }
-    try {
-      if (event === 'taskDeleted') {
-        result = await markTaskDeleted(taskId)
-      } else if (MUTATING_EVENTS.includes(event)) {
-        result = await upsertTaskFromClickUp(taskId)
-      }
-    } catch (syncError) {
-      console.error('❌ Error sincronizando tarea desde webhook:', syncError instanceof Error ? syncError.message : syncError)
-    }
-
-    // Notificar a los clientes en tiempo real (Pusher).
+    // Notificar a los clientes en tiempo real (Pusher). La DB ya no se toca:
+    // el tablero y el motor de asignación leen las tareas en vivo de ClickUp.
     if (event === 'taskDeleted' || MUTATING_EVENTS.includes(event)) {
       await publishTaskUpdate({
         taskId,
-        name: body.task?.name || result?.name,
+        name: body.task?.name,
         status: body.task?.status?.status,
         event,
       })
     }
 
-    return NextResponse.json({ success: true, event, result })
+    return NextResponse.json({ success: true, event })
   } catch (error) {
     console.error('❌ Error procesando webhook:', error)
     // Responder 200 para que ClickUp no reintente en bucle.

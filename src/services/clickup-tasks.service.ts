@@ -134,3 +134,12 @@ export async function fetchActiveClickUpTasks(): Promise<ActiveClickUpTask[]> {
   }
   return result
 }
+
+/**
+ * Tareas activas de ClickUp asignadas a un usuario concreto (sin caché).
+ * El id de ClickUp del asignado coincide con el user.id local.
+ */
+export async function getActiveClickUpTasksByUser(userId: string): Promise<ActiveClickUpTask[]> {
+  const all = await fetchActiveClickUpTasks()
+  return all.filter((t) => t.assignees.some((a) => a.id === userId))
+}
