@@ -18,8 +18,6 @@ export async function GET() {
 
     // Si no hay settings, crear los por defecto
     if (settings.length === 0) {
-      console.log('🔄 Creating default settings...');
-
       for (const defaultSetting of DEFAULT_SETTINGS) {
         await db.insert(systemSettings).values(defaultSetting);
       }
@@ -35,7 +33,7 @@ export async function GET() {
     });
 
   } catch (error) {
-    console.error('❌ Error fetching settings:', error);
+    console.error('Error fetching settings:', error);
     return NextResponse.json({
       error: 'Error fetching settings',
       details: error instanceof Error ? error.message : 'Unknown error'
@@ -76,8 +74,6 @@ export async function PATCH(req: Request) {
       });
     }
 
-    console.log(`✅ Updated ${results.length} settings`);
-
     // Invalidar la caché en memoria para que el motor lea los nuevos valores ya.
     invalidateAppSettingsCache();
 
@@ -87,7 +83,7 @@ export async function PATCH(req: Request) {
     });
 
   } catch (error) {
-    console.error('❌ Error updating settings:', error);
+    console.error('Error updating settings:', error);
     return NextResponse.json({
       error: 'Error updating settings',
       details: error instanceof Error ? error.message : 'Unknown error'

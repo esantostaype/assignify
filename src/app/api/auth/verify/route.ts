@@ -12,13 +12,9 @@ export const dynamic = 'force-dynamic';
 
 export async function GET(request: NextRequest) {
   try {
-    console.log('🔍 Verify endpoint called');
-    
     const token = request.cookies.get('auth-token')?.value;
-    console.log('🔑 Auth token found:', !!token);
 
     if (!token) {
-      console.log('❌ No token provided');
       return NextResponse.json({
         success: false,
         message: 'No authentication token provided',
@@ -27,10 +23,8 @@ export async function GET(request: NextRequest) {
     }
 
     try {
-      console.log('🔍 Verifying JWT token...');
       const { payload } = await jwtVerify(token, JWT_SECRET);
-      console.log('✅ Token verified successfully:', { email: payload.email });
-      
+
       return NextResponse.json({
         success: true,
         user: {
@@ -38,9 +32,7 @@ export async function GET(request: NextRequest) {
         },
         authenticated: true
       });
-    } catch (jwtError: any) {
-      console.log('❌ JWT verification failed:', jwtError.message);
-      
+    } catch {
       // Limpiar cookie inválida
       const response = NextResponse.json({
         success: false,
@@ -55,7 +47,7 @@ export async function GET(request: NextRequest) {
       return response;
     }
   } catch (error) {
-    console.error('❌ Verify endpoint error:', error);
+    console.error('Verify endpoint error:', error);
     return NextResponse.json({
       success: false,
       message: 'Internal server error',

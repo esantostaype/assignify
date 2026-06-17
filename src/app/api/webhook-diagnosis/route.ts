@@ -48,8 +48,6 @@ export async function GET(req: Request) {
   }
 
   try {
-    console.log(`🔍 Fetching webhook configuration for team ${teamId}...`)
-
     const response = await axios.get(
       `https://api.clickup.com/api/v2/team/${teamId}/webhook`,
       {
@@ -144,21 +142,6 @@ export async function GET(req: Request) {
     diagnosis.recommendations.push('After fixing, test by changing a task status in ClickUp')
     diagnosis.recommendations.push('Check /api/webhook-monitor for received events')
 
-    // Log para debugging
-    console.log('📊 WEBHOOK DIAGNOSIS RESULTS:')
-    console.log(`   Total webhooks: ${diagnosis.totalWebhooks}`)
-    console.log(`   Your webhooks: ${diagnosis.yourWebhooks.length}`)
-    console.log(`   Issues found: ${diagnosis.issues.length}`)
-    
-    diagnosis.yourWebhooks.forEach((webhook, index) => {
-      console.log(`\n   Webhook ${index + 1}:`)
-      console.log(`     ID: ${webhook.id}`)
-      console.log(`     Endpoint: ${webhook.endpoint}`)
-      console.log(`     Status: ${webhook.status}`)
-      console.log(`     Events: ${webhook.events.join(', ') || 'NONE ⚠️'}`)
-      console.log(`     Events count: ${webhook.eventsCount}`)
-    })
-
     return NextResponse.json({
       success: true,
       diagnosis,
@@ -171,8 +154,8 @@ export async function GET(req: Request) {
     })
 
   } catch (error) {
-    console.error('❌ Error in webhook diagnosis:', error)
-    
+    console.error('Error in webhook diagnosis:', error)
+
     let errorDetails = 'Unknown error'
     let statusCode = 500
     

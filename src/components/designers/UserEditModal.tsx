@@ -62,8 +62,8 @@ export const UserEditModal: React.FC<UserEditModalProps> = ({
   } = useBrands()
 
   const { mutate: updateLevel, isPending: updatingLevel } = useUpdateUserLevel(userId, {
-    onSuccess: () => toast.success('Nivel actualizado'),
-    onError: () => toast.error('Error al actualizar el nivel'),
+    onSuccess: () => toast.success('Level updated'),
+    onError: () => toast.error('Error updating level'),
   })
 
   // Alta de rol gestionada aquí para poder enviar también `isPrimary`.
@@ -75,22 +75,9 @@ export const UserEditModal: React.FC<UserEditModalProps> = ({
   // Alterna el cargo primario/secundario de un rol existente.
   const { mutate: togglePrimary, isPending: togglingPrimary, variables: togglingVars } =
     useToggleUserRolePrimary(userId, {
-      onError: () => toast.error('Error al actualizar el cargo'),
+      onError: () => toast.error('Error updating primary role'),
     })
 
-  // ✅ DEBUG: Log para verificar datos
-  React.useEffect(() => {
-    console.log('🔍 UserEditModal Debug:', {
-      userId,
-      user: user ? { id: user.id, name: user.name, rolesCount: user.roles?.length } : null,
-      taskTypes: taskTypes?.length || 0,
-      brands: brands?.length || 0,
-      loading: { user: loadingUser, types: loadingTypes, brands: loadingBrands },
-      errors: { user: userError, types: typesError, brands: brandsError }
-    })
-  }, [userId, user, taskTypes, brands, loadingUser, loadingTypes, loadingBrands, userError, typesError, brandsError])
-
-  // ✅ Manejo mejorado de errores
   if (userError || typesError || brandsError) {
     return (
       <div className="p-6">
@@ -116,25 +103,16 @@ export const UserEditModal: React.FC<UserEditModalProps> = ({
     )
   }
 
-  // ✅ Verificación adicional de datos
-  if (!taskTypes || taskTypes.length === 0) {
-    console.warn('⚠️ No task types loaded')
-  }
-
-  if (!brands || brands.length === 0) {
-    console.warn('⚠️ No brands loaded')
-  }
-
   const showRoleSkeleton = loadingUser || (user && user.roles?.length === 0 && loadingUser);
   const showVacationSkeleton = loadingUser || (user && user.vacations?.length === 0 && loadingUser);
 
   return (
-    <div className="p-8 space-y-6">
+    <div className="space-y-6">
       {/* Designer Level Section */}
       <div>
         <h3 className="text-lg font-medium text-(--color-text-strong) mb-2 flex items-center gap-2">
           <Icon icon={PiMedal} size={20} />
-          Nivel del diseñador
+          Designer Level
         </h3>
         <div className="max-w-[16rem]">
           <Select<UserLevel>
@@ -147,7 +125,7 @@ export const UserEditModal: React.FC<UserEditModalProps> = ({
           />
         </div>
         <p className="mt-1.5 text-sm text-(--color-text-subtle)">
-          Decide el escalado de asignación automática (Jr → Mid → Sr).
+          Drives auto-assignment escalation (Jr → Mid → Sr).
         </p>
       </div>
 
@@ -168,7 +146,7 @@ export const UserEditModal: React.FC<UserEditModalProps> = ({
               <tr>
                 <th className="p-2 first:pl-4 last:pr-4 text-left text-sm font-medium text-gray-300">Type</th>
                 <th className="p-2 first:pl-4 last:pr-4 text-left text-sm font-medium text-gray-300">Brand</th>
-                <th className="p-2 first:pl-4 last:pr-4 text-left text-sm font-medium text-gray-300">Cargo</th>
+                <th className="p-2 first:pl-4 last:pr-4 text-left text-sm font-medium text-gray-300">Primary</th>
                 <th className="p-2 first:pl-4 last:pr-4 text-left text-sm font-medium text-gray-300 w-[5rem]">Actions</th>
               </tr>
             </thead>

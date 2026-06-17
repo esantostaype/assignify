@@ -214,7 +214,7 @@ export const CreateTaskForm: FC = () => {
 
       const finalDurationDays = parseFloat(values.durationDays as string);
       if (finalDurationDays <= 0) {
-        toast.error("La duración de la tarea debe ser mayor a cero.");
+        toast.error("Task duration must be greater than zero.");
         return;
       }
 
@@ -243,7 +243,7 @@ export const CreateTaskForm: FC = () => {
         createdTask.assignees?.map((a: any) => a.user.name).join(", ") ?? "somebody";
 
       const fmt = (d: string) =>
-        new Date(d).toLocaleDateString("es-PE", {
+        new Date(d).toLocaleDateString("en-US", {
           year: "numeric",
           month: "short",
           day: "numeric",
@@ -269,7 +269,7 @@ export const CreateTaskForm: FC = () => {
       } else if (axios.isAxiosError(error) && error.response?.data?.details) {
         toast.error(`Error: ${error.response.data.details}`);
       } else {
-        toast.error("Error inesperado al crear la tarea");
+        toast.error("Unexpected error while creating the task");
       }
     }
   };
@@ -294,7 +294,7 @@ export const CreateTaskForm: FC = () => {
       {fetchingSuggestion && (
         <div className="mb-4 flex items-center gap-2 rounded-lg bg-primary-500/10 px-3 py-2 text-sm text-primary-600">
           <Spinner size={16} colorClassName="text-primary-600" />
-          Buscando diseñador sugerido...
+          Finding suggested designer...
         </div>
       )}
       <Formik
@@ -315,7 +315,7 @@ export const CreateTaskForm: FC = () => {
           const handleInactivityReset = () => {
             resetForm();
             resetLocalState();
-            toast("Formulario reiniciado por inactividad", { icon: "🕒" });
+            toast("Form reset due to inactivity", { icon: "🕒" });
           };
 
           return (
@@ -443,7 +443,7 @@ export const CreateTaskForm: FC = () => {
 
               {brands.length === 0 && !dataLoading && (
                 <Typography variant="caption" color="warning-600" className="text-center">
-                  No hay brands activos disponibles
+                  No active brands available
                 </Typography>
               )}
             </Form>

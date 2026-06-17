@@ -120,7 +120,6 @@ export const ClickUpUsersSync: React.FC = () => {
     }
 
     setSelectedUsers(newSelection)
-    console.log(`${checked ? 'Selected' : 'Deselected'} user: ${userId}`)
   }
 
   const handleSelectAll = () => {

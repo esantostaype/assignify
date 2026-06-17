@@ -45,9 +45,7 @@ async function createMetadataComment(
 ): Promise<void> {
   try {
     const markdownTable = createMetadataTable(typeName, categoryName)
-    
-    console.log(`📝 Creando comentario con tabla de metadata para tarea ${taskId}`)
-    
+
     await axios.post(
       `${API_CONFIG.CLICKUP_API_BASE}/task/${taskId}/comment`,
       {
@@ -61,11 +59,8 @@ async function createMetadataComment(
         },
       }
     )
-    
-    console.log(`✅ Comentario con tabla de metadata creado exitosamente`)
-    
   } catch (error: any) {
-    console.error('❌ Error creando comentario con metadata:', error.response?.data || error.message)
+    console.error('Failed to create metadata comment:', error.response?.data || error.message)
     // No lanzar error, ya que es información adicional
   }
 }
@@ -117,21 +112,18 @@ async function prepareTaskMetadata(
   if (USE_CUSTOM_FIELDS && teamId) {
     try {
       const customFields = await prepareCustomFields(teamId, typeName, categoryName)
-      console.log(`✅ Usando Custom Fields para Type y Category`)
       return { customFields }
     } catch (error) {
-      console.error('❌ Error con Custom Fields, fallback a tabla en comentarios:', error)
+      console.error('Custom fields failed, falling back to table comment:', error)
     }
   }
-  
+
   if (USE_TABLE_COMMENTS) {
-    console.log(`📊 Usando tabla en comentarios para Type y Category`)
     return { useTableComment: true }
   }
-  
+
   // Fallback final a tags
   const tags = [`type:${typeName}`, `category:${categoryName}`]
-  console.log(`🏷️ Usando Tags para Type y Category: ${tags.join(', ')}`)
   return { tags }
 }
 
@@ -144,7 +136,6 @@ async function getCustomFields(teamId: string): Promise<{
 }> {
   const cached = customFieldsCache[teamId]
   if (cached && (Date.now() - cached.timestamp) < CACHE_DURATION) {
-    console.log(`📋 Custom fields obtenidos del cache para team ${teamId}`)
     return {
       typeField: cached.typeField,
       categoryField: cached.categoryField
@@ -152,7 +143,6 @@ async function getCustomFields(teamId: string): Promise<{
   }
 
   try {
-    console.log(`🔍 Obteniendo custom fields de ClickUp para team ${teamId}`)
     const response = await axios.get(
       `${API_CONFIG.CLICKUP_API_BASE}/team/${teamId}/customfields`,
       {
@@ -179,14 +169,10 @@ async function getCustomFields(teamId: string): Promise<{
       timestamp: Date.now()
     }
 
-    console.log(`✅ Custom fields encontrados:`)
-    console.log(`   - Type Field (dropdown): ${typeField ? `✓ ID: ${typeField.id}` : '✗ No encontrado'}`)
-    console.log(`   - Category Field (label): ${categoryField ? `✓ ID: ${categoryField.id}` : '✗ No encontrado'}`)
-
     return { typeField, categoryField }
 
   } catch (error: any) {
-    console.error('❌ Error obteniendo custom fields:', error.response?.data || error.message)
+    console.error('Failed to fetch ClickUp custom fields:', error.response?.data || error.message)
     return {}
   }
 }
@@ -203,12 +189,9 @@ async function findOrCreateDropdownOption(
     )
 
     if (existingOption) {
-      console.log(`✅ Opción existente encontrada: "${optionName}" -> ID: ${existingOption.id}`)
       return existingOption.id
     }
 
-    console.log(`🔄 Creando nueva opción "${optionName}" en custom field ${field.name}`)
-    
     const createResponse = await axios.post(
       `${API_CONFIG.CLICKUP_API_BASE}/team/${teamId}/customfields/${fieldId}/options`,
       {
@@ -224,7 +207,6 @@ async function findOrCreateDropdownOption(
     )
 
     const newOptionId = createResponse.data.id
-    console.log(`✅ Nueva opción creada: "${optionName}" -> ID: ${newOptionId}`)
 
     if (!field.type_config) field.type_config = {}
     if (!field.type_config.options) field.type_config.options = []
@@ -236,13 +218,12 @@ async function findOrCreateDropdownOption(
     return newOptionId
 
   } catch (error: any) {
-    console.error(`❌ Error creando opción "${optionName}":`, error.response?.data || error.message)
+    console.error(`Failed to create custom field option "${optionName}":`, error.response?.data || error.message)
     return null
   }
 }
 
 function processLabelField(categoryName: string): string {
-  console.log(`🏷️ Configurando label field con valor: "${categoryName}"`)
   return categoryName
 }
 
@@ -262,10 +243,7 @@ async function prepareCustomFields(
         id: typeField.id,
         value: typeOptionId
       })
-      console.log(`📋 Type custom field configurado: ${typeName} (Option ID: ${typeOptionId})`)
     }
-  } else {
-    console.warn(`⚠️ Custom field "Type" (dropdown) no encontrado en ClickUp para team ${teamId}`)
   }
 
   if (categoryField) {
@@ -274,9 +252,6 @@ async function prepareCustomFields(
       id: categoryField.id,
       value: labelValue
     })
-    console.log(`🏷️ Category custom field configurado: ${categoryName} (Label: ${labelValue})`)
-  } else {
-    console.warn(`⚠️ Custom field "Category" (label) no encontrado en ClickUp para team ${teamId}`)
   }
 
   return customFieldsValues
@@ -346,8 +321,6 @@ export async function createTaskInClickUp(params: ClickUpTaskCreationParams & { 
   }
 
   try {
-    console.log(`📡 Enviando request a ClickUp: ${API_CONFIG.CLICKUP_API_BASE}/list/${brand.id}/task`)
-    
     const response = await axios.post(
       `${ API_CONFIG.CLICKUP_API_BASE }/list/${brand.id}/task`,
       clickUpPayload,
@@ -358,20 +331,6 @@ export async function createTaskInClickUp(params: ClickUpTaskCreationParams & { 
         },
       }
     )
-
-    console.log('✅ Respuesta de ClickUp:')
-    console.log(`   Task ID: ${response.data.id}`)
-    console.log(`   Task URL: ${response.data.url}`)
-    
-    // 🧪 DEBUG: Verificar qué devolvió ClickUp
-    if (response.data.start_date) {
-      const returnedStart = new Date(parseInt(response.data.start_date))
-      console.log(`   Start date returned: ${returnedStart.toISOString()} (${returnedStart.toLocaleString('es-PE', { timeZone: 'America/Lima' })})`)
-    }
-    if (response.data.due_date) {
-      const returnedDue = new Date(parseInt(response.data.due_date))
-      console.log(`   Due date returned: ${returnedDue.toISOString()} (${returnedDue.toLocaleString('es-PE', { timeZone: 'America/Lima' })})`)
-    }
 
     await createSyncLog('Task', null, response.data.id, 'CREATE', 'SUCCESS', undefined, response.data)
 
@@ -384,8 +343,6 @@ export async function createTaskInClickUp(params: ClickUpTaskCreationParams & { 
       )
     }
 
-    console.log(`🎉 === TAREA "${name}" CREADA EN CLICKUP EXITOSAMENTE ===\n`)
-
     return {
       clickupTaskId: response.data.id,
       clickupTaskUrl: response.data.url
@@ -395,7 +352,7 @@ export async function createTaskInClickUp(params: ClickUpTaskCreationParams & { 
     const axiosError = error as any
     const errorMessage = `Error al crear tarea en ClickUp: ${axiosError.response?.data?.err || axiosError.message || axiosError.toString()}`
 
-    console.error('❌ Error de ClickUp API:', {
+    console.error('ClickUp API error while creating task:', {
       status: axiosError.response?.status,
       statusText: axiosError.response?.statusText,
       errorData: axiosError.response?.data,
@@ -413,13 +370,13 @@ export async function createTaskInClickUp(params: ClickUpTaskCreationParams & { 
 
 export async function updateTaskInClickUp(taskId: string, updatedTaskData: Task): Promise<void> {
   if (!CLICKUP_TOKEN) {
-    console.error('ERROR: CLICKUP_API_TOKEN no configurado para actualizar tarea en ClickUp.')
+    console.error('CLICKUP_API_TOKEN is not configured; cannot update task in ClickUp.')
     throw new Error('CLICKUP_API_TOKEN no configurado.')
   }
 
   const brand = await db.query.brand.findFirst({ where: eq(brandTable.id, updatedTaskData.brandId) });
   if (!brand) {
-    console.warn(`Brand no encontrado para la tarea ${taskId}. No se puede actualizar el estado en ClickUp.`);
+    console.warn(`Brand not found for task ${taskId}; cannot update status in ClickUp.`);
     await createSyncLog('Task', null, taskId, 'UPDATE_CLICKUP', 'WARNING', 'Brand no encontrado para mapeo de estado.');
     return;
   }
@@ -461,13 +418,6 @@ export async function updateTaskInClickUp(taskId: string, updatedTaskData: Task)
     clickUpPayload.tags = metadata.tags
   }
 
-  console.log(`📤 Enviando actualización a ClickUp API para tarea ${taskId}:`);
-  console.log('   URL:', `${ API_CONFIG.CLICKUP_API_BASE }/task/${taskId}`);
-  console.log('   Use Custom Fields:', USE_CUSTOM_FIELDS);
-  console.log('   Use Table Comments:', USE_TABLE_COMMENTS);
-  console.log('   Start DateTime:', new Date(updatedTaskData.startDate).toISOString());
-  console.log('   Due DateTime:', new Date(updatedTaskData.deadline).toISOString());
-
   try {
     const response = await axios.put(
       `${ API_CONFIG.CLICKUP_API_BASE }/task/${taskId}`,
@@ -491,12 +441,11 @@ export async function updateTaskInClickUp(taskId: string, updatedTaskData: Task)
       )
     }
 
-    console.log(`✅ Tarea ${taskId} actualizada en ClickUp.`);
     await createSyncLog('Task', null, taskId, 'UPDATE_CLICKUP', 'SUCCESS', undefined, response.data);
   } catch (error: unknown) {
     const axiosError = error as any;
     const errorMessage = `Error al actualizar tarea ${taskId} en ClickUp: ${axiosError.response?.data?.err || axiosError.message || axiosError.toString()}`;
-    console.error('❌ Error de ClickUp API al actualizar tarea:', {
+    console.error('ClickUp API error while updating task:', {
       status: axiosError.response?.status,
       statusText: axiosError.response?.statusText,
       errorData: axiosError.response?.data,
@@ -518,7 +467,6 @@ export async function emitTaskUpdateEvent(taskData: unknown): Promise<void> {
  * ✅ FUNCIÓN PARA CAMBIAR ENTRE MODOS
  */
 export function enableCustomFields(): void {
-  console.log('🔄 Habilitando Custom Fields para futuras tareas...')
   // En producción, esto debería ser una variable de entorno
   // USE_CUSTOM_FIELDS = true
   // USE_TABLE_COMMENTS = false
@@ -526,7 +474,6 @@ export function enableCustomFields(): void {
 
 export function invalidateCustomFieldsCache(teamId: string): void {
   delete customFieldsCache[teamId]
-  console.log(`🗑️ Cache de custom fields invalidado para team ${teamId}`)
 }
 
 /**

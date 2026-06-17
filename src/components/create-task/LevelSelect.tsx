@@ -27,7 +27,7 @@ export const LevelSelect: React.FC<LevelSelectProps> = ({
   <div>
     <Typography variant="label" className="flex items-center gap-1.5 mb-1.5">
       <Icon icon={PiMedal} size={18} />
-      Nivel
+      Level
     </Typography>
     <Select
       value={value}

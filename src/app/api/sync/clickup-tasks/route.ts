@@ -18,14 +18,12 @@ export const dynamic = 'force-dynamic';
 
 export async function GET() {
   if (!CLICKUP_TOKEN) {
-    return NextResponse.json({ 
-      error: 'CLICKUP_API_TOKEN no configurado' 
+    return NextResponse.json({
+      error: 'CLICKUP_API_TOKEN is not configured'
     }, { status: 500 });
   }
 
   try {
-    console.log('🔍 Obteniendo tareas activas de ClickUp (excluyendo completadas)...');
-
     const teamsResponse = await axios.get(
       `${API_CONFIG.CLICKUP_API_BASE}/team`,
       {
@@ -50,18 +48,14 @@ export async function GET() {
         );
         allSpaces.push(...spacesResponse.data.spaces);
       } catch (error) {
-        console.warn(`⚠️ Error obteniendo spaces del team ${team.name}:`, error);
+        console.warn(`Failed to fetch spaces for team ${team.name}:`, error);
       }
     }
 
-    console.log(`📊 Spaces encontrados: ${allSpaces.length}`);
-
     const allTasks: any[] = [];
-    
+
     async function getTasksFromList(list: any, tasksArray: any[]) {
       try {
-        console.log(`       Obteniendo tareas de la lista: ${list.name}`);
-        
         let page = 0;
         let hasMorePages = true;
         
@@ -89,65 +83,38 @@ export async function GET() {
           // ✅ FILTROS MEJORADOS: Estado activo + Fechas requeridas + Incluir ON APPROVAL
           const filteredTasks = tasks.filter((task: any) => {
             const taskStatus = task.status?.status || '';
-            
-            console.log(`\n📋 Analyzing task: "${task.name}"`);
-            console.log(`   📊 Status: "${taskStatus}"`);
-            
+
             // ✅ MEJORADO: Usar nueva utilidad para verificar si está activa
             if (!isActiveTaskStatus(taskStatus)) {
-              console.log(`   🚫 Task EXCLUDED: completed/invalid status`);
               return false;
             }
-            
+
             const mappedStatus = mapClickUpStatusToLocal(taskStatus);
-            console.log(`   🔄 Mapped status: ${taskStatus} -> ${mappedStatus}`);
-            
+
             // ✅ MEJORADO: Incluir todas las tareas activas (TO_DO, IN_PROGRESS, ON_APPROVAL)
             const validStatuses = getValidLocalStatuses();
             const hasValidStatus = mappedStatus && validStatuses.includes(mappedStatus);
-            
+
             const hasStartDate = task.start_date && task.start_date !== null;
             const hasDueDate = task.due_date && task.due_date !== null;
-            
-            console.log(`   📅 Has start date: ${hasStartDate}`);
-            console.log(`   📅 Has due date: ${hasDueDate}`);
-            console.log(`   ✅ Valid mapped status: ${hasValidStatus} (${mappedStatus})`);
-            
-            if (hasValidStatus && hasStartDate && hasDueDate) {
-              console.log(`   ✅ Task INCLUDED: "${task.name}" (${taskStatus} → ${mappedStatus})`);
-              return true;
-            }
-            
-            // Log de exclusión para tareas activas sin fechas
-            if (!hasStartDate) {
-              console.log(`   🚫 Task EXCLUDED: missing start date`);
-            } else if (!hasDueDate) {
-              console.log(`   🚫 Task EXCLUDED: missing due date`);
-            } else if (!hasValidStatus) {
-              console.log(`   🚫 Task EXCLUDED: invalid mapped status (${mappedStatus})`);
-            }
-            
-            return false;
+
+            return Boolean(hasValidStatus && hasStartDate && hasDueDate);
           });
-          
+
           tasksArray.push(...filteredTasks);
-          
-          console.log(`         Página ${page}: ${tasks.length} tareas totales, ${filteredTasks.length} tareas activas con fechas válidas`);
-          
+
           hasMorePages = tasks.length > 0 && tasks.length >= 100;
           page++;
         }
-        
+
       } catch (taskError: any) {
-        console.warn(`       ⚠️ Error obteniendo tareas de la lista ${list.name}:`, taskError.response?.status || taskError.message);
+        console.warn(`Failed to fetch tasks for list ${list.name}:`, taskError.response?.status || taskError.message);
       }
     }
 
     // Procesar todos los spaces
     for (const space of allSpaces) {
       try {
-        console.log(`   Obteniendo folders del space: ${space.name}`);
-        
         const foldersResponse = await axios.get(
           `${API_CONFIG.CLICKUP_API_BASE}/space/${space.id}/folder?archived=false`,
           {
@@ -177,7 +144,7 @@ export async function GET() {
             await getTasksFromList(list, allTasks);
           }
         } catch (spaceListError) {
-          console.warn(`⚠️ Error obteniendo listas directas del space ${space.name}`);
+          console.warn(`Failed to fetch lists for space ${space.name}`);
         }
 
         // Obtener listas de cada folder
@@ -198,22 +165,19 @@ export async function GET() {
               await getTasksFromList(list, allTasks);
             }
           } catch (folderError) {
-            console.warn(`⚠️ Error obteniendo listas del folder ${folder.name}`);
+            console.warn(`Failed to fetch lists for folder ${folder.name}`);
           }
         }
-        
+
       } catch (error: any) {
-        console.warn(`⚠️ Error obteniendo contenido del space ${space.name}:`, error.response?.status || error.message);
+        console.warn(`Failed to fetch contents for space ${space.name}:`, error.response?.status || error.message);
       }
     }
-
-    console.log(`🎯 Total de tareas activas con fechas válidas en ClickUp: ${allTasks.length}`);
 
     // El tablero se alimenta EN VIVO de ClickUp: ya no se compara con la DB local.
     const clickupTasks = allTasks
       .filter(clickupTask => {
         if (!clickupTask.id || !clickupTask.name) {
-          console.warn(`⚠️ Tarea sin ID/nombre omitida:`, clickupTask.id);
           return false;
         }
         return true;
@@ -282,22 +246,22 @@ export async function GET() {
     });
 
   } catch (error) {
-    console.error('❌ Error obteniendo tareas de ClickUp:', error);
-    
+    console.error('Failed to fetch tasks from ClickUp:', error);
+
     if (axios.isAxiosError(error)) {
       const status = error.response?.status;
       const message = error.response?.data?.err || error.message;
-      
+
       return NextResponse.json({
-        error: 'Error al obtener tareas de ClickUp',
+        error: 'Failed to fetch tasks from ClickUp',
         details: message,
         status: status
       }, { status: status || 500 });
     }
 
     return NextResponse.json({
-      error: 'Error interno del servidor',
-      details: error instanceof Error ? error.message : 'Error desconocido'
+      error: 'Internal server error',
+      details: error instanceof Error ? error.message : 'Unknown error'
     }, { status: 500 });
   }
 }

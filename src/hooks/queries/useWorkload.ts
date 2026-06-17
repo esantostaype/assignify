@@ -4,11 +4,22 @@ import axios from 'axios'
 
 export type WorkloadStatus = 'available' | 'busy' | 'overloaded' | 'on_vacation'
 
+export type UserLevel = 'JUNIOR' | 'MID' | 'SENIOR'
+
+/** Cargo del diseñador: nombre del tipo + si es su cargo primario. */
+export interface RoleDetail {
+  typeName: string
+  isPrimary: boolean
+}
+
 export interface UserWorkload {
   id: string
   name: string
   email: string
+  level: UserLevel
   roles: string[]
+  /** Cargos con su tipo e indicador de primario (para derivar el título del puesto). */
+  roleDetails: RoleDetail[]
   isSpecialist: boolean
   taskCount: number
   approvalCount: number

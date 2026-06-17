@@ -29,7 +29,6 @@ export const usePusherTaskSync = () => {
     const cluster = process.env.NEXT_PUBLIC_PUSHER_CLUSTER
 
     if (!key || !cluster) {
-      console.warn('[realtime] Pusher no configurado: faltan NEXT_PUBLIC_PUSHER_KEY / NEXT_PUBLIC_PUSHER_CLUSTER')
       return
     }
 
@@ -38,12 +37,12 @@ export const usePusherTaskSync = () => {
 
     channel.bind('task-updated', (payload: TaskUpdatePayload) => {
       // ClickUp no envía el nombre en el webhook; intentamos sacarlo de la caché.
-      let nombre = payload?.name
-      if (!nombre && payload?.taskId) {
+      let taskName = payload?.name
+      if (!taskName && payload?.taskId) {
         const data = queryClient.getQueryData<{
           clickupTasks?: Array<{ clickupId: string; name: string }>
         }>(taskKeys.clickup())
-        nombre = data?.clickupTasks?.find((t) => t.clickupId === payload.taskId)?.name
+        taskName = data?.clickupTasks?.find((t) => t.clickupId === payload.taskId)?.name
       }
       // El kanban lee en vivo desde ClickUp → re-pedir la query para repintar (siempre).
       queryClient.invalidateQueries({ queryKey: taskKeys.clickup() })
@@ -58,16 +57,16 @@ export const usePusherTaskSync = () => {
       }
       lastNotifiedRef.current = { taskId: payload?.taskId, at: now }
 
-      const accion =
+      const action =
         payload?.event === 'taskCreated'
-          ? 'creada'
+          ? 'created'
           : payload?.event === 'taskDeleted'
-          ? 'eliminada'
-          : 'actualizada'
-      const mensaje = nombre ? `Tarea "${nombre}" ${accion}` : 'Tablero de tareas actualizado'
+          ? 'deleted'
+          : 'updated'
+      const message = taskName ? `Task "${taskName}" ${action}` : 'Task board updated'
 
       // Solo notificación del navegador + sonido (sin toast).
-      notifyTaskChange('Assignify · ClickUp', mensaje)
+      notifyTaskChange('Assignify · ClickUp', message)
     })
 
     return () => {

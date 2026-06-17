@@ -91,8 +91,8 @@ export const AddRoleForm: React.FC<AddRoleFormProps> = ({
 
       <Checkbox
         size="sm"
-        label="Cargo primario"
-        helper="Marca este cargo como primario; el motor lo prefiere antes de escalar a secundarios."
+        label="Primary role"
+        helper="Mark this role as primary; the engine prefers it before escalating to secondary roles."
         checked={isPrimary}
         onChange={(e) => setIsPrimary(e.target.checked)}
         disabled={loading}

@@ -79,7 +79,7 @@ export async function GET(req: NextRequest) {
   const token = process.env.CLICKUP_API_TOKEN
   if (!token) {
     return NextResponse.json(
-      { error: 'CLICKUP_API_TOKEN no está configurado' },
+      { error: 'CLICKUP_API_TOKEN is not configured' },
       { status: 500 }
     )
   }
@@ -146,7 +146,7 @@ export async function GET(req: NextRequest) {
           errors.push({
             taskId: t.id,
             name: t.name,
-            reason: 'No se pudo aplicar ningún estado complete válido',
+            reason: 'Could not apply any valid complete status',
           })
         }
       }

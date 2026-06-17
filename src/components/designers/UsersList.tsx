@@ -46,7 +46,7 @@ export const UsersList: React.FC<UsersListProps> = ({
       <div className="flex flex-col gap-8">
         <section>
           <h2 className="mb-4 text-lg font-semibold text-(--color-text-strong)">
-            Sincronizados
+            Synced
           </h2>
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
             <DesignerCardSkeleton />
@@ -81,14 +81,14 @@ export const UsersList: React.FC<UsersListProps> = ({
       {/* ── Diseñadores sincronizados (tarjeta completa con carga) ── */}
       <section>
         <h2 className="mb-4 text-lg font-semibold text-(--color-text-strong)">
-          Sincronizados
+          Synced
           <span className="ml-2 text-sm font-normal text-(--color-text-muted)">
             {syncedUsers.length}
           </span>
         </h2>
         {syncedUsers.length === 0 ? (
           <p className="text-sm text-(--color-text-muted)">
-            No hay diseñadores sincronizados todavía.
+            No synced designers yet.
           </p>
         ) : (
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
@@ -109,7 +109,7 @@ export const UsersList: React.FC<UsersListProps> = ({
       {availableUsers.length > 0 && (
         <section>
           <h2 className="mb-4 text-lg font-semibold text-(--color-text-strong)">
-            Disponibles para sincronizar
+            Available to sync
             <span className="ml-2 text-sm font-normal text-(--color-text-muted)">
               {availableUsers.length}
             </span>

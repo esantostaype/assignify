@@ -81,6 +81,12 @@ export async function GET() {
 
         const roles = Array.from(new Set(u.roles.map((r) => r.type.name)))
         const isSpecialist = roles.length === 1
+        // Cargos con su tipo e indicador de primario, para que la tarjeta pueda
+        // derivar el título del puesto (cargo primario → "Senior UX/UI Designer").
+        const roleDetails = u.roles.map((r) => ({
+          typeName: r.type.name,
+          isPrimary: r.isPrimary,
+        }))
 
         let status: WorkloadStatus
         if (currentVacation) status = 'on_vacation'
@@ -92,7 +98,9 @@ export async function GET() {
           id: u.id,
           name: u.name,
           email: u.email,
+          level: u.level,
           roles,
+          roleDetails,
           isSpecialist,
           taskCount,
           approvalCount,

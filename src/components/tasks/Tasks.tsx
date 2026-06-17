@@ -21,8 +21,8 @@ export const TasksSync: React.FC = () => {
   const { data: tasksData, isLoading: loadingTasks, error: tasksError } = useClickUpTasks();
 
   const { mutate: refreshTasks, isPending: refreshing } = useRefreshTasks({
-    onSuccess: () => toast.success("Tareas actualizadas"),
-    onError: () => toast.error("Error al actualizar tareas"),
+    onSuccess: () => toast.success("Tasks updated"),
+    onError: () => toast.error("Failed to update tasks"),
   });
 
   const tasks = useMemo(() => {
@@ -36,11 +36,11 @@ export const TasksSync: React.FC = () => {
       <div className="flex h-full items-center justify-center">
         <EmptyState
           icon={PiListChecks}
-          title="Error al cargar los datos"
-          description={tasksError.message || "Error desconocido"}
+          title="Failed to load data"
+          description={tasksError.message || "Unknown error"}
           action={
             <Button variant="soft" startIcon={<Icon icon={PiArrowsClockwise} />} onClick={() => refreshTasks()}>
-              Reintentar
+              Retry
             </Button>
           }
         />
@@ -59,14 +59,14 @@ export const TasksSync: React.FC = () => {
           <div className="flex items-center gap-3">
             <Input
               size="sm"
-              placeholder="Buscar tareas..."
+              placeholder="Search tasks..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               startAdornment={<Icon icon={PiMagnifyingGlass} size={16} />}
             />
-            <Tooltip content="Actualizar desde ClickUp">
+            <Tooltip content="Refresh from ClickUp">
               <IconButton
-                aria-label="Actualizar"
+                aria-label="Refresh"
                 variant="soft"
                 color="neutral"
                 size="sm"
@@ -76,9 +76,9 @@ export const TasksSync: React.FC = () => {
                 <Icon icon={PiArrowsClockwise} />
               </IconButton>
             </Tooltip>
-            <Tooltip content={theme === "dark" ? "Modo claro" : "Modo oscuro"}>
+            <Tooltip content={theme === "dark" ? "Light mode" : "Dark mode"}>
               <IconButton
-                aria-label="Cambiar tema"
+                aria-label="Toggle theme"
                 variant="ghost"
                 color="neutral"
                 size="sm"

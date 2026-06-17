@@ -8,44 +8,16 @@ export async function POST(req: Request) {
   const timestamp = new Date().toISOString();
   
   try {
-    // Log todo lo que llega
-    console.log('\n🚨 =================== WEBHOOK DEBUG ===================');
-    console.log(`⏰ Timestamp: ${timestamp}`);
-    console.log(`🔗 URL: ${req.url}`);
-    console.log(`📧 Method: ${req.method}`);
-    
-    // Log headers
-    console.log('\n📨 HEADERS:');
-    req.headers.forEach((value, key) => {
-      console.log(`   ${key}: ${value}`);
-    });
-    
-    // Log body
     const rawBody = await req.text();
-    console.log(`\n📦 RAW BODY (${rawBody.length} chars):`);
-    console.log(rawBody);
-    
+
     // Intentar parsear JSON
     let jsonBody = null;
     try {
       jsonBody = JSON.parse(rawBody);
-      console.log('\n📝 PARSED JSON:');
-      console.log(JSON.stringify(jsonBody, null, 2));
     } catch (e) {
-      console.log('\n❌ JSON PARSE ERROR:', e);
+      // Cuerpo no es JSON válido: se reporta en la respuesta.
     }
-    
-    // Log específico de ClickUp
-    if (jsonBody) {
-      console.log('\n🎯 CLICKUP EVENT ANALYSIS:');
-      console.log(`   Event: ${jsonBody.event || 'NOT_PROVIDED'}`);
-      console.log(`   Task ID: ${jsonBody.task_id || 'NOT_PROVIDED'}`);
-      console.log(`   Task Name: ${jsonBody.task?.name || 'NOT_PROVIDED'}`);
-      console.log(`   Webhook ID: ${jsonBody.webhook_id || 'NOT_PROVIDED'}`);
-    }
-    
-    console.log('=======================================================\n');
-    
+
     // Respuesta exitosa para ClickUp
     return NextResponse.json({
       success: true,
@@ -59,8 +31,8 @@ export async function POST(req: Request) {
     }, { status: 200 });
     
   } catch (error) {
-    console.error('❌ DEBUG WEBHOOK ERROR:', error);
-    
+    console.error('Debug webhook error:', error);
+
     return NextResponse.json({
       error: 'Debug webhook error',
       message: error instanceof Error ? error.message : 'Unknown error',
@@ -75,8 +47,7 @@ export async function GET(req: Request) {
   const challenge = searchParams.get('challenge');
   
   if (challenge) {
-    console.log('🔐 ClickUp verification challenge:', challenge);
-    return new Response(challenge, { 
+    return new Response(challenge, {
       status: 200,
       headers: { 'Content-Type': 'text/plain' }
     });

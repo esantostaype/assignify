@@ -98,7 +98,7 @@ export const TasksList: React.FC<TasksListProps> = ({ tasks, loading = false }) 
         <div className="text-center">
           <Icon icon={PiListChecks} size={48} className="mx-auto mb-4 text-(--color-text-subtle)" />
           <h3 className="text-2xl font-medium mb-2">No active tasks</h3>
-          <p className="text-(--color-text-subtle)">Las tareas activas de ClickUp aparecerán aquí.</p>
+          <p className="text-(--color-text-subtle)">Active ClickUp tasks will appear here.</p>
         </div>
       </div>
     );

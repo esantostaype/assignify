@@ -25,11 +25,11 @@ type UploadResult = {
 };
 
 const schema = Yup.object({
-  fullName: Yup.string().trim().min(2).required("Nombre requerido"),
-  title: Yup.string().trim().min(2).required("Cargo requerido"),
-  phone: Yup.string().trim().min(6).required("Teléfono requerido"),
-  email: Yup.string().trim().email("Email inválido").required("Email requerido"),
-  address: Yup.string().trim().min(2).required("Dirección requerida"),
+  fullName: Yup.string().trim().min(2).required("Name is required"),
+  title: Yup.string().trim().min(2).required("Title is required"),
+  phone: Yup.string().trim().min(6).required("Phone is required"),
+  email: Yup.string().trim().email("Invalid email").required("Email is required"),
+  address: Yup.string().trim().min(2).required("Address is required"),
   extra: Yup.string().trim().max(1200).optional(),
 });
 
@@ -70,11 +70,11 @@ export default function OutlookSignaturePage() {
         });
 
         const json = await r.json();
-        if (!r.ok) throw new Error(json?.error || "No se pudo generar la firma");
+        if (!r.ok) throw new Error(json?.error || "Could not generate the signature");
 
         setSignatureHtml(json.html);
       } catch (e: any) {
-        setErr(e?.message || "Error generando firma");
+        setErr(e?.message || "Error generating signature");
       } finally {
         setBusyGenerate(false);
       }
@@ -98,12 +98,12 @@ export default function OutlookSignaturePage() {
 
       setOriginal(json);
 
-      // warning simple de baja calidad
+      // simple low-quality warning
       if ((json?.width ?? 0) < 300 || (json?.height ?? 0) < 300) {
-        setErr("⚠️ El logo parece pequeño. La IA puede ayudar, pero lo ideal es subir un PNG grande o SVG.");
+        setErr("⚠️ The logo looks small. AI can help, but ideally upload a large PNG or an SVG.");
       }
     } catch (e: any) {
-      setErr(e?.message || "Error subiendo imagen");
+      setErr(e?.message || "Error uploading image");
     } finally {
       setBusyUpload(false);
     }
@@ -127,7 +127,7 @@ export default function OutlookSignaturePage() {
 
       setEnhanced(json);
     } catch (e: any) {
-      setErr(e?.message || "Error mejorando logo");
+      setErr(e?.message || "Error enhancing logo");
     } finally {
       setBusyEnhance(false);
     }
@@ -156,7 +156,7 @@ export default function OutlookSignaturePage() {
     <>
         <Typography variant="h2">Outlook Signature Generator</Typography>
         <Typography variant="bodySm" className="opacity-80 mt-0.5">
-          Formik + Yup + UI propia. Subes tu logo, opcionalmente lo mejoras con IA, y generas HTML compatible.
+          Formik + Yup + custom UI. Upload your logo, optionally enhance it with AI, and generate compatible HTML.
         </Typography>
 
         <Divider className="my-4" />
@@ -173,7 +173,7 @@ export default function OutlookSignaturePage() {
             <form onSubmit={formik.handleSubmit}>
               <div className="flex flex-col gap-3">
                 <div>
-                  <Typography variant="label" as="label" className="mb-1.5 block">Nombre</Typography>
+                  <Typography variant="label" as="label" className="mb-1.5 block">Name</Typography>
                   <Input name="fullName" value={formik.values.fullName} onChange={formik.handleChange} onBlur={formik.handleBlur} invalid={Boolean(formik.touched.fullName && formik.errors.fullName)} />
                   {formik.touched.fullName && formik.errors.fullName && (
                     <Typography variant="caption" color="error-600" className="mt-1 block">
@@ -183,7 +183,7 @@ export default function OutlookSignaturePage() {
                 </div>
 
                 <div>
-                  <Typography variant="label" as="label" className="mb-1.5 block">Cargo</Typography>
+                  <Typography variant="label" as="label" className="mb-1.5 block">Title</Typography>
                   <Input name="title" value={formik.values.title} onChange={formik.handleChange} onBlur={formik.handleBlur} invalid={Boolean(formik.touched.title && formik.errors.title)} />
                   {formik.touched.title && formik.errors.title && (
                     <Typography variant="caption" color="error-600" className="mt-1 block">
@@ -193,7 +193,7 @@ export default function OutlookSignaturePage() {
                 </div>
 
                 <div>
-                  <Typography variant="label" as="label" className="mb-1.5 block">Teléfono</Typography>
+                  <Typography variant="label" as="label" className="mb-1.5 block">Phone</Typography>
                   <Input name="phone" value={formik.values.phone} onChange={formik.handleChange} onBlur={formik.handleBlur} invalid={Boolean(formik.touched.phone && formik.errors.phone)} />
                   {formik.touched.phone && formik.errors.phone && (
                     <Typography variant="caption" color="error-600" className="mt-1 block">
@@ -213,7 +213,7 @@ export default function OutlookSignaturePage() {
                 </div>
 
                 <div>
-                  <Typography variant="label" as="label" className="mb-1.5 block">Dirección</Typography>
+                  <Typography variant="label" as="label" className="mb-1.5 block">Address</Typography>
                   <Input name="address" value={formik.values.address} onChange={formik.handleChange} onBlur={formik.handleBlur} invalid={Boolean(formik.touched.address && formik.errors.address)} />
                   {formik.touched.address && formik.errors.address && (
                     <Typography variant="caption" color="error-600" className="mt-1 block">
@@ -223,7 +223,7 @@ export default function OutlookSignaturePage() {
                 </div>
 
                 <div>
-                  <Typography variant="label" as="label" className="mb-1.5 block">Otros</Typography>
+                  <Typography variant="label" as="label" className="mb-1.5 block">Other</Typography>
                   <Textarea
                     name="extra"
                     minRows={3}
@@ -236,7 +236,7 @@ export default function OutlookSignaturePage() {
                 <Divider className="my-2" />
 
                 <div>
-                  <Typography variant="label" as="label" className="mb-1.5 block">Logo personalizado (usuario)</Typography>
+                  <Typography variant="label" as="label" className="mb-1.5 block">Custom logo (user)</Typography>
                   <Input
                     type="file"
                     accept="image/*"
@@ -254,11 +254,11 @@ export default function OutlookSignaturePage() {
                     onClick={handleEnhance}
                     disabled={!original?.secure_url || busyEnhance}
                   >
-                    {busyEnhance ? "Mejorando..." : "Mejorar con IA"}
+                    {busyEnhance ? "Enhancing..." : "Enhance with AI"}
                   </Button>
 
                   <Button type="submit" disabled={!formik.isValid || busyGenerate}>
-                    {busyGenerate ? "Generando..." : "Generar firma"}
+                    {busyGenerate ? "Generating..." : "Generate signature"}
                   </Button>
                 </div>
               </div>
@@ -271,7 +271,7 @@ export default function OutlookSignaturePage() {
             </Typography>
             <div className="grid grid-cols-2 gap-4">
               <LogoCard title="Original" data={original} />
-              <LogoCard title="Procesado" data={enhanced} />
+              <LogoCard title="Processed" data={enhanced} />
             </div>
           </div>
 
@@ -285,7 +285,7 @@ export default function OutlookSignaturePage() {
                 <div dangerouslySetInnerHTML={{ __html: signatureHtml }} />
               ) : (
                 <Typography variant="bodySm" className="opacity-80">
-                  Genera la firma para ver el preview.
+                  Generate the signature to see the preview.
                 </Typography>
               )}
             </div>
@@ -318,7 +318,7 @@ function LogoCard({ title, data }: { title: string; data: UploadResult | null })
         </div>
       ) : (
         <Typography variant="caption" className="opacity-70">
-          Sin imagen
+          No image
         </Typography>
       )}
     </Card>

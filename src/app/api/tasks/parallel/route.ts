@@ -23,8 +23,8 @@ const CLICKUP_TOKEN = process.env.CLICKUP_API_TOKEN
 
 export async function POST(req: Request) {
   if (!CLICKUP_TOKEN) {
-    console.error('ERROR: CLICKUP_API_TOKEN no configurado.')
-    return NextResponse.json({ error: 'CLICKUP_API_TOKEN no configurado' }, { status: 500 })
+    console.error('CLICKUP_API_TOKEN is not configured.')
+    return NextResponse.json({ error: 'CLICKUP_API_TOKEN is not configured' }, { status: 500 })
   }
 
   try {
@@ -42,7 +42,7 @@ export async function POST(req: Request) {
 
     if (!name || !typeId || !tierId || !priority || !brandId || typeof durationDays !== 'number' || durationDays <= 0) {
       return NextResponse.json({
-        error: 'Faltan campos requeridos o duración inválida',
+        error: 'Missing required fields or invalid duration',
         required: ['name', 'typeId', 'tierId', 'priority', 'brandId', 'durationDays'],
       }, { status: 400 })
     }
@@ -54,13 +54,6 @@ export async function POST(req: Request) {
       ? levelParam
       : 'MID') as Level
 
-    console.log(`🚀 === CREANDO TAREA "${name}" EN CLICKUP (motor de prioridades en vivo) ===`)
-    console.log(`   - Priority: ${priority}`)
-    console.log(`   - Duration: ${durationDays} días`)
-    console.log(`   - Type ID: ${typeId} | Tier ID: ${tierId} | Brand ID: ${brandId}`)
-    console.log(`   - Level solicitado: ${reqLevel}`)
-    console.log(`   - Users: ${assignedUserIds || 'AUTO-ASSIGNMENT'}`)
-
     // Config desde la DB (Drizzle/Turso).
     const [tier, type, brand] = await Promise.all([
       db.query.tierList.findFirst({ where: eq(tierList.id, tierId) }),
@@ -68,11 +61,9 @@ export async function POST(req: Request) {
       db.query.brand.findFirst({ where: eq(brandTable.id, brandId) }),
     ])
 
-    if (!tier) return NextResponse.json({ error: 'Tier no encontrado' }, { status: 404 })
-    if (!type) return NextResponse.json({ error: 'Tipo no encontrado' }, { status: 404 })
-    if (!brand) return NextResponse.json({ error: 'Brand no encontrado' }, { status: 404 })
-
-    console.log(`✅ Tier: ${tier.name} (${type.name}) | Brand: ${brand.name}`)
+    if (!tier) return NextResponse.json({ error: 'Tier not found' }, { status: 404 })
+    if (!type) return NextResponse.json({ error: 'Task type not found' }, { status: 404 })
+    if (!brand) return NextResponse.json({ error: 'Brand not found' }, { status: 404 })
 
     // ¿La duración es personalizada (distinta a la del tier)?
     const isCustomDuration = Math.abs(durationDays - tier.duration) > 0.001
@@ -81,8 +72,6 @@ export async function POST(req: Request) {
     let usersToAssign: string[] = []
 
     if (assignedUserIds && assignedUserIds.length > 0) {
-      console.log('👤 Asignación manual de usuarios:', assignedUserIds)
-
       const specificUsersResults = await Promise.all(
         assignedUserIds.map(userId =>
           db.query.user.findFirst({
@@ -103,42 +92,32 @@ export async function POST(req: Request) {
 
       if (validUsers.length === 0) {
         return NextResponse.json({
-          error: 'Ninguno de los usuarios especificados es compatible con este tipo de tarea',
-          details: 'Verifique que los usuarios existan, estén activos y tengan roles compatibles',
+          error: 'None of the specified users are compatible with this task type',
+          details: 'Make sure the users exist, are active, and have compatible roles',
         }, { status: 400 })
       }
 
       usersToAssign = validUsers.map(user => user.id)
-      console.log(`✅ Usuarios válidos para asignación manual: ${usersToAssign.length}`)
     } else {
-      console.log('🤖 Iniciando asignación automática...')
       const bestUser = await getBestUserWithCache(typeId, brandId, priority, durationDays, reqLevel)
 
       if (!bestUser) {
         return NextResponse.json({
-          error: 'No se pudo encontrar un diseñador óptimo para la asignación automática',
-          details: 'No hay usuarios disponibles que cumplan con los criterios de asignación considerando vacaciones y carga de trabajo',
+          error: 'Could not find an optimal designer for automatic assignment',
+          details: 'No available users meet the assignment criteria considering vacations and workload',
         }, { status: 400 })
       }
 
       usersToAssign = [bestUser.userId]
-      console.log('✅ Usuario seleccionado automáticamente:', {
-        name: bestUser.userName,
-        carga: bestUser.cargaTotal,
-        disponible: bestUser.availableDate.toISOString(),
-        especialista: bestUser.isSpecialist,
-      })
     }
 
     // Calcular fechas con el modelo de carriles + vacaciones para cada usuario.
     // calculateParallelPriorityInsertion ya considera vacaciones internamente.
-    console.log(`\n🎯 === CALCULANDO FECHAS (modelo de carriles + vacaciones) ===`)
     const userDuration = durationDays / usersToAssign.length
 
     const insertionResults = await Promise.all(
       usersToAssign.map(async (userId) => {
         const result = await calculateParallelPriorityInsertion(userId, priority, userDuration)
-        console.log(`👤 ${userId}: ${result.startDate.toISOString()} → ${result.deadline.toISOString()} (${result.insertionReason})`)
         return { userId, ...result }
       })
     )
@@ -148,16 +127,12 @@ export async function POST(req: Request) {
       current.startDate > latest.startDate ? current : latest
     )
 
-    console.log(`📅 Fecha final: ${finalInsertion.startDate.toISOString()} → ${finalInsertion.deadline.toISOString()}`)
-
     const vacationAdjustments = insertionResults.filter(r => r.vacationAdjustment)
 
     const brandForClickUp: ClickUpBrand = {
       ...brand,
       teamId: brand.teamId ?? '',
     }
-
-    console.log('📤 Creando tarea EN CLICKUP REAL...')
 
     const { clickupTaskId, clickupTaskUrl } = await createTaskInClickUp({
       name,
@@ -171,9 +146,6 @@ export async function POST(req: Request) {
       customDurationDays: isCustomDuration ? durationDays : undefined,
     })
 
-    console.log(`✅ Tarea creada en ClickUp: ${clickupTaskId}`)
-    console.log(`🔗 URL: ${clickupTaskUrl}`)
-
     // Notificar en tiempo real (el tablero se lee en vivo de ClickUp).
     await publishTaskUpdate({
       taskId: clickupTaskId,
@@ -183,15 +155,12 @@ export async function POST(req: Request) {
     })
 
     invalidateAllCache()
-    console.log('🗑️ Cache invalidado después de crear tarea')
 
     // Datos de los asignados desde la DB (config), sin leer la tarea de la DB.
     const assigneeUsers = await db.query.user.findMany({
       where: inArray(userTable.id, usersToAssign),
       columns: { id: true, name: true, email: true },
     })
-
-    console.log(`🎉 === TAREA "${name}" CREADA EN CLICKUP ===`)
 
     return NextResponse.json({
       id: clickupTaskId,
@@ -236,10 +205,10 @@ export async function POST(req: Request) {
       },
     })
   } catch (error) {
-    console.error('❌ Error general al crear tarea:', error)
+    console.error('Failed to create task:', error)
     return NextResponse.json({
-      error: 'Error interno del servidor',
-      details: error instanceof Error ? error.message : 'Error desconocido',
+      error: 'Internal server error',
+      details: error instanceof Error ? error.message : 'Unknown error',
     }, { status: 500 })
   }
 }

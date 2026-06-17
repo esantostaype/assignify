@@ -155,7 +155,7 @@ export async function getAppSettings(): Promise<AppSettings> {
     setInCache(CACHE_KEY, settings, CACHE_TTL_SECONDS);
     return settings;
   } catch (error) {
-    console.error('❌ getAppSettings: error leyendo system_settings, usando fallback de @/config:', error);
+    console.error('getAppSettings: failed to read system_settings, using @/config fallback:', error);
     return FALLBACK_SETTINGS;
   }
 }

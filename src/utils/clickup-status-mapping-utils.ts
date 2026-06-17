@@ -9,9 +9,7 @@ export type LocalTaskStatus = 'TO_DO' | 'IN_PROGRESS' | 'ON_APPROVAL' | 'COMPLET
  */
 export function mapClickUpStatusToLocal(clickupStatus: string): LocalTaskStatus | null {
   const statusLower = clickupStatus.toLowerCase().trim();
-  
-  console.log(`🔍 Mapping ClickUp status: "${clickupStatus}" -> "${statusLower}"`);
-  
+
   // ✅ ON APPROVAL - Estados de revisión/aprobación (PRIMERO para evitar conflictos)
   if (statusLower === 'on approval' || 
       statusLower === 'approval' ||
@@ -25,39 +23,34 @@ export function mapClickUpStatusToLocal(clickupStatus: string): LocalTaskStatus 
       statusLower.includes('check') ||
       statusLower.includes('waiting for approval') ||
       statusLower.includes('ready for review')) {
-    console.log(`✅ Mapped to: ON_APPROVAL`);
     return 'ON_APPROVAL';
   }
-  
+
   // IN PROGRESS - Estados de trabajo activo
   if (statusLower.includes('in progress') || statusLower.includes('in-progress') ||
       statusLower.includes('progress') || statusLower.includes('active') ||
       statusLower.includes('working') || statusLower.includes('development') ||
       statusLower.includes('doing') || statusLower === 'in progress') {
-    console.log(`✅ Mapped to: IN_PROGRESS`);
     return 'IN_PROGRESS';
   }
-  
+
   // TO DO - Estados iniciales
-  if (statusLower.includes('to do') || statusLower.includes('todo') || 
+  if (statusLower.includes('to do') || statusLower.includes('todo') ||
       statusLower.includes('open') || statusLower.includes('backlog') ||
       statusLower.includes('new') || statusLower.includes('pending') ||
       statusLower.includes('ready') || statusLower === 'to do') {
-    console.log(`✅ Mapped to: TO_DO`);
     return 'TO_DO';
   }
-  
+
   // ✅ EXCLUDE completed tasks - return null
   if (statusLower.includes('done') || statusLower.includes('complete') ||
       statusLower.includes('finished') || statusLower.includes('closed') ||
       statusLower.includes('resolved') || statusLower.includes('delivered') ||
       statusLower.includes('merged') || statusLower.includes('deployed')) {
-    console.log(`🚫 Task completed, excluding: ${clickupStatus}`);
     return null; // Exclude completed tasks
   }
-  
+
   // Por defecto, estados desconocidos van a TO DO
-  console.log(`⚠️ Unknown status "${clickupStatus}", defaulting to TO_DO`);
   return 'TO_DO';
 }
 
@@ -69,13 +62,12 @@ export function mapClickUpStatusToLocal(clickupStatus: string): LocalTaskStatus 
  */
 export function mapClickUpStatusToLocalSafe(clickupStatus: string): LocalTaskStatus {
   const mapped = mapClickUpStatusToLocal(clickupStatus);
-  
+
   // If mapping returned null (completed task), this shouldn't happen in create context
   if (mapped === null) {
-    console.warn(`⚠️ Received completed status "${clickupStatus}" in safe mapping, defaulting to TO_DO`);
     return 'TO_DO';
   }
-  
+
   return mapped;
 }
 export function mapLocalStatusToColumn(localStatus: LocalTaskStatus): string | null {

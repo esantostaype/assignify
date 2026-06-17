@@ -59,10 +59,6 @@ export async function GET(req: Request, { params }: RouteParams) {
       }, { status: 404 });
     }
 
-    console.log(`✅ User details loaded for: ${user_.name} (${user_.id})`);
-    console.log(`   - Roles: ${user_.roles.length}`);
-    console.log(`   - Vacations: ${user_.vacations.length}`);
-
     return NextResponse.json(user_);
 
   } catch (error) {

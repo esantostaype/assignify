@@ -11,8 +11,6 @@ export const dynamic = 'force-dynamic';
 // POST /api/settings/reset
 export async function POST() {
   try {
-    console.log('🔄 Resetting settings to defaults...');
-
     // Eliminar todos los settings actuales
     await db.delete(systemSettings);
 
@@ -28,15 +26,13 @@ export async function POST() {
       orderBy: [asc(systemSettings.group), asc(systemSettings.order)]
     });
 
-    console.log('✅ Settings reset to defaults');
-
     return NextResponse.json({
       success: true,
       settings
     });
 
   } catch (error) {
-    console.error('❌ Error resetting settings:', error);
+    console.error('Error resetting settings:', error);
     return NextResponse.json({
       error: 'Error resetting settings',
       details: error instanceof Error ? error.message : 'Unknown error'

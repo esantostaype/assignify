@@ -30,7 +30,7 @@ import {
   useUpdateSettings,
   useResetSettings,
 } from "@/hooks/useSettings";
-import { useTaskDataInvalidation } from "@/hooks/useTaskData"; // ✅ NUEVO IMPORT
+import { useTaskDataInvalidation } from "@/hooks/useTaskData";
 import axios from "axios";
 import toast from "react-hot-toast";
 
@@ -56,7 +56,7 @@ export const SettingsForm: React.FC = () => {
   const updateSettingsMutation = useUpdateSettings();
   const resetSettingsMutation = useResetSettings();
 
-  // ✅ NUEVO: Hook para invalidar cache de task data
+  // Hook to invalidate task data cache
   const { invalidateTiers, invalidateAll } = useTaskDataInvalidation();
 
   const [settingValues, setSettingValues] = useState<
@@ -213,8 +213,7 @@ export const SettingsForm: React.FC = () => {
         setTiers(response.data);
         setTierChanges({});
 
-        // ✅ NUEVO: Invalidar cache de task data para que otros componentes se actualicen
-        console.log('🔄 Invalidating task data cache after tier changes...');
+        // Invalidate task data cache so other components refresh
         invalidateTiers();
 
         toast.success("Tier durations updated successfully");
@@ -240,8 +239,7 @@ export const SettingsForm: React.FC = () => {
       await resetSettingsMutation.mutateAsync();
       setTierChanges({});
 
-      // ✅ NUEVO: Invalidar todo el cache después del reset
-      console.log('🔄 Invalidating all task data cache after settings reset...');
+      // Invalidate all task data cache after the reset
       invalidateAll();
     }
   };
@@ -283,12 +281,12 @@ export const SettingsForm: React.FC = () => {
             max={setting.maxValue}
             step={setting.key.includes("duration") ? 0.1 : 1}
             size={size}
-            className={`w-24${hasChanged ? " border-warning-500" : ""}`}
+            className={`w-full${hasChanged ? " border-warning-500" : ""}`}
           />
         );
 
       default:
-        // Para tier_info, no mostrar input
+        // For tier_info, do not render an input
         if (setting.key === 'tier_info') {
           return null;
         }
@@ -304,19 +302,19 @@ export const SettingsForm: React.FC = () => {
               )
             }
             size={size}
-            className={`w-24${hasChanged ? " border-warning-500" : ""}`}
+            className={`w-full${hasChanged ? " border-warning-500" : ""}`}
           />
         );
     }
   };
 
-  // Get setting display info: usa el label/description del catálogo (en español)
-  // y añade el rango permitido al tooltip cuando existe.
+  // Get setting display info: uses the label/description from the catalog
+  // and appends the allowed range to the tooltip when present.
   const getSettingDisplayInfo = (setting: any) => {
     const range =
       setting.minValue !== undefined && setting.minValue !== null &&
       setting.maxValue !== undefined && setting.maxValue !== null
-        ? ` (Rango: ${setting.minValue}-${setting.maxValue})`
+        ? ` (Range: ${setting.minValue}-${setting.maxValue})`
         : '';
 
     return {
@@ -340,8 +338,8 @@ export const SettingsForm: React.FC = () => {
   // Group name mapping
   const getGroupDisplayName = (groupName: string) => {
     const mapping: Record<string, string> = {
-      work_schedule: "Horario laboral",
-      task_assignment: "Asignación de tareas"
+      work_schedule: "Work schedule",
+      task_assignment: "Task assignment"
     };
     return mapping[groupName] || groupName;
   };
@@ -360,7 +358,7 @@ export const SettingsForm: React.FC = () => {
 
   if (error) {
     return (
-      <div className="p-8 max-w-6xl mx-auto">
+      <div className="max-w-6xl mx-auto">
         <Alert tone="error" variant="soft" icon={null}>
           <div className="text-sm font-medium">Failed to load settings</div>
           <div className="text-xs mt-1">
@@ -373,7 +371,7 @@ export const SettingsForm: React.FC = () => {
 
   if (!settingsData?.settings) {
     return (
-      <div className="p-8 max-w-6xl mx-auto">
+      <div className="max-w-6xl mx-auto">
         <Alert tone="info" variant="soft" icon={null}>
           <span>No settings available</span>
         </Alert>
@@ -387,7 +385,7 @@ export const SettingsForm: React.FC = () => {
   );
 
   return (
-    <div className="p-8">
+    <>
 
       {/* Settings Groups */}
       <div className="space-y-6">
@@ -415,62 +413,41 @@ export const SettingsForm: React.FC = () => {
               </div>
 
               {settingsToShow.length > 0 && (
-                <div className="border border-(--color-border-default) rounded-lg overflow-y-hidden overflow-x-auto">
-                  <table className="w-full">
-                    <thead className="bg-(--color-surface-hover)">
-                      <tr>
-                        {settingsToShow.map((setting) => {
-                          const { label, tooltip } = getSettingDisplayInfo(setting);
-                          const settingKey = `${setting.category}.${setting.key}`;
-                          const hasChanged = settingValues[settingKey]?.hasChanged ?? false;
+                <div className="border border-(--color-border-default) rounded-lg p-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-x-6 gap-y-4">
+                    {settingsToShow.map((setting) => {
+                      const { label, tooltip } = getSettingDisplayInfo(setting);
+                      const settingKey = `${setting.category}.${setting.key}`;
+                      const hasChanged = settingValues[settingKey]?.hasChanged ?? false;
 
-                          return (
-                            <th key={settingKey} className="p-2 first:pl-4 last:pr-4 text-left text-sm font-medium text-gray-300">
-                              <div className="flex items-center gap-2">
-                                <span>{label}</span>
-                                {hasChanged && (
-                                  <div
-                                    className="w-2 h-2 bg-orange-500 rounded-full"
-                                    title="Changed"
-                                  />
-                                )}
-                                <Tooltip content={tooltip}>
-                                  <span className="inline-flex cursor-help text-(--color-text-subtle)">
-                                    <Icon
-                                      icon={PiInfo}
-                                      size={14}
-                                    />
-                                  </span>
-                                </Tooltip>
-                              </div>
-                            </th>
-                          );
-                        })}
-                      </tr>
-                    </thead>
-                    <tbody>
-                      <tr>
-                        {settingsToShow.map((setting) => {
-                          const settingKey = `${setting.category}.${setting.key}`;
-
-                          return (
-                            <td key={settingKey} className="p-2 first:pl-4 last:pr-4">
-                              <div className="py-2 w-full">
-                                {renderSettingInput(setting)}
-                              </div>
-                            </td>
-                          );
-                        })}
-                      </tr>
-                    </tbody>
-                  </table>
+                      return (
+                        <div key={settingKey} className="flex flex-col gap-1.5 min-w-0">
+                          <div className="flex items-center gap-2 text-sm font-medium text-(--color-text-muted)">
+                            <span className="truncate">{label}</span>
+                            {hasChanged && (
+                              <div
+                                className="w-2 h-2 bg-orange-500 rounded-full shrink-0"
+                                title="Changed"
+                              />
+                            )}
+                            <Tooltip content={tooltip}>
+                              <span className="inline-flex cursor-help text-(--color-text-subtle) shrink-0">
+                                <Icon icon={PiInfo} size={14} />
+                              </span>
+                            </Tooltip>
+                          </div>
+                          {renderSettingInput(setting)}
+                        </div>
+                      );
+                    })}
+                  </div>
                 </div>
               )}
             </div>
           );
         })}
 
-        {/* Tier Settings Table */}
+        {/* Tier Settings */}
         <div>
           <div className="flex items-center gap-2 mb-4">
             <Icon
@@ -484,60 +461,41 @@ export const SettingsForm: React.FC = () => {
           {loadingTiers ? (
             <Progress />
           ) : (
-            <div className="border border-(--color-border-default) rounded-lg overflow-y-hidden overflow-x-auto">
-              <table className="w-full">
-                <thead className="bg-(--color-surface-hover)">
-                  <tr>
-                    {tiers.map((tier) => {
-                      const hasChanged = tierChanges[tier.id] !== undefined;
+            <div className="border border-(--color-border-default) rounded-lg p-4">
+              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
+                {tiers.map((tier) => {
+                  const hasChanged = tierChanges[tier.id] !== undefined;
+                  const currentDuration = tierChanges[tier.id] ?? tier.duration;
 
-                      return (
-                        <th key={tier.id} className="p-2 first:pl-4 last:pr-4 text-left text-sm font-medium text-gray-300">
-                          <div className="flex items-center gap-2">
-                            <span>Tier {tier.name}</span>
-                            {hasChanged && (
-                              <div
-                                className="w-2 h-2 bg-orange-500 rounded-full"
-                                title="Changed"
-                              />
-                            )}
-                          </div>
-                        </th>
-                      );
-                    })}
-                  </tr>
-                </thead>
-                <tbody>
-                  <tr>
-                    {tiers.map((tier) => {
-                      const hasChanged = tierChanges[tier.id] !== undefined;
-                      const currentDuration =
-                        tierChanges[tier.id] ?? tier.duration;
-
-                      return (
-                        <td key={tier.id} className="p-2 first:pl-4 last:pr-4">
-                          <div className="py-2 px-2 w-full">
-                            <Input
-                              type="number"
-                              value={currentDuration.toString()}
-                              onChange={(e) => {
-                                const value = parseFloat(e.target.value);
-                                if (!isNaN(value) && value > 0) {
-                                  handleTierDurationChange(tier.id, value);
-                                }
-                              }}
-                              min={0.1}
-                              step={0.1}
-                              size="sm"
-                              className={`w-18${hasChanged ? " border-warning-500" : ""}`}
-                            />
-                          </div>
-                        </td>
-                      );
-                    })}
-                  </tr>
-                </tbody>
-              </table>
+                  return (
+                    <div key={tier.id} className="flex flex-col gap-1.5 min-w-0">
+                      <div className="flex items-center gap-2 text-sm font-medium text-(--color-text-muted)">
+                        <span className="truncate">Tier {tier.name}</span>
+                        {hasChanged && (
+                          <div
+                            className="w-2 h-2 bg-orange-500 rounded-full shrink-0"
+                            title="Changed"
+                          />
+                        )}
+                      </div>
+                      <Input
+                        type="number"
+                        value={currentDuration.toString()}
+                        onChange={(e) => {
+                          const value = parseFloat(e.target.value);
+                          if (!isNaN(value) && value > 0) {
+                            handleTierDurationChange(tier.id, value);
+                          }
+                        }}
+                        min={0.1}
+                        step={0.1}
+                        size="sm"
+                        className={`w-full${hasChanged ? " border-warning-500" : ""}`}
+                      />
+                    </div>
+                  );
+                })}
+              </div>
             </div>
           )}
         </div>
@@ -590,6 +548,6 @@ export const SettingsForm: React.FC = () => {
           Changes will take effect immediately after saving
         </p>
       </div>
-    </div>
+    </>
   );
 };

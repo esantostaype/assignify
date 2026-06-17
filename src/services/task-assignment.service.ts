@@ -126,9 +126,6 @@ async function getVacationAwareUserSlots(
   brandId: string,
   taskDurationDays: number
 ): Promise<VacationAwareUserSlot[]> {
-  console.log(`🏖️ === VACATION FILTERING FOR ${taskDurationDays}-DAY TASK ===`);
-  console.log(`📋 Will EXCLUDE users with vacation conflicts instead of adjusting dates`);
-
   const allUsersWithRoles = await db.query.user.findMany({
     where: eq(userTable.active, true),
     with: {
@@ -159,13 +156,6 @@ async function getVacationAwareUserSlots(
     roleAffinity: roleAffinityOf(user),
   }));
 
-  const primaryCount = candidateUsers.filter(c => c.roleAffinity === 1).length;
-  const secondaryCount = candidateUsers.filter(c => c.roleAffinity === 2).length;
-  const fallbackCount = candidateUsers.filter(c => c.roleAffinity === 3).length;
-  console.log(
-    `👥 Candidatos para tipo ${typeId}: ${primaryCount} primarios, ${secondaryCount} secundarios, ${fallbackCount} otros cargos (fallback)`
-  );
-
   const userIds = candidateUsers.map(c => c.user.id);
 
   // Las tareas se leen EN VIVO de ClickUp (misma fuente que el tablero), no de la DB.
@@ -193,11 +183,8 @@ async function getVacationAwareUserSlots(
   }
 
   const eligibleSlots: VacationAwareUserSlot[] = [];
-  const excludedUsers: Array<{ name: string, reason: string, vacations: string[] }> = [];
 
   for (const { user, roleAffinity } of candidateUsers) {
-    console.log(`\n👤 Evaluating ${user.name} (${user.id}) — afinidad de cargo ${roleAffinity}`);
-
     const userTasks = tasksByUser[user.id] || [];
     const upcomingVacations: UserVacation[] = user.vacations.map(v => ({
       id: v.id,
@@ -205,12 +192,6 @@ async function getVacationAwareUserSlots(
       startDate: new Date(v.startDate),
       endDate: new Date(v.endDate)
     }));
-
-    console.log(`   🏖️ Upcoming vacations: ${upcomingVacations.length}`);
-    upcomingVacations.forEach(vacation => {
-      const days = Math.ceil((vacation.endDate.getTime() - vacation.startDate.getTime()) / (1000 * 60 * 60 * 24));
-      console.log(`     - ${vacation.startDate.toISOString().split('T')[0]} to ${vacation.endDate.toISOString().split('T')[0]} (${days} days)`);
-    });
 
     // Calculate when user would be available
     let baseAvailableDate: Date;
@@ -224,12 +205,8 @@ async function getVacationAwareUserSlots(
 
       // ClickUp no trae tier: 1 día por tarea pendiente es suficiente para el desempate.
       totalAssignedDurationDays = userTasks.length;
-
-      console.log(`   📊 Current workload: ${userTasks.length} tasks, ${totalAssignedDurationDays} days total`);
-      console.log(`   📅 Available after current tasks: ${baseAvailableDate.toISOString().split('T')[0]}`);
     } else {
       baseAvailableDate = await getNextAvailableStart(new Date());
-      console.log(`   ✅ User is currently free, available from: ${baseAvailableDate.toISOString().split('T')[0]}`);
     }
 
     // Ajustar la fecha de inicio para SALTAR las vacaciones (en lugar de excluir al usuario).
@@ -273,27 +250,7 @@ async function getVacationAwareUserSlots(
       // Afinidad de cargo (1 primario / 2 secundario / 3 otro): eje superior al de nivel.
       roleAffinity,
     });
-
-    const affinityLabel = roleAffinity === 1 ? 'primario' : roleAffinity === 2 ? 'secundario' : 'otro cargo';
-    console.log(`   ✅ ${user.name}: cargo ${affinityLabel}, nivel ${user.level}, disponible ${availableDate.toISOString().split('T')[0]}, carga ${totalAssignedDurationDays}d, ${isSpecialist ? 'especialista' : 'generalista'}`);
   }
-
-  console.log(`\n🚫 === USERS EXCLUDED DUE TO VACATIONS ===`);
-  if (excludedUsers.length === 0) {
-    console.log(`✅ No users excluded - all users available`);
-  } else {
-    excludedUsers.forEach(excluded => {
-      console.log(`❌ ${excluded.name}: ${excluded.reason}`);
-      excluded.vacations.forEach(vacation => {
-        console.log(`   📅 Conflicting vacation: ${vacation}`);
-      });
-    });
-  }
-
-  console.log(`\n✅ === ELIGIBLE USERS (${eligibleSlots.length}) ===`);
-  eligibleSlots.forEach(slot => {
-    console.log(`✅ ${slot.userName}: ${slot.isSpecialist ? 'Specialist' : 'Generalist'}, available ${slot.availableDate.toISOString().split('T')[0]}, load: ${slot.totalAssignedDurationDays} days`);
-  });
 
   return eligibleSlots;
 }
@@ -334,9 +291,6 @@ function pickBestInLevel(
       (bestSpecialist.availableDate.getTime() - bestGeneralist.availableDate.getTime()) /
       (1000 * 60 * 60 * 24);
     if (daysLater > forceGeneralistThresholdDays) {
-      console.log(
-        `   🔧 [${bestSpecialist.level}] especialista ${bestSpecialist.userName} libre ${daysLater.toFixed(1)}d más tarde → generalista ${bestGeneralist.userName}`
-      );
       return bestGeneralist;
     }
   }
@@ -375,11 +329,6 @@ function pickBestByLevelEscalation(
     const best = pickBestInLevel(slotsOfLevel, forceGeneralistThreshold);
     if (best) {
       bestByLevel[lvl] = best;
-      console.log(
-        `      • Nivel ${lvl}: mejor = ${best.userName} (libre ${best.availableDate.toISOString().split('T')[0]}, carga ${best.totalAssignedDurationDays}d)`
-      );
-    } else {
-      console.log(`      • Nivel ${lvl}: sin candidatos`);
     }
   }
 
@@ -400,14 +349,7 @@ function pickBestByLevelEscalation(
       (chosen.availableDate.getTime() - current.availableDate.getTime()) / (1000 * 60 * 60 * 24);
 
     if (daysLater > levelEscalationDays) {
-      console.log(
-        `      ⬆️ ${chosen.userName} (${chosen.level}) libre ${daysLater.toFixed(1)}d más tarde que ${current.userName} (${lvl}) → escala a ${lvl}`
-      );
       chosen = current;
-    } else {
-      console.log(
-        `      ⏹️ ${chosen.userName} (${chosen.level}) NO supera el umbral (${daysLater.toFixed(1)}d <= ${levelEscalationDays}d) vs ${lvl}: se mantiene`
-      );
     }
   }
 
@@ -444,11 +386,8 @@ async function selectBestUserWithVacationLogic(
   reqLevel: Level
 ): Promise<VacationAwareUserSlot | null> {
   if (userSlots.length === 0) {
-    console.log(`❌ No users available - all users excluded due to vacation conflicts`);
     return null;
   }
-
-  console.log(`\n🏆 === SELECTING BEST USER (escalado por cargo + nivel, pedido: ${reqLevel}) ===`);
 
   const settings = await getAppSettings();
   const forceGeneralistThreshold = settings.thresholds.DEADLINE_DIFFERENCE_TO_FORCE_GENERALIST;
@@ -460,10 +399,8 @@ async function selectBestUserWithVacationLogic(
   for (const affinity of ROLE_AFFINITY_ASCENDING) {
     const slotsOfAffinity = userSlots.filter((s) => (s.roleAffinity ?? 3) === affinity);
     if (slotsOfAffinity.length === 0) {
-      console.log(`   • Cargo ${AFFINITY_LABEL[affinity]} (${affinity}): sin candidatos`);
       continue;
     }
-    console.log(`   • Cargo ${AFFINITY_LABEL[affinity]} (${affinity}): ${slotsOfAffinity.length} candidato(s)`);
     const best = pickBestByLevelEscalation(
       slotsOfAffinity,
       reqLevel,
@@ -472,11 +409,6 @@ async function selectBestUserWithVacationLogic(
     );
     if (best) {
       bestByAffinity[affinity] = best;
-      console.log(
-        `     ↳ mejor de cargo ${AFFINITY_LABEL[affinity]}: ${best.userName} (nivel ${best.level}, libre ${best.availableDate.toISOString().split('T')[0]})`
-      );
-    } else {
-      console.log(`     ↳ cargo ${AFFINITY_LABEL[affinity]}: nadie cumple nivel >= ${reqLevel}`);
     }
   }
 
@@ -497,23 +429,8 @@ async function selectBestUserWithVacationLogic(
       (chosen.availableDate.getTime() - current.availableDate.getTime()) / (1000 * 60 * 60 * 24);
 
     if (daysLater > forceGeneralistThreshold) {
-      console.log(
-        `   ⬆️ Cargo: ${chosen.userName} (${AFFINITY_LABEL[chosen.roleAffinity ?? 3]}) libre ${daysLater.toFixed(1)}d más tarde que ${current.userName} (${AFFINITY_LABEL[affinity]}) → escala a ${AFFINITY_LABEL[affinity]}`
-      );
       chosen = current;
-    } else {
-      console.log(
-        `   ⏹️ Cargo: ${chosen.userName} (${AFFINITY_LABEL[chosen.roleAffinity ?? 3]}) NO supera el umbral (${daysLater.toFixed(1)}d <= ${forceGeneralistThreshold}d) vs ${AFFINITY_LABEL[affinity]}: se mantiene`
-      );
     }
-  }
-
-  if (chosen) {
-    console.log(
-      `🏆 Seleccionado: ${chosen.userName} (cargo ${AFFINITY_LABEL[chosen.roleAffinity ?? 3]}, nivel ${chosen.level}, disponible ${chosen.availableDate.toISOString().split('T')[0]})`
-    );
-  } else {
-    console.log(`❌ No hay candidatos de nivel >= ${reqLevel} disponibles`);
   }
 
   return chosen;
@@ -526,24 +443,17 @@ export async function getBestUserWithCache(
   durationDays?: number,
   reqLevel: Level = Level.MID
 ): Promise<UserSlot | null> {
-
-  console.log(`\n🎯 === GET BEST USER WITH VACATION CACHE ===`);
-  console.log(`📋 Params: typeId=${typeId}, brandId=${brandId}, priority=${priority}, duration=${durationDays}, level=${reqLevel}`);
-
   const cacheKey = `${CACHE_KEYS.BEST_USER_SELECTION_PREFIX}${typeId}-${brandId}-${priority}-vacation-${durationDays || 'no-duration'}-lvl-${reqLevel}`;
   let bestSlot = getFromCache<UserSlot | null>(cacheKey);
 
   if (bestSlot !== undefined) {
-    console.log(`💾 Using cached result for user: ${bestSlot?.userName || 'null'}`);
     return bestSlot;
   }
 
-  console.log(`🏖️ Calculating vacation-aware user slots...`);
   const vacationAwareSlots = await getVacationAwareUserSlots(typeId, brandId, durationDays || 0);
   const bestVacationSlot = await selectBestUserWithVacationLogic(vacationAwareSlots, reqLevel);
 
   if (!bestVacationSlot) {
-    console.log(`❌ No eligible users found after vacation filtering`);
     setInCache(cacheKey, null);
     return null;
   }
@@ -559,10 +469,6 @@ export async function getBestUserWithCache(
     totalAssignedDurationDays: bestVacationSlot.totalAssignedDurationDays,
     level: bestVacationSlot.level,
   };
-
-  console.log(`✅ Selected vacation-aware user: ${compatibleSlot.userName}`);
-  console.log(`   📅 Available from: ${compatibleSlot.availableDate.toISOString().split('T')[0]}`);
-  console.log(`   🎯 Is specialist: ${compatibleSlot.isSpecialist}`);
 
   setInCache(cacheKey, compatibleSlot);
   return compatibleSlot;

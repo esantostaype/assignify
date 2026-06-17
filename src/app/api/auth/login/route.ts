@@ -18,10 +18,7 @@ const VALID_CREDENTIALS = {
 
 export async function POST(request: NextRequest) {
   try {
-    console.log('Login attempt received');
-    
     const { email, password } = await request.json();
-    console.log('Login attempt for email:', email);
 
     // Validación de entrada
     if (!email || !password) {
@@ -33,10 +30,8 @@ export async function POST(request: NextRequest) {
 
     // Validar credenciales
     if (email === VALID_CREDENTIALS.email && password === VALID_CREDENTIALS.password) {
-      console.log('Credentials valid, creating JWT token');
-      
       // Crear JWT token usando jose
-      const token = await new SignJWT({ 
+      const token = await new SignJWT({
         email: email, 
         authenticated: true,
         loginTime: new Date().toISOString()
@@ -45,8 +40,6 @@ export async function POST(request: NextRequest) {
         .setExpirationTime('7d')
         .setIssuedAt()
         .sign(JWT_SECRET);
-
-      console.log('JWT token created, setting up response');
 
       // Crear respuesta
       const response = NextResponse.json({
@@ -66,11 +59,8 @@ export async function POST(request: NextRequest) {
         path: '/',
       });
 
-      console.log('Cookie configured, sending response');
       return response;
     } else {
-      console.log('Invalid credentials provided');
-      
       // Pequeño delay para prevenir ataques de fuerza bruta
       await new Promise(resolve => setTimeout(resolve, 1000));
       
@@ -90,8 +80,6 @@ export async function POST(request: NextRequest) {
 
 // Logout endpoint
 export async function DELETE() {
-  console.log('Logout request received');
-  
   const response = NextResponse.json({
     success: true,
     message: 'Logout successful',
@@ -101,6 +89,5 @@ export async function DELETE() {
   // Limpiar cookie
   response.cookies.delete('auth-token');
 
-  console.log('Cookie cleared, user logged out');
   return response;
 }

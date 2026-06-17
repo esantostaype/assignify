@@ -38,10 +38,10 @@ export const UserRoleRow: React.FC<UserRoleRowProps> = ({
         ) : (
           <div className="flex items-center gap-2">
             <Tooltip
-              content={role.isPrimary ? "Quitar como cargo primario" : "Marcar como cargo primario"}
+              content={role.isPrimary ? "Unset as primary role" : "Set as primary role"}
             >
               <IconButton
-                aria-label={role.isPrimary ? "Quitar como cargo primario" : "Marcar como cargo primario"}
+                aria-label={role.isPrimary ? "Unset as primary role" : "Set as primary role"}
                 size="sm"
                 color={role.isPrimary ? "warning" : "neutral"}
                 variant="ghost"
@@ -53,7 +53,7 @@ export const UserRoleRow: React.FC<UserRoleRowProps> = ({
             </Tooltip>
             {role.isPrimary && (
               <Chip color="warning" variant="soft" size="sm" startIcon={<Icon icon={PiStarFill} size={11} />}>
-                Primario
+                Primary
               </Chip>
             )}
           </div>

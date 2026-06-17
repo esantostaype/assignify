@@ -12,8 +12,6 @@ export const dynamic = 'force-dynamic';
  */
 export async function GET() {
   try {
-    console.log('🎯 Fetching all tiers...');
-
     const tiers = await db.query.tierList.findMany({
       orderBy: [asc(tierList.name)] // Esto ordenará S, A, B, C, D, E
     });
@@ -31,14 +29,12 @@ export async function GET() {
       return tierOrder.indexOf(a.name) - tierOrder.indexOf(b.name);
     });
 
-    console.log(`✅ Found ${sortedTiers.length} tiers`);
-    
     return NextResponse.json(sortedTiers);
   } catch (error) {
-    console.error('❌ Error fetching tiers:', error);
+    console.error('Error fetching tiers:', error);
     return NextResponse.json({
-      error: 'Error interno del servidor al obtener tiers',
-      details: error instanceof Error ? error.message : 'Error desconocido'
+      error: 'Internal server error while fetching tiers',
+      details: error instanceof Error ? error.message : 'Unknown error'
     }, { status: 500 });
   }
 }

@@ -83,39 +83,25 @@ export const useTaskData = () => {
 
   // Funciones de refresh
   const refreshData = () => {
-    console.log('🔄 Refrescando todos los datos...')
     queryClient.invalidateQueries({ queryKey: taskDataKeys.all })
   }
 
   const refreshTypes = () => {
-    console.log('🔄 Refrescando tipos y categorías...')
     queryClient.invalidateQueries({ queryKey: taskDataKeys.types() })
   }
 
   const refreshTiers = () => {
-    console.log('🔄 Refrescando tiers...')
     queryClient.invalidateQueries({ queryKey: taskDataKeys.tiers() })
     // También invalidar types porque las categorías dependen de los tiers
     queryClient.invalidateQueries({ queryKey: taskDataKeys.types() })
   }
 
   const refreshBrands = () => {
-    console.log('🔄 Refrescando brands...')
     queryClient.invalidateQueries({ queryKey: taskDataKeys.brands() })
   }
 
   const refreshUsers = () => {
-    console.log('🔄 Refrescando users...')
     queryClient.invalidateQueries({ queryKey: taskDataKeys.users() })
-  }
-
-  // Log cuando se obtienen datos
-  if (types.length > 0 || brands.length > 0 || users.length > 0 || tiers.length > 0) {
-    console.log('📊 Datos obtenidos del servidor:')
-    console.log(`   - Types: ${types.length}`)
-    console.log(`   - Brands: ${brands.length}`)
-    console.log(`   - Users: ${users.length}`)
-    console.log(`   - Tiers: ${tiers.length}`)
   }
 
   return {
@@ -139,24 +125,19 @@ export const useTaskDataInvalidation = () => {
 
   return {
     invalidateAll: () => {
-      console.log('🗑️ Invalidating all task data cache...')
       queryClient.invalidateQueries({ queryKey: taskDataKeys.all })
     },
     invalidateTypes: () => {
-      console.log('🗑️ Invalidating types cache...')
       queryClient.invalidateQueries({ queryKey: taskDataKeys.types() })
     },
     invalidateTiers: () => {
-      console.log('🗑️ Invalidating tiers cache...')
       queryClient.invalidateQueries({ queryKey: taskDataKeys.tiers() })
       queryClient.invalidateQueries({ queryKey: taskDataKeys.types() })
     },
     invalidateBrands: () => {
-      console.log('🗑️ Invalidating brands cache...')
       queryClient.invalidateQueries({ queryKey: taskDataKeys.brands() })
     },
     invalidateUsers: () => {
-      console.log('🗑️ Invalidating users cache...')
       queryClient.invalidateQueries({ queryKey: taskDataKeys.users() })
     },
   }

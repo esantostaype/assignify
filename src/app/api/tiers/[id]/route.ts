@@ -47,15 +47,13 @@ export async function PATCH(req: Request, { params }: RouteParams) {
       .where(eq(tierList.id, parseInt(id)))
       .returning();
 
-    console.log(`✅ Updated tier ${updatedTier.name}: duration ${existingTier.duration} → ${duration}`);
-
     return NextResponse.json({
       ...updatedTier,
       previousDuration: existingTier.duration
     });
 
   } catch (error) {
-    console.error('❌ Error updating tier:', error);
+    console.error('Error updating tier:', error);
     return NextResponse.json({
       error: 'Error updating tier',
       details: error instanceof Error ? error.message : 'Unknown error'

@@ -115,8 +115,7 @@ export const TierListForm: React.FC = () => {
         setTiers(response.data);
         setTierChanges({});
 
-        // Invalidar cache de task data para que otros componentes se actualicen
-        console.log("🔄 Invalidating task data cache after tier changes...");
+        // Invalidate task data cache so other components refresh
         invalidateTiers();
 
         toast.success("Tier durations updated successfully");
@@ -130,7 +129,7 @@ export const TierListForm: React.FC = () => {
   };
 
   return (
-    <div className="p-8">
+    <>
       {!loadingTiers && hasChanges && (
         <Alert tone="warning" variant="soft" icon={null} className="mb-4">
           <div className="flex items-center gap-2">
@@ -225,6 +224,6 @@ export const TierListForm: React.FC = () => {
             : "No Changes"}
         </Button>
       </div>
-    </div>
+    </>
   );
 };

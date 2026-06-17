@@ -1,7 +1,8 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-// src/hooks/queries/useUsers.ts - FIXED VERSION
+// src/hooks/queries/useUsers.ts
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import axios from 'axios'
+import { workloadKeys } from './useWorkload'
 
 // Types
 interface ClickUpUser {
@@ -157,26 +158,26 @@ export const useAddUserRole = (options?: {
       return data
     },
     onSuccess: (_, variables) => {
-      // ✅ FIX: Invalidate user details to refetch roles
+      // Refresca el modal (detalle) y la tarjeta/lista (workload + clickup users),
+      // que muestran roles/nivel/estado del diseñador.
       queryClient.invalidateQueries({ queryKey: userKeys.details(variables.userId) })
-      
-      // ✅ NEW: Comprehensive cache invalidation for task assignment
+      queryClient.invalidateQueries({ queryKey: workloadKeys.all })
+      queryClient.invalidateQueries({ queryKey: userKeys.clickup() })
+
+      // Invalidación de los caches del motor de asignación.
       queryClient.invalidateQueries({ queryKey: ['task-suggestion'] })
       queryClient.invalidateQueries({ queryKey: ['compatible-users'] })
       queryClient.invalidateQueries({ queryKey: ['user-slots'] })
       queryClient.invalidateQueries({ queryKey: ['best-user-selection'] })
-      
-      // ✅ NEW: Also invalidate task data queries (for user compatibility)
       queryClient.invalidateQueries({ queryKey: ['task-data'] })
-      
-      console.log('🔄 Cache invalidated after role addition - task suggestions will be recalculated')
+
       options?.onSuccess?.()
     },
     onError: options?.onError,
   })
 }
 
-// ✅ FIXED: Proper deletion with userId context
+// Eliminación de rol con el userId en contexto para poder invalidar su detalle.
 export const useDeleteUserRole = (userId: string, options?: {
   onSuccess?: () => void
   onError?: () => void
@@ -189,17 +190,18 @@ export const useDeleteUserRole = (userId: string, options?: {
       return { roleId, userId }
     },
     onSuccess: (data) => {
-      // ✅ FIX: Now we always have userId to invalidate
+      // Refresca el modal (detalle) y la tarjeta/lista (workload + clickup users).
       queryClient.invalidateQueries({ queryKey: userKeys.details(data.userId) })
-      
-      // ✅ NEW: Comprehensive cache invalidation for task assignment
+      queryClient.invalidateQueries({ queryKey: workloadKeys.all })
+      queryClient.invalidateQueries({ queryKey: userKeys.clickup() })
+
+      // Invalidación de los caches del motor de asignación.
       queryClient.invalidateQueries({ queryKey: ['task-suggestion'] })
       queryClient.invalidateQueries({ queryKey: ['compatible-users'] })
       queryClient.invalidateQueries({ queryKey: ['user-slots'] })
       queryClient.invalidateQueries({ queryKey: ['best-user-selection'] })
       queryClient.invalidateQueries({ queryKey: ['task-data'] })
-      
-      console.log('🔄 Cache invalidated after role deletion - task suggestions will be recalculated')
+
       options?.onSuccess?.()
     },
     onError: options?.onError,
@@ -222,14 +224,18 @@ export const useToggleUserRolePrimary = (userId: string, options?: {
       return data
     },
     onSuccess: () => {
+      // El cargo primario define el título del puesto que muestra la tarjeta:
+      // refrescar detalle + workload + lista de usuarios.
       queryClient.invalidateQueries({ queryKey: userKeys.details(userId) })
+      queryClient.invalidateQueries({ queryKey: workloadKeys.all })
+      queryClient.invalidateQueries({ queryKey: userKeys.clickup() })
+
       queryClient.invalidateQueries({ queryKey: ['task-suggestion'] })
       queryClient.invalidateQueries({ queryKey: ['compatible-users'] })
       queryClient.invalidateQueries({ queryKey: ['user-slots'] })
       queryClient.invalidateQueries({ queryKey: ['best-user-selection'] })
       queryClient.invalidateQueries({ queryKey: ['task-data'] })
 
-      console.log('🔄 Cache invalidated after role primary toggle - task suggestions will be recalculated')
       options?.onSuccess?.()
     },
     onError: options?.onError,
@@ -248,23 +254,23 @@ export const useAddUserVacation = (options?: {
       return data
     },
     onSuccess: (_, variables) => {
-      // ✅ FIX: Invalidate user details to refetch vacations
+      // Refresca el modal (detalle) y la tarjeta (workload: estado "On vacation").
       queryClient.invalidateQueries({ queryKey: userKeys.details(variables.userId) })
-      
-      // ✅ NEW: Vacation-specific cache invalidation (affects task assignment logic)
+      queryClient.invalidateQueries({ queryKey: workloadKeys.all })
+
+      // Las vacaciones afectan la lógica de disponibilidad del motor.
       queryClient.invalidateQueries({ queryKey: ['task-suggestion'] })
       queryClient.invalidateQueries({ queryKey: ['user-slots'] })
       queryClient.invalidateQueries({ queryKey: ['best-user-selection'] })
       queryClient.invalidateQueries({ queryKey: ['vacation-aware'] })
-      
-      console.log('🏖️ Cache invalidated after vacation addition - vacation-aware logic will recalculate')
+
       options?.onSuccess?.()
     },
     onError: options?.onError,
   })
 }
 
-// ✅ FIXED: Proper deletion with userId context
+// Eliminación de vacación con el userId en contexto para invalidar su detalle.
 export const useDeleteUserVacation = (userId: string, options?: {
   onSuccess?: () => void
   onError?: () => void
@@ -277,16 +283,16 @@ export const useDeleteUserVacation = (userId: string, options?: {
       return { vacationId, userId }
     },
     onSuccess: (data) => {
-      // ✅ FIX: Now we always have userId to invalidate
+      // Refresca el modal (detalle) y la tarjeta (workload: estado "On vacation").
       queryClient.invalidateQueries({ queryKey: userKeys.details(data.userId) })
-      
-      // ✅ NEW: Vacation-specific cache invalidation
+      queryClient.invalidateQueries({ queryKey: workloadKeys.all })
+
+      // Las vacaciones afectan la lógica de disponibilidad del motor.
       queryClient.invalidateQueries({ queryKey: ['task-suggestion'] })
       queryClient.invalidateQueries({ queryKey: ['user-slots'] })
       queryClient.invalidateQueries({ queryKey: ['best-user-selection'] })
       queryClient.invalidateQueries({ queryKey: ['vacation-aware'] })
-      
-      console.log('🏖️ Cache invalidated after vacation deletion - vacation-aware logic will recalculate')
+
       options?.onSuccess?.()
     },
     onError: options?.onError,
@@ -306,14 +312,17 @@ export const useUpdateUserLevel = (userId: string, options?: {
       return data
     },
     onSuccess: () => {
-      // Refrescar los detalles del usuario y los caches del motor de asignación.
+      // El nivel se muestra en la tarjeta (p.ej. "Senior UX/UI Designer"):
+      // refrescar detalle + workload + lista de usuarios, y los caches del motor.
       queryClient.invalidateQueries({ queryKey: userKeys.details(userId) })
+      queryClient.invalidateQueries({ queryKey: workloadKeys.all })
+      queryClient.invalidateQueries({ queryKey: userKeys.clickup() })
+
       queryClient.invalidateQueries({ queryKey: ['task-suggestion'] })
       queryClient.invalidateQueries({ queryKey: ['user-slots'] })
       queryClient.invalidateQueries({ queryKey: ['best-user-selection'] })
       queryClient.invalidateQueries({ queryKey: ['task-data'] })
 
-      console.log('🔄 Cache invalidated after level update - task suggestions will be recalculated')
       options?.onSuccess?.()
     },
     onError: options?.onError,

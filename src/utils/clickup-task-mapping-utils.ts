@@ -21,8 +21,6 @@ export const clickupPriorityMap: Record<Priority, number> = {
  * ✅ ACTUALIZADO: Mapea estados de ClickUp a estados locales INCLUYENDO COMPLETE
  */
 export function mapClickUpStatusToLocal(clickupStatus: string): Status {
-  console.log(`🔄 Mapeando estado de ClickUp: "${clickupStatus}"`);
-  
   // Normalizar el estado (minúsculas y trim)
   const normalizedStatus = clickupStatus.toLowerCase().trim();
   
@@ -101,40 +99,26 @@ export function mapClickUpStatusToLocal(clickupStatus: string): Status {
   };
   
   const mappedStatus = statusMap[normalizedStatus];
-  
+
   if (mappedStatus) {
-    console.log(`✅ Estado mapeado: "${clickupStatus}" → ${mappedStatus}`);
-    
-    // ✅ NUEVO: Log especial para estados COMPLETE
-    if (mappedStatus === Status.COMPLETE) {
-      console.log(`🎯 Tarea marcada como COMPLETADA desde ClickUp: "${clickupStatus}"`);
-    }
-    
     return mappedStatus;
-  } else {
-    console.warn(`⚠️ Estado no reconocido: "${clickupStatus}", usando TO_DO por defecto`);
-    console.warn(`💡 Considera agregar "${normalizedStatus}" al mapeo de estados`);
-    return Status.TO_DO; // Default fallback
   }
+
+  return Status.TO_DO; // Default fallback
 }
 
 /**
  * ✅ ACTUALIZADO: Mapea estados locales a nombres de ClickUp
  */
 export const getClickUpStatusName = (localStatus: Status): string => {
-  console.log(`🔄 Convirtiendo estado local a ClickUp: ${localStatus}`);
-  
   const statusMap: Record<Status, string> = {
     [Status.TO_DO]: 'to do',
-    [Status.IN_PROGRESS]: 'in progress', 
+    [Status.IN_PROGRESS]: 'in progress',
     [Status.ON_APPROVAL]: 'review',
     [Status.COMPLETE]: 'complete' // ✅ ACTUALIZADO: Mapear COMPLETE a 'complete'
   };
-  
-  const clickupStatus = statusMap[localStatus] || 'to do';
-  console.log(`✅ Estado convertido: ${localStatus} → "${clickupStatus}"`);
-  
-  return clickupStatus;
+
+  return statusMap[localStatus] || 'to do';
 };
 
 /**
@@ -177,55 +161,6 @@ export function getStatusIcon(status: Status): string {
   };
   
   return iconMap[status] || '📋';
-}
-
-/**
- * ✅ MEJORADO: Debug de mapeo de estados para troubleshooting
- */
-export function debugStatusMapping(clickupStatuses: string[]): void {
-  console.log('\n🔍 === DEBUG DE MAPEO DE ESTADOS (INCLUYENDO DONE) ===');
-  console.log('Estados únicos encontrados en ClickUp:');
-  
-  const uniqueStatuses = [...new Set(clickupStatuses)];
-  const mappingResults = uniqueStatuses.map(status => ({
-    original: status,
-    mapped: mapClickUpStatusToLocal(status),
-    isCompleted: isCompletedStatus(status)
-  }));
-  
-  // Agrupar por estado mapeado
-  const groupedResults = mappingResults.reduce((acc, result) => {
-    if (!acc[result.mapped]) acc[result.mapped] = [];
-    acc[result.mapped].push(result);
-    return acc;
-  }, {} as Record<Status, typeof mappingResults>);
-  
-  // Mostrar agrupados
-  Object.entries(groupedResults).forEach(([mappedStatus, results]) => {
-    console.log(`\n📊 ${mappedStatus}:`);
-    results.forEach(result => {
-      const completedFlag = result.isCompleted ? ' ✅' : '';
-      console.log(`  "${result.original}" → ${result.mapped}${completedFlag}`);
-    });
-  });
-  
-  console.log('\n📋 Mapeos disponibles:');
-  Object.values(Status).forEach(localStatus => {
-    const clickupName = getClickUpStatusName(localStatus);
-    const color = getStatusColor(localStatus);
-    const icon = getStatusIcon(localStatus);
-    console.log(`  ${icon} ${localStatus} → "${clickupName}" (${color})`);
-  });
-  
-  // ✅ NUEVO: Estadísticas de mapeo
-  console.log('\n📈 Estadísticas de mapeo:');
-  console.log(`  Total estados únicos: ${uniqueStatuses.length}`);
-  console.log(`  TO_DO: ${groupedResults[Status.TO_DO]?.length || 0}`);
-  console.log(`  IN_PROGRESS: ${groupedResults[Status.IN_PROGRESS]?.length || 0}`);
-  console.log(`  ON_APPROVAL: ${groupedResults[Status.ON_APPROVAL]?.length || 0}`);
-  console.log(`  COMPLETE: ${groupedResults[Status.COMPLETE]?.length || 0}`);
-  
-  console.log('===========================================\n');
 }
 
 /**
@@ -288,7 +223,6 @@ export async function inferTaskTypeAndTier(taskName: string, clickupTags: string
   let taskType = await db.query.taskType.findFirst({ where: eq(taskTypeTable.name, inferredTypeName) });
   if (!taskType) {
     [taskType] = await db.insert(taskTypeTable).values({ name: inferredTypeName }).returning();
-    console.log(`  -> Creado nuevo TaskType: ${taskType.name}`);
   }
 
   // ✅ Resolver el tier inferido. Si no existe, usar el tier por defecto 'D'.
@@ -297,7 +231,6 @@ export async function inferTaskTypeAndTier(taskName: string, clickupTags: string
   });
 
   if (!tierRecord) {
-    console.warn(`⚠️ Tier ${inferredTier} no encontrado, usando tier por defecto 'D'`);
     tierRecord = await db.query.tierList.findFirst({ where: eq(tierList.name, Tier.D) });
   }
 
