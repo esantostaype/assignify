@@ -12,10 +12,8 @@ interface TaskForInsertion {
   deadline: Date;
   priority: Priority;
   customDuration?: number | null;
-  category: {
-    tierList: {
-      duration: number;
-    };
+  tier: {
+    duration: number;
   };
 }
 
@@ -209,11 +207,7 @@ export async function calculatePriorityInsertion(
     },
     orderBy: { startDate: 'asc' },
     include: {
-      category: {
-        include: {
-          tierList: true
-        }
-      }
+      tier: true
     }
   }) as unknown as TaskForInsertion[];
   
@@ -259,7 +253,7 @@ export async function shiftTasksAfterInsertion(
   let currentDate = newTaskDeadline;
   
   for (const task of affectedTasks) {
-    const taskDuration = task.customDuration ?? task.category.tierList.duration;
+    const taskDuration = task.customDuration ?? task.tier.duration;
     const taskHours = taskDuration * 8;
     
     const newStartDate = await getNextAvailableStart(currentDate);

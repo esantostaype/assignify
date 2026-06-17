@@ -406,14 +406,14 @@ export async function POST(req: Request) {
   }
 
   try {
-    const { 
-      taskIds, 
-      categoryId, 
-      brandId 
-    }: { 
-      taskIds: string[]; 
-      categoryId?: number; 
-      brandId: string; 
+    const {
+      taskIds,
+      tierId,
+      brandId
+    }: {
+      taskIds: string[];
+      tierId?: number;
+      brandId: string;
     } = await req.json();
 
     if (!taskIds || !Array.isArray(taskIds) || taskIds.length === 0) {
@@ -430,7 +430,7 @@ export async function POST(req: Request) {
 
     console.log(`🔄 === SINCRONIZANDO ${taskIds.length} TAREAS ACTIVAS ===`);
     console.log(`📋 Brand ID: ${brandId}`);
-    console.log(`📋 Category ID: ${categoryId || 'default'}`);
+    console.log(`📋 Tier ID: ${tierId || 'default'}`);
 
     const brand = await prisma.brand.findUnique({
       where: { id: brandId }
@@ -442,61 +442,37 @@ export async function POST(req: Request) {
       }, { status: 404 });
     }
 
-    // Determinar category/type por defecto
-    let finalCategoryId = categoryId;
-    let finalTypeId = 1;
+    // Determinar tier/type por defecto
+    const defaultTier = await prisma.tierList.findFirst({
+      where: { name: 'D' }
+    });
 
-    if (!categoryId) {
-      let defaultCategory = await prisma.taskCategory.findFirst({
-        where: { 
-          name: 'Miscellaneous',
-          type: { name: 'General Design' }
-        },
-        include: { type: true }
-      });
+    const finalTierId = tierId ?? defaultTier?.id;
 
-      if (!defaultCategory) {
-        let defaultType = await prisma.taskType.findFirst({
-          where: { name: 'General Design' }
-        });
-
-        if (!defaultType) {
-          defaultType = await prisma.taskType.create({
-            data: { name: 'General Design' }
-          });
-        }
-
-        const defaultTier = await prisma.tierList.findFirst({
-          where: { name: 'D' }
-        });
-
-        if (defaultTier) {
-          defaultCategory = await prisma.taskCategory.create({
-            data: {
-              name: 'Miscellaneous',
-              typeId: defaultType.id,
-              tierId: defaultTier.id
-            },
-            include: { type: true }
-          });
-        }
-      }
-
-      if (defaultCategory) {
-        finalCategoryId = defaultCategory.id;
-        finalTypeId = defaultCategory.type.id;
-        console.log(`✅ Usando categoría por defecto: ${defaultCategory.name} (Type: ${defaultCategory.type.name})`);
-      }
-    } else {
-      const category = await prisma.taskCategory.findUnique({
-        where: { id: categoryId },
-        include: { type: true }
-      });
-      if (category) {
-        finalTypeId = category.type.id;
-        console.log(`✅ Usando categoría especificada: ${category.name} (Type: ${category.type.name})`);
-      }
+    if (!finalTierId) {
+      return NextResponse.json({
+        error: 'No se pudo determinar un tier para las tareas (tier por defecto "D" no existe)'
+      }, { status: 400 });
     }
+
+    // Type por defecto: "General Design" o el primero disponible
+    let defaultType = await prisma.taskType.findFirst({
+      where: { name: 'General Design' }
+    });
+
+    if (!defaultType) {
+      defaultType = await prisma.taskType.findFirst();
+    }
+
+    if (!defaultType) {
+      return NextResponse.json({
+        error: 'No se pudo determinar un type para las tareas (no hay TaskType disponibles)'
+      }, { status: 400 });
+    }
+
+    const finalTypeId = defaultType.id;
+
+    console.log(`✅ Usando tier por defecto ID: ${finalTierId} | Type: ${defaultType.name} (ID: ${finalTypeId})`);
 
     // Obtener información de tareas desde ClickUp
     const tasksData: any[] = [];
@@ -645,16 +621,12 @@ export async function POST(req: Request) {
             url: clickupTask.url,
             // ✅ NO incluir queuePosition
             typeId: finalTypeId,
-            categoryId: finalCategoryId || 1,
+            tierId: finalTierId,
             brandId: brandId,
           },
           include: {
-            category: {
-              include: {
-                type: true,
-                tierList: true
-              }
-            },
+            tier: true,
+            type: true,
             brand: true
           }
         });

@@ -149,12 +149,8 @@ export async function shiftUserTasks(userId: string, newTaskId: string, newDeadl
       }
     },
     orderBy: { startDate: 'asc' }, // ✅ ORDENAR POR FECHA, NO POR queuePosition
-    include: { 
-      category: {
-        include: {
-          tierList: true
-        }
-      }
+    include: {
+      tier: true
     }
   });
 
@@ -174,7 +170,7 @@ export async function shiftUserTasks(userId: string, newTaskId: string, newDeadl
 
     console.log(`  -> Reorganizando tarea "${task.name}" (ID: ${task.id})`);
 
-    const effectiveDurationDays = (task as any).customDuration ?? task.category.tierList.duration;
+    const effectiveDurationDays = (task as any).customDuration ?? task.tier.duration;
     const taskHours = effectiveDurationDays * 8;
     const newStartDate = await getNextAvailableStart(lastDeadline);
     const newDeadlineForTask = await calculateWorkingDeadline(newStartDate, taskHours);
@@ -191,12 +187,7 @@ export async function shiftUserTasks(userId: string, newTaskId: string, newDeadl
         // ✅ NO actualizar queuePosition
       },
       include: {
-        category: {
-          include: {
-            type: true,
-            tierList: true
-          }
-        },
+        tier: true,
         type: true,
         brand: true,
         assignees: { include: { user: true } }
@@ -224,11 +215,7 @@ export async function getTaskHours(taskId: string): Promise<number> {
   const task = await prisma.task.findUnique({
     where: { id: taskId },
     include: {
-      category: {
-        include: {
-          tierList: true
-        }
-      },
+      tier: true,
       type: true,
       assignees: {
         include: {
@@ -241,7 +228,7 @@ export async function getTaskHours(taskId: string): Promise<number> {
   if (!task) throw new Error('Tarea no encontrada');
   if (!task.assignees.length) throw new Error('Tarea sin asignaciones');
 
-  return task.customDuration !== null 
-    ? task.customDuration * 8 
-    : task.category.tierList.duration * 8;
+  return task.customDuration !== null
+    ? task.customDuration * 8
+    : task.tier.duration * 8;
 }

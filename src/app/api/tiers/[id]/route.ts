@@ -38,23 +38,14 @@ export async function PATCH(req: Request, { params }: RouteParams) {
     // Actualizar la duración
     const updatedTier = await prisma.tierList.update({
       where: { id: parseInt(id) },
-      data: { duration },
-      include: {
-        categories: {
-          select: {
-            id: true,
-            name: true
-          }
-        }
-      }
+      data: { duration }
     });
 
     console.log(`✅ Updated tier ${updatedTier.name}: duration ${existingTier.duration} → ${duration}`);
 
     return NextResponse.json({
       ...updatedTier,
-      previousDuration: existingTier.duration,
-      categoryCount: updatedTier.categories.length
+      previousDuration: existingTier.duration
     });
 
   } catch (error) {

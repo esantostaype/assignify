@@ -12,13 +12,6 @@ export async function GET() {
     const tiers = await prisma.tierList.findMany({
       orderBy: {
         name: 'asc' // Esto ordenará S, A, B, C, D, E
-      },
-      include: {
-        categories: {
-          include: {
-            type: true
-          }
-        }
       }
     });
 
@@ -26,13 +19,7 @@ export async function GET() {
     const tiersWithInfo = tiers.map(tier => ({
       id: tier.id,
       name: tier.name,
-      duration: tier.duration,
-      categoryCount: tier.categories.length,
-      categories: tier.categories.map(cat => ({
-        id: cat.id,
-        name: cat.name,
-        typeName: cat.type.name
-      }))
+      duration: tier.duration
     }));
 
     // Ordenar manualmente para asegurar el orden correcto S > A > B > C > D > E

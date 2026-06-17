@@ -139,18 +139,14 @@ export async function getCompatibleUsersWithRealLoad(
       },
       orderBy: { deadline: 'asc' },
       include: {
-        category: {
-          include: {
-            tierList: true
-          }
-        },
+        tier: true,
         brand: true
       }
     });
 
     // Calcular carga total en días
     const totalDurationDays = userTasks.reduce((sum, task) => {
-      return sum + (task.customDuration ?? task.category.tierList.duration);
+      return sum + (task.customDuration ?? task.tier.duration);
     }, 0);
 
     // Determinar si es especialista

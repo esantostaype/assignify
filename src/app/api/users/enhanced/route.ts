@@ -148,11 +148,7 @@ export async function GET(req: Request) {
         },
         orderBy: { startDate: 'asc' },
         include: {
-          category: {
-            include: {
-              tierList: true
-            }
-          }
+          tier: true
         }
       });
 
@@ -182,7 +178,7 @@ export async function GET(req: Request) {
             return sum + remainingDays;
           }
           // Para tareas futuras, usar duración completa
-          const duration = task.customDuration !== null ? task.customDuration : task.category.tierList.duration;
+          const duration = task.customDuration ?? task.tier.duration;
           return sum + duration;
         }, 0),
         lastTaskDeadline: userTasks.length > 0 ? userTasks[userTasks.length - 1].deadline.toISOString().split('T')[0] : undefined

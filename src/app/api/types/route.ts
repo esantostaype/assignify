@@ -3,15 +3,7 @@ import { prisma } from '@/utils/prisma'
 
 export async function GET() {
   try {
-    const types = await prisma.taskType.findMany({
-      include: {
-        categories: {
-          include: {
-            tierList: true
-          }
-        }
-      }
-    })
+    const types = await prisma.taskType.findMany()
 
     return NextResponse.json(types)
   } catch (error) {
@@ -40,13 +32,6 @@ export async function POST(request: Request) {
     const newTaskType = await prisma.taskType.create({
       data: {
         name: name.trim()
-      },
-      include: {
-        categories: {
-          include: {
-            tierList: true
-          }
-        }
       }
     })
 
@@ -109,13 +94,6 @@ export async function PATCH(request: Request) {
       where: { id: Number(id) },
       data: {
         name: name.trim()
-      },
-      include: {
-        categories: {
-          include: {
-            tierList: true
-          }
-        }
       }
     })
 
@@ -152,24 +130,13 @@ export async function DELETE(request: Request) {
 
     // Verificar que el task type existe
     const existingTaskType = await prisma.taskType.findUnique({
-      where: { id: Number(id) },
-      include: {
-        categories: true
-      }
+      where: { id: Number(id) }
     })
 
     if (!existingTaskType) {
       return NextResponse.json(
         { error: 'Task type not found' },
         { status: 404 }
-      )
-    }
-
-    // Verificar si tiene categorías asociadas
-    if (existingTaskType.categories.length > 0) {
-      return NextResponse.json(
-        { error: 'Cannot delete task type with associated categories' },
-        { status: 400 }
       )
     }
 

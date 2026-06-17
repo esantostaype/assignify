@@ -14,7 +14,7 @@ interface TaskCreationParams {
   name: string;
   description?: string;
   typeId: number;
-  categoryId: number;
+  tierId: number;
   priority: Priority;
   brandId: string;
   assignedUserIds?: string[];
@@ -46,12 +46,7 @@ export async function GET(req: Request) {
         { deadline: 'asc' }
       ],
       include: {
-        category: {
-          include: {
-            type: true,
-            tierList: true
-          }
-        },
+        tier: true,
         type: true,
         brand: true,
         assignees: {
@@ -84,14 +79,13 @@ export async function GET(req: Request) {
         naturalPosition: index + 1,
         // ✅ NO incluir queuePosition
         url: task.url,
-        category: {
-          id: task.category.id,
-          name: task.category.name,
-          duration: task.category.tierList.duration,
-          tier: task.category.tierList.name,
+        tier: {
+          id: task.tier.id,
+          name: task.tier.name,
+          duration: task.tier.duration,
           type: {
-            id: task.category.type.id,
-            name: task.category.type.name
+            id: task.type.id,
+            name: task.type.name
           }
         },
         brand: {
@@ -132,7 +126,7 @@ export async function POST(req: Request) {
       name,
       description,
       typeId,
-      categoryId,
+      tierId,
       priority,
       brandId,
       assignedUserIds,
@@ -140,32 +134,28 @@ export async function POST(req: Request) {
     } = body
 
     // Validaciones básicas
-    if (!name || !typeId || !categoryId || !priority || !brandId || !durationDays) {
+    if (!name || !typeId || !tierId || !priority || !brandId || !durationDays) {
       return NextResponse.json({
         error: 'Faltan campos requeridos',
-        required: ['name', 'typeId', 'categoryId', 'priority', 'brandId', 'durationDays']
+        required: ['name', 'typeId', 'tierId', 'priority', 'brandId', 'durationDays']
       }, { status: 400 })
     }
 
     console.log(`🚀 API v2: Creando tarea "${name}" con prioridad ${priority}`)
 
-    // Verificar que existen category y brand
-    const [category, brand] = await Promise.all([
-      prisma.taskCategory.findUnique({
-        where: { id: categoryId },
-        include: { 
-          type: true,
-          tierList: true
-        }
+    // Verificar que existen tier y brand
+    const [tier, brand] = await Promise.all([
+      prisma.tierList.findUnique({
+        where: { id: tierId }
       }),
       prisma.brand.findUnique({
         where: { id: brandId }
       })
     ])
 
-    if (!category || !brand) {
+    if (!tier || !brand) {
       return NextResponse.json({
-        error: 'Categoría o Brand no encontrado'
+        error: 'Tier o Brand no encontrado'
       }, { status: 404 })
     }
 
@@ -239,7 +229,7 @@ export async function POST(req: Request) {
         name,
         description: description || '',
         typeId: typeId,
-        categoryId: categoryId,
+        tierId: tierId,
         brandId: brandId,
         priority,
         startDate: finalInsertion.startDate,
@@ -248,15 +238,10 @@ export async function POST(req: Request) {
         url: `https://test-v2.com/task/${taskId}`,
         lastSyncAt: new Date(),
         syncStatus: 'SYNCED',
-        customDuration: durationDays !== category.tierList.duration ? durationDays : null
+        customDuration: durationDays !== tier.duration ? durationDays : null
       },
       include: {
-        category: {
-          include: {
-            type: true,
-            tierList: true
-          }
-        },
+        tier: true,
         type: true,
         brand: true
       }
@@ -283,12 +268,7 @@ export async function POST(req: Request) {
     const taskWithAssignees = await prisma.task.findUnique({
       where: { id: task.id },
       include: {
-        category: {
-          include: {
-            type: true,
-            tierList: true
-          }
-        },
+        tier: true,
         type: true,
         brand: true,
         assignees: {
@@ -315,11 +295,10 @@ export async function POST(req: Request) {
         startDate: taskWithAssignees?.startDate.toISOString(),
         deadline: taskWithAssignees?.deadline.toISOString(),
         // ✅ NO incluir queuePosition
-        category: {
-          id: taskWithAssignees?.category.id,
-          name: taskWithAssignees?.category.name,
-          duration: taskWithAssignees?.category.tierList.duration,
-          tier: taskWithAssignees?.category.tierList.name
+        tier: {
+          id: taskWithAssignees?.tier.id,
+          name: taskWithAssignees?.tier.name,
+          duration: taskWithAssignees?.tier.duration
         },
         brand: {
           id: taskWithAssignees?.brand.id,

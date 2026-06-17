@@ -19,7 +19,7 @@ import { useEnhancedUsers } from "@/hooks";
 interface UserAssignmentSelectProps {
   users: User[]; // Fallback users
   values: string[];
-  info?: { categoryId: string; brandId: string }
+  info?: { tierId: string; brandId: string }
   onChange: (value: string[]) => void;
   suggestedUser?: User | null;
   fetchingSuggestion: boolean;
@@ -341,7 +341,7 @@ export const UserAssignmentSelect: React.FC<UserAssignmentSelectProps> = ({
         key={values.join(",")}
         onChange={(_, val) => onChange(val as string[])}
         placeholder={getPlaceholder()}
-        disabled={isLoading || !info?.categoryId || !info?.brandId}
+        disabled={isLoading || !info?.tierId || !info?.brandId}
         color={touched && error ? "danger" : "neutral"}
         renderValue={(selected) => {
           if (selected.length === 0) {

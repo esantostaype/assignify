@@ -56,12 +56,8 @@ export async function GET(req: Request, { params }: RouteParams) {
             user: true
           }
         },
-        category: {
-          include: {
-            type: true,
-            tierList: true
-          }
-        },
+        tier: true,
+        type: true,
         brand: true
       }
     });
@@ -134,12 +130,8 @@ export async function GET(req: Request, { params }: RouteParams) {
           name: assignment.user.name,
           email: assignment.user.email
         })),
-        category: localTask.category ? {
-          id: localTask.category.id,
-          name: localTask.category.name,
-          type: localTask.category.type.name,
-          tier: localTask.category.tierList.name
-        } : null,
+        type: localTask.type ? localTask.type.name : null,
+        tier: localTask.tier ? localTask.tier.name : null,
         brand: {
           id: localTask.brand.id,
           name: localTask.brand.name
@@ -200,7 +192,7 @@ export async function POST(req: Request, { params }: RouteParams) {
   }
 
   try {
-    const { categoryId, brandId }: { categoryId?: number; brandId: string } = await req.json();
+    const { tierId, brandId }: { tierId?: number; brandId: string } = await req.json();
 
     if (!brandId) {
       return NextResponse.json({
@@ -248,7 +240,32 @@ export async function POST(req: Request, { params }: RouteParams) {
     }
 
     // Generar ID único para la tarea
-    const newTaskId = clickupTask.id; 
+    const newTaskId = clickupTask.id;
+
+    // Resolver tier por defecto (D) y type por defecto (General Design)
+    const defaultTier = await prisma.tierList.findFirst({
+      where: { name: 'D' }
+    });
+    const finalTierId = tierId ?? defaultTier?.id;
+
+    if (!finalTierId) {
+      return NextResponse.json({
+        error: 'No se pudo determinar un tier para la tarea (tier por defecto "D" no existe)'
+      }, { status: 400 });
+    }
+
+    let defaultType = await prisma.taskType.findFirst({
+      where: { name: 'General Design' }
+    });
+    if (!defaultType) {
+      defaultType = await prisma.taskType.findFirst();
+    }
+
+    if (!defaultType) {
+      return NextResponse.json({
+        error: 'No se pudo determinar un type para la tarea (no hay TaskType disponibles)'
+      }, { status: 400 });
+    }
 
     // Crear tarea en la base de datos local
     const newTask = await prisma.task.create({
@@ -264,17 +281,13 @@ export async function POST(req: Request, { params }: RouteParams) {
         points: clickupTask.points,
         tags: clickupTask.tags?.map((t: any) => t.name).join(', ') || null,
         url: clickupTask.url,
-        typeId: categoryId ? (await prisma.taskCategory.findUnique({ where: { id: categoryId }, include: { type: true } }))?.typeId || 1 : 1,
-        categoryId: categoryId || 1,
+        typeId: defaultType.id,
+        tierId: finalTierId,
         brandId: brandId,
       },
       include: {
-        category: {
-          include: {
-            type: true,
-            tierList: true
-          }
-        },
+        tier: true,
+        type: true,
         brand: true,
         assignees: {
           include: {

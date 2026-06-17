@@ -281,7 +281,7 @@ async function prepareCustomFields(
 }
 
 export async function createTaskInClickUp(params: ClickUpTaskCreationParams & { customDurationDays?: number }): Promise<ClickUpTaskResponse> {
-  const { name, description, priority, deadline, startDate, usersToAssign, category, brand } = params
+  const { name, description, priority, deadline, startDate, usersToAssign, tier, brand } = params
 
   const clickupAssignees: number[] = []
   const assigneeDebugInfo: AssigneeDebugInfo[] = []
@@ -316,8 +316,8 @@ export async function createTaskInClickUp(params: ClickUpTaskCreationParams & { 
   // ✅ PREPARAR METADATA (Custom Fields, Table Comment, o Tags)
   const metadata = await prepareTaskMetadata(
     brand.teamId ?? undefined,
-    category.type.name,
-    category.name
+    String(tier.name),
+    String(tier.name)
   )
 
   // ✅ TIMESTAMPS para ClickUp
@@ -377,8 +377,8 @@ export async function createTaskInClickUp(params: ClickUpTaskCreationParams & { 
     if (metadata.useTableComment) {
       await createMetadataComment(
         response.data.id,
-        category.type.name,
-        category.name
+        String(tier.name),
+        String(tier.name)
       )
     }
 
@@ -436,7 +436,7 @@ export async function updateTaskInClickUp(taskId: string, updatedTaskData: Task)
   const metadata = await prepareTaskMetadata(
     brand.teamId ?? undefined,
     updatedTaskData.type.name,
-    updatedTaskData.category.name
+    String(updatedTaskData.tier.name)
   )
 
   // ✅ SOLUCIÓN: Agregar campos de tiempo para actualizaciones también
@@ -485,7 +485,7 @@ export async function updateTaskInClickUp(taskId: string, updatedTaskData: Task)
       await createMetadataComment(
         taskId,
         updatedTaskData.type.name,
-        updatedTaskData.category.name
+        String(updatedTaskData.tier.name)
       )
     }
 

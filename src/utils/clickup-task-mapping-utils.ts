@@ -227,9 +227,10 @@ export function debugStatusMapping(clickupStatuses: string[]): void {
 }
 
 /**
- * ✅ FUNCIÓN EXISTENTE: Inferir tipo y categoría (sin cambios)
+ * ✅ ACTUALIZADO: Inferir tipo y tier (ya no existe TaskCategory; Task -> tier directo)
+ * Devuelve typeId y tierId. El tier se infiere por palabras clave; si no se resuelve, usa el tier 'D' por defecto.
  */
-export async function inferTaskTypeAndCategory(taskName: string, clickupTags: string[]): Promise<{ typeId: number; categoryId: number }> {
+export async function inferTaskTypeAndTier(taskName: string, clickupTags: string[]): Promise<{ typeId: number; tierId: number }> {
   let inferredTypeName: string | null = null;
   let inferredCategoryName: string | null = null;
   let inferredDuration: number = 2; // Default days (used if category needs to be created)
@@ -288,32 +289,22 @@ export async function inferTaskTypeAndCategory(taskName: string, clickupTags: st
     console.log(`  -> Creado nuevo TaskType: ${taskType.name}`);
   }
 
-  // Busca o crea la TaskCategory
-  let taskCategory = await prisma.taskCategory.findFirst({
-    where: { name: inferredCategoryName, typeId: taskType.id },
+  // ✅ Resolver el tier inferido. Si no existe, usar el tier por defecto 'D'.
+  let tierRecord = await prisma.tierList.findFirst({
+    where: { name: inferredTier }
   });
-  if (!taskCategory) {
-    // ✅ CORRECCIÓN: Buscar el tier por nombre
-    const tierRecord = await prisma.tierList.findUnique({
-      where: { name: inferredTier }
-    });
-    
-    if (!tierRecord) {
-      throw new Error(`Tier ${inferredTier} not found in database`);
-    }
-    
-    taskCategory = await prisma.taskCategory.create({
-      data: {
-        name: inferredCategoryName,
-        typeId: taskType.id,
-        tierId: tierRecord.id, // ✅ Usar el ID del tier
-      },
-    });
-    console.log(`  -> Creada nueva TaskCategory: ${taskCategory.name} (Type: ${taskType.name})`);
+
+  if (!tierRecord) {
+    console.warn(`⚠️ Tier ${inferredTier} no encontrado, usando tier por defecto 'D'`);
+    tierRecord = await prisma.tierList.findFirst({ where: { name: Tier.D } });
+  }
+
+  if (!tierRecord) {
+    throw new Error(`Default tier 'D' not found in database`);
   }
 
   return {
     typeId: taskType.id,
-    categoryId: taskCategory.id
+    tierId: tierRecord.id
   };
 }

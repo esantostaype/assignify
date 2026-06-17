@@ -36,7 +36,7 @@ export async function GET(req: Request, { params }: TaskRouteParams) {
     const task = await prisma.task.findUnique({
       where: { id: id }, // Buscar por el ID de ClickUp
       include: {
-        category: true,
+        tier: true,
         type: true,
         brand: true,
         assignees: {
@@ -119,7 +119,7 @@ export async function PUT(req: Request, { params }: TaskRouteParams) {
       where: { id: id },
       data: updateData,
       include: {
-        category: true,
+        tier: true,
         type: true,
         brand: true,
         assignees: {
@@ -153,7 +153,7 @@ export async function PUT(req: Request, { params }: TaskRouteParams) {
     const taskWithUpdatedAssignees = await prisma.task.findUnique({
       where: { id: updatedTask.id },
       include: {
-        category: true,
+        tier: true,
         type: true,
         brand: true,
         assignees: {

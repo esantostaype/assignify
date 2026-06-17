@@ -1,5 +1,5 @@
 export * from './BrandSelect'
-export * from './CategorySelect'
+export * from './TierSelect'
 export * from './CreateTaskForm'
 export * from './DurationField'
 export * from './PrioritySelect'

@@ -198,17 +198,17 @@ export async function POST(req: Request) {
       name,
       description,
       typeId,
-      categoryId,
+      tierId,
       priority,
       brandId,
       assignedUserIds,
       durationDays
     }: TaskCreationParams = body
 
-    if (!name || !typeId || !categoryId || !priority || !brandId || typeof durationDays !== 'number' || durationDays <= 0) {
+    if (!name || !typeId || !tierId || !priority || !brandId || typeof durationDays !== 'number' || durationDays <= 0) {
       return NextResponse.json({
         error: 'Faltan campos requeridos o duración inválida',
-        required: ['name', 'typeId', 'categoryId', 'priority', 'brandId', 'durationDays']
+        required: ['name', 'typeId', 'tierId', 'priority', 'brandId', 'durationDays']
       }, { status: 400 })
     }
 
@@ -217,35 +217,38 @@ export async function POST(req: Request) {
     console.log(`   - Priority: ${priority}`)
     console.log(`   - Duration: ${durationDays} días`)
     console.log(`   - Type ID: ${typeId}`)
-    console.log(`   - Category ID: ${categoryId}`)
+    console.log(`   - Tier ID: ${tierId}`)
     console.log(`   - Brand ID: ${brandId}`)
     console.log(`   - Users: ${assignedUserIds || 'AUTO-ASSIGNMENT'}`)
 
-    const [category, brand] = await Promise.all([
-      prisma.taskCategory.findUnique({
-        where: { id: categoryId },
-        include: {
-          type: true,
-          tierList: true
-        }
+    const [tier, type, brand] = await Promise.all([
+      prisma.tierList.findUnique({
+        where: { id: tierId }
+      }),
+      prisma.taskType.findUnique({
+        where: { id: typeId }
       }),
       prisma.brand.findUnique({
         where: { id: brandId }
       })
     ])
 
-    if (!category) {
-      return NextResponse.json({ error: 'Categoría no encontrada' }, { status: 404 })
+    if (!tier) {
+      return NextResponse.json({ error: 'Tier no encontrado' }, { status: 404 })
+    }
+
+    if (!type) {
+      return NextResponse.json({ error: 'Tipo no encontrado' }, { status: 404 })
     }
 
     if (!brand) {
       return NextResponse.json({ error: 'Brand no encontrado' }, { status: 404 })
     }
 
-    console.log(`✅ Categoría: ${category.name} (${category.type.name})`)
+    console.log(`✅ Tier: ${tier.name} (${type.name})`)
     console.log(`✅ Brand: ${brand.name}`)
 
-    const categoryDefaultDuration = category.tierList.duration;
+    const categoryDefaultDuration = tier.duration;
     const userProvidedDuration = durationDays;
     const isCustomDuration = Math.abs(userProvidedDuration - categoryDefaultDuration) > 0.001;
 
@@ -365,14 +368,14 @@ export async function POST(req: Request) {
       })
     }
 
-    const categoryForClickUp = {
-      ...category,
+    const tierForClickUp = {
+      ...tier,
       type: {
-        ...category.type,
+        ...type,
         categories: []
       },
-      duration: category.tierList.duration,
-      tier: category.tierList.name
+      duration: tier.duration,
+      tier: tier.name
     }
 
     const brandForClickUp: ClickUpBrand = {
@@ -395,7 +398,7 @@ export async function POST(req: Request) {
         name,
         description,
         typeId: typeId,
-        categoryId: categoryId,
+        tierId: tierId,
         brandId: brandId,
         priority,
         startDate: finalInsertion.startDate,
@@ -407,12 +410,7 @@ export async function POST(req: Request) {
         customDuration: isCustomDuration ? userProvidedDuration : null
       },
       include: {
-        category: {
-          include: {
-            type: true,
-            tierList: true
-          }
-        },
+        tier: true,
         type: true,
         brand: true,
         assignees: {
@@ -454,12 +452,7 @@ export async function POST(req: Request) {
     const taskWithAssignees = await prisma.task.findUnique({
       where: { id: task.id },
       include: {
-        category: {
-          include: {
-            type: true,
-            tierList: true
-          }
-        },
+        tier: true,
         type: true,
         brand: true,
         assignees: {
@@ -498,14 +491,13 @@ export async function POST(req: Request) {
       deadline: taskWithAssignees?.deadline.toISOString(),
       url: taskWithAssignees?.url,
       createdAt: taskWithAssignees?.createdAt.toISOString(),
-      category: {
-        id: taskWithAssignees?.category.id,
-        name: taskWithAssignees?.category.name,
-        duration: taskWithAssignees?.category.tierList.duration,
-        tier: taskWithAssignees?.category.tierList.name,
+      tier: {
+        id: taskWithAssignees?.tier.id,
+        name: taskWithAssignees?.tier.name,
+        duration: taskWithAssignees?.tier.duration,
         type: {
-          id: taskWithAssignees?.category.type.id,
-          name: taskWithAssignees?.category.type.name
+          id: taskWithAssignees?.type.id,
+          name: taskWithAssignees?.type.name
         }
       },
       brand: {

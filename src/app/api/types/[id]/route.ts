@@ -43,13 +43,6 @@ export async function PATCH(
       where: { id: Number(id) },
       data: {
         name: name.trim()
-      },
-      include: {
-        categories: {
-          include: {
-            tierList: true
-          }
-        }
       }
     })
 
@@ -88,24 +81,13 @@ export async function DELETE(
 
     // Verificar que el task type existe
     const existingTaskType = await prisma.taskType.findUnique({
-      where: { id: Number(id) },
-      include: {
-        categories: true
-      }
+      where: { id: Number(id) }
     })
 
     if (!existingTaskType) {
       return NextResponse.json(
         { error: 'Task type not found' },
         { status: 404 }
-      )
-    }
-
-    // Verificar si tiene categorías asociadas
-    if (existingTaskType.categories.length > 0) {
-      return NextResponse.json(
-        { error: 'Cannot delete task type with associated categories' },
-        { status: 400 }
       )
     }
 

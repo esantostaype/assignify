@@ -15,10 +15,8 @@ interface TaskForParallelInsertion {
   priority: Priority;
   customDuration?: number | null;
   createdAt: Date;
-  category: {
-    tierList: {
-      duration: number;
-    };
+  tier: {
+    duration: number;
   };
 }
 
@@ -474,7 +472,7 @@ async function handleNormalParallel(
     let currentDate = newDeadline; // Empezar después de la nueva NORMAL
     
     for (const lowTask of currentFutureLowTasksToday) {
-      const lowDuration = lowTask.customDuration ?? lowTask.category.tierList.duration;
+      const lowDuration = lowTask.customDuration ?? lowTask.tier.duration;
       const lowHours = lowDuration * 8;
       
       const lowStartDate = await getNextAvailableStart(currentDate);
@@ -588,13 +586,9 @@ export async function calculateParallelPriorityInsertion(
       priority: true,
       customDuration: true,
       createdAt: true,
-      category: {
-        include: {
-          tierList: {
-            select: {
-              duration: true
-            }
-          }
+      tier: {
+        select: {
+          duration: true
         }
       }
     }

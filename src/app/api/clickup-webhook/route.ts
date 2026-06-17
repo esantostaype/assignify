@@ -171,11 +171,7 @@ export async function GET(req: Request) {
       take: limit,
       orderBy: { startDate: 'asc' },
       include: {
-        category: {
-          include: {
-            tierList: true
-          }
-        },
+        tier: true,
         type: true,
         brand: true,
         assignees: { include: { user: true } }
@@ -419,7 +415,7 @@ async function handleTaskUpdate(event: ClickUpWebhookEvent) {
             user: true
           }
         },
-        category: true,
+        tier: true,
         type: true,
         brand: true
       }
@@ -616,11 +612,7 @@ async function handleTaskUpdate(event: ClickUpWebhookEvent) {
         where: { id: event.task_id },
         data: updateData,
         include: {
-          category: {
-            include: {
-              tierList: true
-            }
-          },
+          tier: true,
           type: true,
           brand: true,
           assignees: {

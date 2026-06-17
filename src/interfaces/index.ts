@@ -3,20 +3,12 @@ import { Priority, Status, Tier } from '@prisma/client'
 export interface TaskType {
   id: number
   name: string
-  categories: TaskCategory[]
 }
 
-export interface TaskCategory {
+export interface TierList {
   id: number
-  name: string
-  typeId: number
-  tierId: number
-  type: TaskType
-  tierList: {
-    id: number
-    name: Tier
-    duration: number
-  }
+  name: Tier
+  duration: number
 }
 
 export interface Brand {
@@ -76,7 +68,7 @@ export interface Task {
   name: string
   description?: string
   typeId: number
-  categoryId: number
+  tierId: number
   brandId: string
   priority: Priority
   status: Status
@@ -86,7 +78,7 @@ export interface Task {
   url?: string
   lastSyncAt?: Date
   syncStatus: string
-  category: TaskCategory
+  tier: TierList
   type: TaskType
   brand: Brand
   assignees: TaskAssignment[]
@@ -132,7 +124,7 @@ export interface TaskCreationParams {
   name: string
   description?: string
   typeId: number
-  categoryId: number
+  tierId: number
   priority: Priority
   brandId: string
   assignedUserIds?: string[]
@@ -162,7 +154,7 @@ export interface ClickUpTaskCreationParams {
   deadline: Date
   startDate: Date
   usersToAssign: string[]
-  category: TaskCategory
+  tier: TierList
   brand: ClickUpBrand
 }
 
@@ -215,10 +207,6 @@ export type UserWithRoles = User & {
   roles: UserRole[]
 }
 
-export type CategoryWithType = TaskCategory & {
-  type: TaskType
-}
-
 export interface UpdatedTask {
   id: string
   name: string
@@ -253,7 +241,7 @@ export interface ExtendedFormValues extends FormValues {
 export interface FormValues {
   name: string
   description: string
-  categoryId: string
+  tierId: string
   priority: string
   brandId: string
   assignedUserIds: string[]

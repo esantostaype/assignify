@@ -9,16 +9,18 @@ export async function GET(req: Request) {
   try {
     const { searchParams } = new URL(req.url);
     const brandId = searchParams.get('brandId');
-    const categoryId = parseInt(searchParams.get('categoryId') || '0');
+    const tierId = parseInt(searchParams.get('tierId') || '0');
+    const typeId = parseInt(searchParams.get('typeId') || '0');
     const priority = searchParams.get('priority') as Priority;
 
-    if (!brandId || !categoryId || !priority) {
-      return NextResponse.json({ 
+    if (!brandId || !tierId || !typeId || !priority) {
+      return NextResponse.json({
         error: 'Faltan parámetros requeridos',
-        required: ['brandId', 'categoryId', 'priority'],
+        required: ['brandId', 'tierId', 'typeId', 'priority'],
         received: {
           brandId: brandId || 'missing',
-          categoryId: categoryId || 'missing',
+          tierId: tierId || 'missing',
+          typeId: typeId || 'missing',
           priority: priority || 'missing'
         }
       }, { status: 400 });
@@ -36,29 +38,37 @@ export async function GET(req: Request) {
     console.log(`🔍 === GENERANDO SUGERENCIA CON LÓGICA DE VACACIONES ===`);
     console.log(`📋 Parámetros de entrada:`);
     console.log(`   - Brand ID: ${brandId}`);
-    console.log(`   - Category ID: ${categoryId}`);
+    console.log(`   - Tier ID: ${tierId}`);
+    console.log(`   - Type ID: ${typeId}`);
     console.log(`   - Priority: ${priority}`);
 
-    const category = await prisma.taskCategory.findUnique({
-      where: { id: categoryId },
-      include: { 
-        type: true,
-        tierList: true // IMPORTANTE: Incluir tierList
-      },
-    });
+    const [tier, type] = await Promise.all([
+      prisma.tierList.findUnique({
+        where: { id: tierId }
+      }),
+      prisma.taskType.findUnique({
+        where: { id: typeId }
+      })
+    ]);
 
-    if (!category) {
-      return NextResponse.json({ 
-        error: 'Categoría no encontrada',
-        categoryId: categoryId
+    if (!tier) {
+      return NextResponse.json({
+        error: 'Tier no encontrado',
+        tierId: tierId
       }, { status: 404 });
     }
 
-    console.log(`✅ Categoría encontrada:`);
-    console.log(`   - Nombre: ${category.name}`);
-    console.log(`   - Tipo: ${category.type.name}`);
-    console.log(`   - Duración: ${category.tierList.duration} días`); // Desde tierList
-    console.log(`   - Tier: ${category.tierList.name}`); // Desde tierList
+    if (!type) {
+      return NextResponse.json({
+        error: 'Tipo no encontrado',
+        typeId: typeId
+      }, { status: 404 });
+    }
+
+    console.log(`✅ Tier encontrado:`);
+    console.log(`   - Tipo: ${type.name}`);
+    console.log(`   - Duración: ${tier.duration} días`); // Desde tier
+    console.log(`   - Tier: ${tier.name}`); // Desde tier
 
     const brand = await prisma.brand.findUnique({
       where: { id: brandId },
@@ -84,10 +94,10 @@ export async function GET(req: Request) {
     console.log(`🤖 Buscando mejor usuario con lógica de vacaciones...`);
     
     const bestSlot = await getBestUserWithCache(
-      category.type.id, 
-      brandId, 
-      priority, 
-      category.tierList.duration // Usar duration desde tierList
+      type.id,
+      brandId,
+      priority,
+      tier.duration // Usar duration desde tier
     );
 
     if (!bestSlot) {
@@ -98,7 +108,7 @@ export async function GET(req: Request) {
           active: true,
           roles: {
             some: {
-              typeId: category.type.id,
+              typeId: type.id,
               OR: [
                 { brandId: brandId },
                 { brandId: null }
@@ -108,20 +118,20 @@ export async function GET(req: Request) {
         }
       });
 
-      return NextResponse.json({ 
+      return NextResponse.json({
         error: 'No se pudo encontrar un diseñador óptimo para la asignación automática',
         details: 'No hay usuarios disponibles que cumplan con los criterios de asignación considerando vacaciones y carga de trabajo',
         diagnostics: {
           compatibleUsersTotal: compatibleUsersCount,
-          typeRequired: category.type.name,
+          typeRequired: type.name,
           brandId: brandId,
           priority: priority
         }
       }, { status: 400 });
     }
 
-    const estimatedDurationHours = category.tierList.duration * 8; // Desde tierList
-    const estimatedDurationDays = category.tierList.duration; // Desde tierList
+    const estimatedDurationHours = tier.duration * 8; // Desde tier
+    const estimatedDurationDays = tier.duration; // Desde tier
 
     const estimatedEndDate = new Date(bestSlot.availableDate);
     estimatedEndDate.setDate(estimatedEndDate.getDate() + Math.ceil(estimatedDurationDays));
@@ -155,14 +165,13 @@ export async function GET(req: Request) {
         lastTaskDeadline: bestSlot.lastTaskDeadline?.toISOString() || null
       },
       
-      categoryInfo: {
-        id: category.id,
-        name: category.name,
-        duration: category.tierList.duration, // Desde tierList
-        tier: category.tierList.name, // Desde tierList
+      tierInfo: {
+        id: tier.id,
+        name: tier.name,
+        duration: tier.duration, // Desde tier
         type: {
-          id: category.type.id,
-          name: category.type.name
+          id: type.id,
+          name: type.name
         }
       },
       

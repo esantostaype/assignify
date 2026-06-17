@@ -45,16 +45,28 @@ Hecho a nivel de código (build de producción verificado, exit 0):
 - [x] **Socket.IO eliminado** por completo: archivos `socket_io.ts`, `socket_emitter.ts`,
       `useSocket.ts`, componentes muertos `TaskQueue.tsx` y `Tasks.tsx` (viejo), y deps.
 
-**Pendiente para activarlo en TU entorno (no es código, es configuración):**
+**Activación en producción — ✅ VERIFICADO end-to-end (16-jun-2026):**
 
-- [ ] Añadir las 6 variables `PUSHER_*` / `NEXT_PUBLIC_PUSHER_*` (+ `CLICKUP_VERIFY_SIGNATURE`)
-      en **Vercel → Settings → Environment Variables** (el `.env` local NO se sube). Redeploy.
-- [ ] Confirmar que el webhook de ClickUp apunta a `https://<tu-dominio>/api/clickup-webhook`.
-- [ ] Probar: cambiar el estado de una tarea en ClickUp → debe verse en la app en <2s.
-- [ ] Tras confirmar firmas OK en logs, poner `CLICKUP_VERIFY_SIGNATURE=true`.
-- [ ] **Rotar el `secret` de Pusher** (quedó expuesto en el chat) y actualizar `.env` + Vercel.
+- [x] 6 variables `PUSHER_*` / `NEXT_PUBLIC_PUSHER_*` + `CLICKUP_VERIFY_SIGNATURE` cargadas en Vercel.
+- [x] Token de ClickUp **rotado** (estaba expuesto, ver nota de seguridad abajo) y actualizado en `.env` + Vercel.
+- [x] **Webhook de ClickUp reapuntado**: estaba en el dominio viejo `task-automation-zeta.vercel.app`
+      y `suspended` (99 fallos). Ahora apunta a `https://assignify.vercel.app/api/clickup-webhook`,
+      `active`, con eventos `taskCreated/Updated/Deleted/StatusUpdated/AssigneeUpdated`.
+      Gestionado con `scripts/setup-clickup-webhook.js`.
+- [x] Probado: cambiar estado en ClickUp → la tarjeta se mueve/desaparece en la app en vivo. ✅
+- [x] Toast de aviso (sale siempre; ClickUp no manda el nombre en el webhook, se toma de la caché).
 
-**Hecho cuando:** cambias una tarea en ClickUp y la app la actualiza sola en <2s, sin recargar.
+**Pendientes menores (seguridad):**
+
+- [ ] **Rotar el `secret` de Pusher** (quedó expuesto en el chat) → actualizar `.env` + Vercel.
+- [ ] Cuando confirmes que las firmas coinciden en logs, poner `CLICKUP_VERIFY_SIGNATURE=true` en Vercel.
+
+**Nota de seguridad (resuelta):** había 3 tokens de ClickUp hardcodeados en `scripts/` que se
+subieron a un repo público. Se sanearon los scripts (leen de `process.env`), se reescribió la
+historia de git (force-push a un commit limpio) y se **rotó el token**. Los scripts de ClickUp
+ahora se ejecutan con `node scripts/<archivo>.js` (cargan el token del `.env`).
+
+**Hecho cuando:** cambias una tarea en ClickUp y la app la actualiza sola en <2s, sin recargar. ✅ LOGRADO
 
 ---
 

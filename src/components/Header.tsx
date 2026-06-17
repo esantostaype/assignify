@@ -1,8 +1,8 @@
 'use client'
 import { HugeiconsIcon } from '@hugeicons/react'
-import { LabelImportantIcon, Layers01Icon, Queue01Icon, Logout02Icon, SwatchIcon, UserIcon, UserGroup03Icon } from '@hugeicons/core-free-icons'
+import { Layers01Icon, Queue01Icon, Logout02Icon, SwatchIcon, UserIcon, UserGroup03Icon } from '@hugeicons/core-free-icons'
 import Image from 'next/image'
-import { CategoriesForm, NavItem, TaskTypesForm, TierListForm } from '@/components'
+import { NavItem, TaskTypesForm, TierListForm } from '@/components'
 import { Button } from '@mui/joy'
 import { useModalStore } from '@/stores/modalStore'
 import { useConfirmationStore } from '@/stores/confirmationStore'
@@ -24,13 +24,6 @@ export const Header = () => {
     openModal({
       title: 'Task Types',
       content: <TaskTypesForm />
-    })
-  }
-
-  const handleCategoriesClick = () => {
-    openModal({
-      title: 'Categories',
-      content: <CategoriesForm />
     })
   }
 
@@ -56,8 +49,7 @@ export const Header = () => {
     { href: '/tasks', label: 'Tasks', icon: Queue01Icon },
     { href: '/designers', label: 'Designers', icon: UserGroup03Icon },
     { onClick: handleTypesClick, label: 'Types', icon: SwatchIcon },
-    { onClick: handleTiersClick, label: 'Tiers', icon: Layers01Icon },
-    { onClick: handleCategoriesClick, label: 'Categories', icon: LabelImportantIcon }
+    { onClick: handleTiersClick, label: 'Tiers', icon: Layers01Icon }
   ]
 
   return (

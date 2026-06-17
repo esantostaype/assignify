@@ -172,11 +172,7 @@ async function getActualAvailableStartDate(
     },
     orderBy: { deadline: 'desc' }, // ✅ ORDENAR POR DEADLINE DESCENDENTE
     include: {
-      category: {
-        include: {
-          tierList: true
-        }
-      },
+      tier: true,
       brand: true
     }
   });
@@ -235,12 +231,7 @@ export async function calculateUserSlots(
     where: whereClause,
     orderBy: { startDate: 'asc' }, // ✅ ORDENAR POR FECHA, NO POR queuePosition
     include: {
-      category: { 
-        include: { 
-          type: true,
-          tierList: true 
-        } 
-      },
+      tier: true,
       type: true,
       brand: true,
       assignees: { include: { user: true } }
@@ -279,9 +270,9 @@ export async function calculateUserSlots(
       lastTaskDeadline = new Date(Math.max(...deadlines.map(d => d.getTime())));
       
       totalAssignedDurationDays = userTasks.reduce((sum, task) => {
-        return sum + (task.customDuration !== null ? task.customDuration : task.category.tierList.duration);
+        return sum + (task.customDuration !== null ? task.customDuration : task.tier.duration);
       }, 0);
-      
+
       console.log(`   📊 Tiene ${userTasks.length} tareas para este tipo/brand`);
       console.log(`   📅 Deadline más lejano (tipo/brand): ${lastTaskDeadline.toISOString()}`);
     }
@@ -401,12 +392,7 @@ async function getVacationAwareUserSlots(
     },
     orderBy: { startDate: 'asc' }, // ✅ ORDENAR POR FECHA, NO POR queuePosition
     include: {
-      category: {
-        include: {
-          type: true,
-          tierList: true
-        }
-      },
+      tier: true,
       type: true,
       brand: true,
       assignees: { include: { user: true } }
@@ -459,11 +445,11 @@ async function getVacationAwareUserSlots(
       baseAvailableDate = await getNextAvailableStart(new Date(lastTask.deadline));
       
       totalAssignedDurationDays = userTasks.reduce((sum, task) => {
-        if (!task.category?.tierList) {
-          console.warn(`⚠️ Task ${task.id} missing category.tierList, using default duration`);
+        if (!task.tier) {
+          console.warn(`⚠️ Task ${task.id} missing tier, using default duration`);
           return sum + (task.customDuration !== null ? task.customDuration : 1);
         }
-        return sum + (task.customDuration !== null ? task.customDuration : task.category.tierList.duration);
+        return sum + (task.customDuration !== null ? task.customDuration : task.tier.duration);
       }, 0);
       
       console.log(`   📊 Current workload: ${userTasks.length} tasks, ${totalAssignedDurationDays} days total`);
@@ -801,11 +787,7 @@ export async function getTaskHours(taskId: string): Promise<number> {
   const task = await prisma.task.findUnique({
     where: { id: taskId },
     include: {
-      category: {
-        include: {
-          tierList: true
-        }
-      },
+      tier: true,
       type: true,
       assignees: {
         include: {
@@ -818,5 +800,5 @@ export async function getTaskHours(taskId: string): Promise<number> {
   if (!task) throw new Error('Tarea no encontrada');
   if (!task.assignees.length) throw new Error('Tarea sin asignaciones');
 
-  return task.customDuration !== null ? task.customDuration * 8 : task.category.tierList.duration * 8;
+  return task.customDuration !== null ? task.customDuration * 8 : task.tier.duration * 8;
 }

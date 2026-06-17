@@ -46,8 +46,8 @@ export function shouldInsertBefore(
  * ✅ FUNCIÓN SIMPLIFICADA: Ordenar tareas por prioridad y fecha
  */
 export function sortTasksByPriorityAndDate(
-  tasks: (Task & { category: { tierList: { name: string } } })[]
-): (Task & { category: { tierList: { name: string } } })[] {
+  tasks: (Task & { tier: { name: string } })[]
+): (Task & { tier: { name: string } })[] {
   console.log(`📋 Ordenando ${tasks.length} tareas por prioridad y fecha`);
 
   const priorityValues = {
@@ -74,7 +74,7 @@ export function sortTasksByPriorityAndDate(
 /**
  * ✅ FUNCIÓN SIMPLIFICADA: Debug de tareas ordenadas
  */
-export function debugTaskOrder(tasks: (Task & { category: { tierList: { name: string } } })[]): void {
+export function debugTaskOrder(tasks: (Task & { tier: { name: string } })[]): void {
   console.log('📋 Orden actual de tareas:');
   tasks.forEach((task, index) => {
     const startDate = new Date(task.startDate).toISOString().split('T')[0];
@@ -83,7 +83,7 @@ export function debugTaskOrder(tasks: (Task & { category: { tierList: { name: st
     console.log(`  ${index + 1}. "${task.name}"`);
     console.log(`     - Prioridad: ${task.priority}`);
     console.log(`     - Fechas: ${startDate} → ${deadline}`);
-    console.log(`     - Tier: ${task.category.tierList.name}`);
+    console.log(`     - Tier: ${task.tier.name}`);
   });
 }
 
@@ -92,7 +92,7 @@ export function debugTaskOrder(tasks: (Task & { category: { tierList: { name: st
  */
 export function getInsertionDateForPriority(
   priority: Priority,
-  userTasks: (Task & { category: { tierList: { name: string } } })[],
+  userTasks: (Task & { tier: { name: string } })[],
   earliestPossibleDate: Date
 ): Date {
   console.log(`🎯 Calculando fecha de inserción para prioridad ${priority}`);

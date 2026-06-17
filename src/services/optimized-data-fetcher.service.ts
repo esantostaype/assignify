@@ -1,7 +1,7 @@
 // src/services/optimizedDataFetcher.service.ts - SIN queuePosition
 import { prisma } from '@/utils/prisma';
 import { Status } from '@prisma/client';
-import { User, UserRole, Task, TaskCategory, TaskType, Brand, TaskAssignment } from '@/interfaces';
+import { User, UserRole, Task, TierList, TaskType, Brand, TaskAssignment } from '@/interfaces';
 
 export interface MinimalTaskType {
   id: number;
@@ -12,7 +12,7 @@ export interface UserWithOptimizedData extends User {
   roles: (UserRole & { type: MinimalTaskType | null })[];
   tasks: (TaskAssignment & {
     task: Task & {
-      category: TaskCategory;
+      tier: TierList;
       type: TaskType;
       brand: Brand;
       assignees: (TaskAssignment & { user: User })[];
@@ -49,7 +49,7 @@ export async function getOptimizedUserData(typeId: number, brandId: string): Pro
         include: {
           task: {
             include: {
-              category: true,
+              tier: true,
               type: true,
               brand: true,
               assignees: {

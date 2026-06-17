@@ -108,7 +108,7 @@ export async function GET(req: Request) {
           status: { notIn: ['COMPLETE'] }
         },
         orderBy: { deadline: 'asc' },
-        include: { category: true }
+        include: { tier: true }
       });
 
       // Calcular cuando estaría disponible el usuario
