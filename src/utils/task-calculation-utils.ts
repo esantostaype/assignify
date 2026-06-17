@@ -7,6 +7,18 @@ import { Status } from '@prisma/client';
 import { WORK_HOURS } from '@/config';
 import usHolidays from '@/data/usHolidays.json';
 
+/**
+ * Estados que "ocupan" realmente a un diseñador (carga y disponibilidad).
+ * - TO_DO / IN_PROGRESS → trabajo pendiente: ocupa su tiempo.
+ * - ON_APPROVAL → ya entregado, esperando revisión del cliente/manager: el
+ *   diseñador YA puede tomar trabajo nuevo, así que NO cuenta como carga ni
+ *   empuja su fecha de disponibilidad.
+ * - COMPLETE → terminado.
+ * Usar este set evita que tareas "en aprobación" con deadlines lejanos
+ * (p. ej. una que lleva meses esperando aprobación) bloqueen asignaciones.
+ */
+export const OCCUPYING_STATUSES: Status[] = [Status.TO_DO, Status.IN_PROGRESS];
+
 // Set de festivos (YYYY-MM-DD en UTC) para lookup O(1).
 const HOLIDAY_SET = new Set((usHolidays as Array<{ date: string }>).map((h) => h.date));
 

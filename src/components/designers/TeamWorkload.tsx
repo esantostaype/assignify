@@ -3,7 +3,7 @@
 // Vista "de un vistazo" de la carga y disponibilidad de cada diseñador.
 import React from 'react'
 import { Card, Chip, Progress, Avatar, Tooltip } from '@/components/ui'
-import { Icon, PiCalendarBlank, PiClock, PiCheckCircle, PiSparkle } from '@/lib/icons'
+import { Icon, PiCalendarBlank, PiClock, PiCheckCircle, PiSparkle, PiArrowsClockwise } from '@/lib/icons'
 import { useUsersWorkload, type UserWorkload, type WorkloadStatus } from '@/hooks/queries/useWorkload'
 
 const STATUS: Record<WorkloadStatus, { label: string; color: 'success' | 'primary' | 'error' | 'warning' }> = {
@@ -13,8 +13,8 @@ const STATUS: Record<WorkloadStatus, { label: string; color: 'success' | 'primar
   on_vacation: { label: 'De vacaciones', color: 'warning' },
 }
 
-// Días de carga que se consideran "lleno" (100% de la barra).
-const MAX_LOAD_DAYS = 15
+// Horizonte (días) que llena la barra al 100%: el umbral de "sobrecargado".
+const HORIZON_DAYS = 14
 
 function fmtDate(d: string) {
   return new Date(d).toLocaleDateString('es-PE', { day: 'numeric', month: 'short' })
@@ -26,9 +26,11 @@ function initialsOf(name: string) {
 
 function WorkloadCard({ u }: { u: UserWorkload }) {
   const st = STATUS[u.status]
-  const loadPct = Math.min(100, Math.round((u.totalDurationDays / MAX_LOAD_DAYS) * 100))
+  // La barra representa cuán lejos está su fecha de disponibilidad (0 = libre hoy,
+  // 100% = a 2 semanas o más → sobrecargado).
+  const loadPct = Math.min(100, Math.round((u.availableInDays / HORIZON_DAYS) * 100))
   const barColor =
-    u.status === 'overloaded' ? 'error' : u.status === 'on_vacation' ? 'warning' : u.totalDurationDays >= 3 ? 'primary' : 'success'
+    u.status === 'overloaded' ? 'error' : u.status === 'on_vacation' ? 'warning' : u.status === 'busy' ? 'primary' : 'success'
 
   return (
     <Card variant="outlined" padding="md" className="flex flex-col gap-3">
@@ -52,12 +54,12 @@ function WorkloadCard({ u }: { u: UserWorkload }) {
         </Chip>
       </div>
 
-      {/* Barra de carga */}
+      {/* Barra de carga (tareas pendientes: TO_DO / En progreso) */}
       <div className="flex flex-col gap-1">
         <div className="flex items-center justify-between text-xs text-(--color-text-muted)">
           <span>Carga</span>
           <span className="font-medium text-(--color-text-default)">
-            {u.totalDurationDays}d · {u.taskCount} {u.taskCount === 1 ? 'tarea' : 'tareas'}
+            {u.taskCount} {u.taskCount === 1 ? 'tarea pendiente' : 'tareas pendientes'}
           </span>
         </div>
         <Progress value={loadPct} color={barColor} />
@@ -74,6 +76,12 @@ function WorkloadCard({ u }: { u: UserWorkload }) {
           <div className="flex items-center gap-1.5 text-(--color-text-muted)">
             <Icon icon={u.taskCount === 0 ? PiCheckCircle : PiClock} size={14} />
             {u.taskCount === 0 ? 'Libre ahora' : `Se libera el ${fmtDate(u.availableFrom)}`}
+          </div>
+        )}
+        {u.approvalCount > 0 && (
+          <div className="flex items-center gap-1.5 text-(--color-text-subtle)">
+            <Icon icon={PiArrowsClockwise} size={14} />
+            {u.approvalCount} en aprobación
           </div>
         )}
         {u.upcomingVacations.length > 0 && (
@@ -102,8 +110,10 @@ export function TeamWorkload() {
 
   if (workload.length === 0) return null
 
-  // Disponibles primero (menor carga); el orden ayuda a ver de un vistazo quién puede tomar trabajo.
-  const sorted = [...workload].sort((a, b) => a.totalDurationDays - b.totalDurationDays)
+  // Disponibles primero (se liberan antes / menos carga); ayuda a ver de un vistazo quién puede tomar trabajo.
+  const sorted = [...workload].sort(
+    (a, b) => a.availableInDays - b.availableInDays || a.taskCount - b.taskCount
+  )
 
   return (
     <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">

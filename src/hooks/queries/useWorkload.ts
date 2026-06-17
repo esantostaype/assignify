@@ -11,8 +11,10 @@ export interface UserWorkload {
   roles: string[]
   isSpecialist: boolean
   taskCount: number
+  approvalCount: number
   totalDurationDays: number
   availableFrom: string
+  availableInDays: number
   status: WorkloadStatus
   currentVacation: { startDate: string; endDate: string } | null
   upcomingVacations: Array<{ startDate: string; endDate: string }>

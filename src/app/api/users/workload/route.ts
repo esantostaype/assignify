@@ -3,13 +3,19 @@
 import { NextResponse } from 'next/server'
 import { prisma } from '@/utils/prisma'
 import { Status } from '@prisma/client'
-import { getNextAvailableStart } from '@/utils/task-calculation-utils'
+import { getNextAvailableStart, OCCUPYING_STATUSES } from '@/utils/task-calculation-utils'
 
 export type WorkloadStatus = 'available' | 'busy' | 'overloaded' | 'on_vacation'
+
+// Un diseñador se considera "sobrecargado" si su trabajo pendiente lo mantiene
+// ocupado más allá de 2 semanas desde hoy.
+const OVERLOAD_HORIZON_DAYS = 14
+const DAY_MS = 24 * 60 * 60 * 1000
 
 export async function GET() {
   try {
     const now = new Date()
+    const overloadThreshold = new Date(now.getTime() + OVERLOAD_HORIZON_DAYS * DAY_MS)
 
     const users = await prisma.user.findMany({
       where: { active: true },
@@ -23,27 +29,34 @@ export async function GET() {
 
     const result = await Promise.all(
       users.map(async (u) => {
-        // Tareas activas (no completadas) del usuario.
-        const activeTasks = u.tasks
-          .map((a) => a.task)
-          .filter((t) => t && t.status !== Status.COMPLETE)
+        const allTasks = u.tasks.map((a) => a.task).filter(Boolean)
 
-        const taskCount = activeTasks.length
-        const totalDurationDays = activeTasks.reduce(
+        // Solo TO_DO / IN_PROGRESS cuentan como carga real. ON_APPROVAL ya está
+        // entregado (esperando revisión) → el diseñador puede tomar trabajo nuevo.
+        const pendingTasks = allTasks.filter((t) => OCCUPYING_STATUSES.includes(t.status))
+        const approvalCount = allTasks.filter((t) => t.status === Status.ON_APPROVAL).length
+
+        const taskCount = pendingTasks.length
+        const totalDurationDays = pendingTasks.reduce(
           (sum, t) => sum + (t.customDuration ?? t.tier?.duration ?? 0),
           0
         )
 
-        // Próxima fecha en que se libera (tras su última entrega; salta findes/festivos).
+        // Se libera tras su última entrega PENDIENTE (no antes de hoy); salta
+        // findes/festivos hasta el siguiente inicio laborable.
         let availableFrom: Date
-        if (activeTasks.length > 0) {
-          const lastDeadline = new Date(
-            Math.max(...activeTasks.map((t) => new Date(t.deadline).getTime()))
+        if (pendingTasks.length > 0) {
+          const lastDeadline = Math.max(
+            ...pendingTasks.map((t) => new Date(t.deadline).getTime())
           )
-          availableFrom = await getNextAvailableStart(lastDeadline)
+          availableFrom = await getNextAvailableStart(new Date(Math.max(lastDeadline, now.getTime())))
         } else {
           availableFrom = await getNextAvailableStart(now)
         }
+        const availableInDays = Math.max(
+          0,
+          Math.ceil((availableFrom.getTime() - now.getTime()) / DAY_MS)
+        )
 
         // Vacaciones: la que está en curso (si hay) y las futuras.
         const currentVacation = u.vacations.find(
@@ -55,10 +68,11 @@ export async function GET() {
         const roles = Array.from(new Set(u.roles.map((r) => r.type.name)))
         const isSpecialist = roles.length === 1
 
-        let status: WorkloadStatus = 'available'
+        let status: WorkloadStatus
         if (currentVacation) status = 'on_vacation'
-        else if (totalDurationDays >= 10) status = 'overloaded'
-        else if (totalDurationDays >= 3) status = 'busy'
+        else if (taskCount > 0 && availableFrom > overloadThreshold) status = 'overloaded'
+        else if (taskCount > 0) status = 'busy'
+        else status = 'available'
 
         return {
           id: u.id,
@@ -67,8 +81,10 @@ export async function GET() {
           roles,
           isSpecialist,
           taskCount,
+          approvalCount,
           totalDurationDays,
           availableFrom: availableFrom.toISOString(),
+          availableInDays,
           status,
           currentVacation: currentVacation
             ? {

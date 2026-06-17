@@ -5,7 +5,7 @@
 import { prisma } from '@/utils/prisma';
 import { Priority, Status } from '@prisma/client';
 import { UserSlot, UserWithRoles, Task, TaskTimingResult, UserVacation, VacationAwareUserSlot } from '@/interfaces';
-import { getNextAvailableStart, calculateWorkingDeadline } from '@/utils/task-calculation-utils';
+import { getNextAvailableStart, calculateWorkingDeadline, OCCUPYING_STATUSES } from '@/utils/task-calculation-utils';
 import { TASK_ASSIGNMENT_THRESHOLDS, CACHE_KEYS } from '@/config';
 import { getFromCache, setInCache } from '@/utils/cache';
 import usHolidays from '@/data/usHolidays.json'
@@ -167,7 +167,7 @@ async function getActualAvailableStartDate(
   const userTasks = await prisma.task.findMany({
     where: {
       assignees: { some: { userId } },
-      status: { notIn: [Status.COMPLETE] }
+      status: { in: OCCUPYING_STATUSES }
       // ✅ NO FILTRAR POR typeId NI brandId para encontrar el deadline MÁS LEJANO
     },
     orderBy: { deadline: 'desc' }, // ✅ ORDENAR POR DEADLINE DESCENDENTE
@@ -219,7 +219,7 @@ export async function calculateUserSlots(
   // ✅ OBTENER TAREAS ORDENADAS POR FECHA, NO POR queuePosition
   const whereClause: any = {
     typeId: typeId,
-    status: { notIn: [Status.COMPLETE] },
+    status: { in: OCCUPYING_STATUSES },
     assignees: { some: { userId: { in: userIds } } }
   };
 
@@ -387,7 +387,7 @@ async function getVacationAwareUserSlots(
   const allRelevantTasks = await prisma.task.findMany({
     where: {
       typeId: typeId,
-      status: { notIn: [Status.COMPLETE] },
+      status: { in: OCCUPYING_STATUSES },
       assignees: { some: { userId: { in: userIds } } }
     },
     orderBy: { startDate: 'asc' }, // ✅ ORDENAR POR FECHA, NO POR queuePosition
