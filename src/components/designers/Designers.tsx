@@ -4,7 +4,7 @@
 'use client'
 
 import React, { useState, useMemo } from 'react'
-import toast from 'react-hot-toast'
+import { hotToast as toast } from '@/lib/hotToast'
 import { DesignersHeader } from './DesignersHeader'
 import { UsersList } from './UsersList'
 import { UserEditModal } from './UserEditModal'
@@ -50,15 +50,15 @@ export const ClickUpUsersSync: React.FC = () => {
         successMessage += ` (${errors.length} errors)`
       }
 
-      toast.success(successMessage)
+      toast.success({ title: successMessage })
 
       if (notFoundUsers && notFoundUsers.length > 0) {
-        toast(`Users not found in teams: ${notFoundUsers.join(', ')}`)
+        toast.neutral({ title: `Users not found in teams: ${notFoundUsers.join(', ')}` })
       }
 
       if (errors && errors.length > 0) {
         console.warn('Errors during sync:', errors)
-        toast('Some users had errors. Check console for details.')
+        toast.neutral({ title: 'Some users had errors. Check console for details.' })
       }
 
       setSelectedUsers(new Set())
@@ -66,22 +66,22 @@ export const ClickUpUsersSync: React.FC = () => {
     onError: (error: any) => {
       console.error('❌ Sync error:', error)
       const message = error.response?.data?.error || error.message
-      toast.error(`Sync error: ${message}`)
+      toast.error({ title: `Sync error: ${message}` })
     },
   })
 
   const { mutate: addRole, isPending: addingRole } = useAddUserRole({
     onSuccess: () => {
-      toast.success('Role added successfully')
+      toast.success({ title: 'Role added successfully' })
     },
     onError: () => {
-      toast.error('Error adding role')
+      toast.error({ title: 'Error adding role' })
     },
   })
 
   const { mutate: addVacation, isPending: addingVacation } = useAddUserVacation({
     onSuccess: () => {
-      toast.success('Vacation added successfully')
+      toast.success({ title: 'Vacation added successfully' })
     }
   })
 
@@ -133,7 +133,7 @@ export const ClickUpUsersSync: React.FC = () => {
 
   const handleSync = () => {
     if (selectedUsers.size === 0) {
-      toast('Select at least one user to sync')
+      toast.neutral({ title: 'Select at least one user to sync' })
       return
     }
 
@@ -175,10 +175,10 @@ export const ClickUpUsersSync: React.FC = () => {
         />
       </div>
 
-      {/* Modal de edición renderizado EN VIVO (no como snapshot en el modalStore):
-          así el modal forma parte del árbol de Designers y se re-renderiza cuando
-          las queries cambian, reflejando al instante nivel / cargo / vacaciones
-          tras cada mutación (antes quedaba congelado en el store global). */}
+      {/* Modal de edición renderizado EN VIVO con estado local (patrón de la
+          referencia): el modal forma parte del árbol de Designers y se
+          re-renderiza cuando las queries cambian, reflejando al instante
+          nivel / cargo / vacaciones tras cada mutación. */}
       <Modal
         open={!!editingUserId}
         onClose={() => setEditingUserId(null)}
@@ -226,19 +226,19 @@ const UserEditModalWrapper: React.FC<UserEditModalWrapperProps> = ({
   // ✅ Create deletion mutations with proper userId context
   const { mutate: deleteRole } = useDeleteUserRole(userId, {
     onSuccess: () => {
-      toast.success('Role removed successfully')
+      toast.success({ title: 'Role removed successfully' })
     },
     onError: () => {
-      toast.error('Error removing role')
+      toast.error({ title: 'Error removing role' })
     },
   })
 
   const { mutate: deleteVacation } = useDeleteUserVacation(userId, {
     onSuccess: () => {
-      toast.success('Vacation removed successfully')
+      toast.success({ title: 'Vacation removed successfully' })
     },
     onError: () => {
-      toast.error('Error removing vacation')
+      toast.error({ title: 'Error removing vacation' })
     },
   })
 

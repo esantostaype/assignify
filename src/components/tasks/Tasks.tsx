@@ -1,6 +1,6 @@
 "use client";
 import React, { useState, useMemo } from "react";
-import toast from "react-hot-toast";
+import { hotToast as toast } from "@/lib/hotToast";
 import { TasksList } from "./TaskList";
 import { useClickUpTasks, useRefreshTasks } from "@/hooks/queries/useTasks";
 import { Input, IconButton, Button, Tooltip, EmptyState } from "@/components/ui";
@@ -21,8 +21,8 @@ export const TasksSync: React.FC = () => {
   const { data: tasksData, isLoading: loadingTasks, error: tasksError } = useClickUpTasks();
 
   const { mutate: refreshTasks, isPending: refreshing } = useRefreshTasks({
-    onSuccess: () => toast.success("Tasks updated"),
-    onError: () => toast.error("Failed to update tasks"),
+    onSuccess: () => toast.success({ title: "Tasks updated" }),
+    onError: () => toast.error({ title: "Failed to update tasks" }),
   });
 
   const tasks = useMemo(() => {

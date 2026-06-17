@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react'
 import axios from 'axios'
-import toast from 'react-hot-toast'
+import { hotToast as toast } from '@/lib/hotToast'
 import { SuggestedAssignment } from '@/interfaces'
 
 export const useTaskSuggestion = (
@@ -86,7 +86,7 @@ export const useTaskSuggestion = (
         if (axios.isAxiosError(error)) {
           // 400 = validation error while typing: stay quiet, no toast.
           if (error.response?.status !== 400) {
-            toast.error('Failed to get assignment suggestion.')
+            toast.error({ title: 'Failed to get assignment suggestion.' })
           }
         }
       } finally {

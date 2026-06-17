@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import axios from 'axios'
-import toast from 'react-hot-toast'
+import { hotToast as toast } from '@/lib/hotToast'
 
 interface Setting {
   id: string
@@ -74,10 +74,10 @@ export const useUpdateSettings = () => {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['settings'] })
-      toast.success('Settings updated successfully')
+      toast.success({ title: 'Settings updated successfully' })
     },
     onError: (error: any) => {
-      toast.error(error.response?.data?.error || 'Error updating settings')
+      toast.error({ title: error.response?.data?.error || 'Error updating settings' })
     }
   })
 }
@@ -93,10 +93,10 @@ export const useResetSettings = () => {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['settings'] })
-      toast.success('Settings reset to defaults')
+      toast.success({ title: 'Settings reset to defaults' })
     },
     onError: (error: any) => {
-      toast.error(error.response?.data?.error || 'Error resetting settings')
+      toast.error({ title: error.response?.data?.error || 'Error resetting settings' })
     }
   })
 }

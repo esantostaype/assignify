@@ -7,7 +7,7 @@ import { Button, Input, Alert } from "@/components/ui";
 import { Icon, PiDownloadSimple, PiWarning } from "@/lib/icons";
 import { useTaskDataInvalidation } from "@/hooks/useTaskData";
 import axios from "axios";
-import toast from "react-hot-toast";
+import { hotToast as toast } from "@/lib/hotToast";
 
 interface TierData {
   id: number;
@@ -67,7 +67,7 @@ export const TierListForm: React.FC = () => {
         setTiers(response.data);
       } catch (error) {
         console.error("Error loading tiers:", error);
-        toast.error("Error loading tier settings");
+        toast.error({ title: "Error loading tier settings" });
       } finally {
         setLoadingTiers(false);
       }
@@ -118,11 +118,11 @@ export const TierListForm: React.FC = () => {
         // Invalidate task data cache so other components refresh
         invalidateTiers();
 
-        toast.success("Tier durations updated successfully");
+        toast.success({ title: "Tier durations updated successfully" });
       }
     } catch (error) {
       console.error("Error saving:", error);
-      toast.error("Error saving tier durations");
+      toast.error({ title: "Error saving tier durations" });
     } finally {
       setSavingTiers(false);
     }

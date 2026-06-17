@@ -13,7 +13,7 @@ import React, {
 import axios from "axios";
 import { Formik, Form, useFormikContext } from "formik";
 import { Button, Typography, LoadingOverlay, Spinner } from "@/components/ui";
-import toast from "react-hot-toast";
+import { hotToast as toast } from "@/lib/hotToast";
 import { useQueryClient } from "@tanstack/react-query";
 
 import {
@@ -202,19 +202,19 @@ export const CreateTaskForm: FC = () => {
   const handleSubmit = async (values: FormValues, { resetForm }: any) => {
     try {
       if (!currentTypeId) {
-        toast.error("No type found for the selected kind");
+        toast.error({ title: "No type found for the selected kind" });
         return;
       }
 
       const selectedTier = tiers.find((t) => t.id.toString() === values.tierId);
       if (!selectedTier) {
-        toast.error("Selected tier not found");
+        toast.error({ title: "Selected tier not found" });
         return;
       }
 
       const finalDurationDays = parseFloat(values.durationDays as string);
       if (finalDurationDays <= 0) {
-        toast.error("Task duration must be greater than zero.");
+        toast.error({ title: "Task duration must be greater than zero." });
         return;
       }
 
@@ -251,13 +251,11 @@ export const CreateTaskForm: FC = () => {
           minute: "2-digit",
         });
 
-      toast.success(
-        <TaskCreatedToastContent
+      toast.success({ title: <TaskCreatedToastContent
           assignedUserNames={assignedUserNames}
           startDate={fmt(createdTask.startDate)}
           endDate={fmt(createdTask.deadline)}
-        />
-      );
+        /> });
 
       // Limpia el formulario por completo: valores de Formik + estado local.
       resetForm();
@@ -265,11 +263,11 @@ export const CreateTaskForm: FC = () => {
     } catch (error: unknown) {
       setLoading(false);
       if (axios.isAxiosError(error) && error.response?.data?.error) {
-        toast.error(error.response.data.error);
+        toast.error({ title: error.response.data.error });
       } else if (axios.isAxiosError(error) && error.response?.data?.details) {
-        toast.error(`Error: ${error.response.data.details}`);
+        toast.error({ title: `Error: ${error.response.data.details}` });
       } else {
-        toast.error("Unexpected error while creating the task");
+        toast.error({ title: "Unexpected error while creating the task" });
       }
     }
   };
@@ -315,7 +313,7 @@ export const CreateTaskForm: FC = () => {
           const handleInactivityReset = () => {
             resetForm();
             resetLocalState();
-            toast("Form reset due to inactivity", { icon: "🕒" });
+            toast.neutral({ title: "Form reset due to inactivity" });
           };
 
           return (

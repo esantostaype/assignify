@@ -29,7 +29,7 @@ import {
 } from "@/hooks/useSettings";
 import { useTaskDataInvalidation } from "@/hooks/useTaskData";
 import axios from "axios";
-import toast from "react-hot-toast";
+import { hotToast as toast } from "@/lib/hotToast";
 
 interface SettingValue {
   category: string;
@@ -74,7 +74,7 @@ export const SettingsForm: React.FC = () => {
         setTiers(response.data);
       } catch (error) {
         console.error("Error loading tiers:", error);
-        toast.error("Error loading tier settings");
+        toast.error({ title: "Error loading tier settings" });
       } finally {
         setLoadingTiers(false);
       }
@@ -213,14 +213,14 @@ export const SettingsForm: React.FC = () => {
         // Invalidate task data cache so other components refresh
         invalidateTiers();
 
-        toast.success("Tier durations updated successfully");
+        toast.success({ title: "Tier durations updated successfully" });
       }
 
       // Recargar settings
       await refetch();
     } catch (error) {
       console.error("Error saving:", error);
-      toast.error("Error saving settings");
+      toast.error({ title: "Error saving settings" });
     } finally {
       setSavingTiers(false);
     }

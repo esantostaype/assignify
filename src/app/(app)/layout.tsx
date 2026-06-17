@@ -1,5 +1,4 @@
-import { CreateTaskForm, GlobalModal, Header } from '@/components'
-import { GlobalConfirmation } from '@/components/Confirmation'
+import { CreateTaskForm, Header } from '@/components'
 import { Providers } from '../providers'
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
@@ -12,8 +11,6 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         </section>
         <CreateTaskForm />
       </main>
-      <GlobalModal />
-      <GlobalConfirmation />
     </Providers>
   )
 }
