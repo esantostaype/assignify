@@ -12,7 +12,6 @@ export interface UserWorkload {
   isSpecialist: boolean
   taskCount: number
   approvalCount: number
-  totalDurationDays: number
   availableFrom: string
   availableInDays: number
   status: WorkloadStatus
