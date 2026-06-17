@@ -1,6 +1,7 @@
 
 import React, { useState } from 'react';
-import { Button, Checkbox, Select, type SelectOption } from '@/components/ui';
+import { Button, Select, type SelectOption } from '@/components/ui';
+import { Switch } from '@/components/ui/choice/Switch';
 import { Icon, PiPlus } from '@/lib/icons';
 
 interface AddRoleFormProps {
@@ -89,10 +90,9 @@ export const AddRoleForm: React.FC<AddRoleFormProps> = ({
         </Button>
       </div>
 
-      <Checkbox
+      <Switch
         size="sm"
         label="Primary role"
-        helper="Mark this role as primary; the engine prefers it before escalating to secondary roles."
         checked={isPrimary}
         onChange={(e) => setIsPrimary(e.target.checked)}
         disabled={loading}

@@ -1,7 +1,7 @@
 'use client'
-import { Layers01Icon, Queue01Icon, Settings01Icon, SwatchIcon, UserGroup03Icon } from '@hugeicons/core-free-icons'
+import { Queue01Icon, Settings01Icon, SwatchIcon, UserGroup03Icon } from '@hugeicons/core-free-icons'
 import Image from 'next/image'
-import { NavItem, SettingsForm, TaskTypesForm, TierListForm } from '@/components'
+import { NavItem, SettingsForm, TaskTypesForm } from '@/components'
 import { Button } from '@/components/ui'
 import { Icon, PiUser, PiSignOut } from '@/lib/icons'
 import { useModalStore } from '@/stores/modalStore'
@@ -13,16 +13,10 @@ export const Header = () => {
   const { openConfirmation } = useConfirmationStore()
   const { logout, user } = useAuth()
 
-  const handleTiersClick = () => {
-    openModal({
-      title: 'Tier List',
-      content: <TierListForm />
-    })
-  }
-
   const handleTypesClick = () => {
     openModal({
       title: 'Task Types',
+      description: 'Click on a task type name to edit it • Press Enter to save • Press Escape to cancel',
       content: <TaskTypesForm />
     })
   }
@@ -30,6 +24,7 @@ export const Header = () => {
   const handleSettingsClick = () => {
     openModal({
       title: 'Settings',
+      description: 'Changes will take effect immediately after saving',
       content: <SettingsForm />,
       size: 'lg'
     })
@@ -57,7 +52,6 @@ export const Header = () => {
     { href: '/tasks', label: 'Tasks', icon: Queue01Icon },
     { href: '/designers', label: 'Designers', icon: UserGroup03Icon },
     { onClick: handleTypesClick, label: 'Types', icon: SwatchIcon },
-    { onClick: handleTiersClick, label: 'Tiers', icon: Layers01Icon },
     { onClick: handleSettingsClick, label: 'Settings', icon: Settings01Icon }
   ]
 

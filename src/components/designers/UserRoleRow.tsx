@@ -1,7 +1,8 @@
 // src/components/designers/UserRoleRow.tsx
 import React from "react";
-import { Chip, IconButton, Tooltip } from "@/components/ui";
-import { Icon, PiTrash, PiStar, PiStarFill } from "@/lib/icons";
+import { IconButton, Tooltip } from "@/components/ui";
+import { Switch } from "@/components/ui/choice/Switch";
+import { Icon, PiTrash } from "@/lib/icons";
 import { useConfirmationStore } from "@/stores/confirmationStore";
 
 interface UserRoleRowProps {
@@ -36,27 +37,15 @@ export const UserRoleRow: React.FC<UserRoleRowProps> = ({
         {loading ? (
           "Loading..."
         ) : (
-          <div className="flex items-center gap-2">
-            <Tooltip
-              content={role.isPrimary ? "Unset as primary role" : "Set as primary role"}
-            >
-              <IconButton
-                aria-label={role.isPrimary ? "Unset as primary role" : "Set as primary role"}
-                size="sm"
-                color={role.isPrimary ? "warning" : "neutral"}
-                variant="ghost"
-                onClick={() => onTogglePrimary(role.id, !role.isPrimary)}
-                disabled={togglingPrimary}
-              >
-                <Icon icon={role.isPrimary ? PiStarFill : PiStar} size={16} />
-              </IconButton>
-            </Tooltip>
-            {role.isPrimary && (
-              <Chip color="warning" variant="soft" size="sm" startIcon={<Icon icon={PiStarFill} size={11} />}>
-                Primary
-              </Chip>
-            )}
-          </div>
+          <Tooltip content={role.isPrimary ? "Unset as primary role" : "Set as primary role"}>
+            <Switch
+              size="sm"
+              aria-label={role.isPrimary ? "Unset as primary role" : "Set as primary role"}
+              checked={role.isPrimary}
+              onChange={() => onTogglePrimary(role.id, !role.isPrimary)}
+              disabled={togglingPrimary}
+            />
+          </Tooltip>
         )}
       </td>
       <td className="p-2 first:pl-4 last:pr-4">

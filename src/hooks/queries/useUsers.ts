@@ -148,10 +148,10 @@ export const useSyncUsers = (options?: {
 
 export const useAddUserRole = (options?: {
   onSuccess?: () => void
-  onError?: () => void
+  onError?: (error: unknown) => void
 }) => {
   const queryClient = useQueryClient()
-  
+
   return useMutation({
     mutationFn: async (payload: { userId: string; typeId: number; brandId?: string | null; isPrimary?: boolean }) => {
       const { data } = await axios.post('/api/users/roles', payload)
@@ -223,7 +223,16 @@ export const useToggleUserRolePrimary = (userId: string, options?: {
       })
       return data
     },
-    onSuccess: () => {
+    onSuccess: (_, { roleId, isPrimary }) => {
+      // Actualización OPTIMISTA: el Switch de la fila refleja `role.isPrimary`
+      // desde esta query, así que lo escribimos al instante en vez de esperar
+      // al refetch.
+      queryClient.setQueryData<DetailedUser>(userKeys.details(userId), (old) =>
+        old
+          ? { ...old, roles: old.roles.map((r) => (r.id === roleId ? { ...r, isPrimary } : r)) }
+          : old
+      )
+
       // El cargo primario define el título del puesto que muestra la tarjeta:
       // refrescar detalle + workload + lista de usuarios.
       queryClient.invalidateQueries({ queryKey: userKeys.details(userId) })
@@ -311,7 +320,14 @@ export const useUpdateUserLevel = (userId: string, options?: {
       const { data } = await axios.patch(`/api/users/${userId}`, { level })
       return data
     },
-    onSuccess: () => {
+    onSuccess: (_, level) => {
+      // Actualización OPTIMISTA del detalle: el Select de nivel lee `user.level`
+      // de esta query. Escribirla al instante evita depender del timing del
+      // refetch (que podía repintar con el valor viejo aún en vuelo).
+      queryClient.setQueryData<DetailedUser>(userKeys.details(userId), (old) =>
+        old ? { ...old, level } : old
+      )
+
       // El nivel se muestra en la tarjeta (p.ej. "Senior UX/UI Designer"):
       // refrescar detalle + workload + lista de usuarios, y los caches del motor.
       queryClient.invalidateQueries({ queryKey: userKeys.details(userId) })

@@ -28,7 +28,7 @@ export function Progress({ value, size = 'md', color = 'primary', className }: P
       aria-valuemin={0}
       aria-valuemax={100}
       aria-valuenow={indeterminate ? undefined : Math.max(0, Math.min(100, value!))}
-      className={cn('w-full overflow-hidden rounded-full bg-neutral-200', TRACK[size], className)}
+      className={cn('w-full overflow-hidden rounded-full bg-neutral-300', TRACK[size], className)}
     >
       {indeterminate ? (
         <div className={cn('h-full w-1/3 rounded-full animate-[progress-indet_1.2s_ease-in-out_infinite]', BAR_COLOR[color])} />

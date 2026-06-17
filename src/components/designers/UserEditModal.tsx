@@ -1,5 +1,6 @@
 // src/components/designers/UserEditModal.tsx - FIXED VERSION
 import React from 'react'
+import axios from 'axios'
 import toast from 'react-hot-toast'
 import { UserRoleRow } from './UserRoleRow'
 import { UserVacationRow } from './UserVacationRow'
@@ -10,6 +11,20 @@ import { useUserDetails, useTaskTypes, useBrands, useUpdateUserLevel, useAddUser
 import { Alert, Select, type SelectOption } from '@/components/ui'
 
 type UserLevel = 'JUNIOR' | 'MID' | 'SENIOR'
+
+/**
+ * Extrae el mensaje REAL que devuelve el servidor (el endpoint responde
+ * `{ error, details? }`), p.ej. "Role already exists for this user" en un 409.
+ * Antes el toast era genérico ("Error adding role") y ocultaba la causa.
+ */
+const serverErrorMessage = (error: unknown, fallback: string): string => {
+  if (axios.isAxiosError(error)) {
+    const data = error.response?.data as { error?: string; details?: string } | undefined
+    return data?.error || data?.details || error.message || fallback
+  }
+  if (error instanceof Error) return error.message
+  return fallback
+}
 
 const LEVEL_OPTIONS: SelectOption<UserLevel>[] = [
   { value: 'JUNIOR', label: 'Junior' },
@@ -69,7 +84,9 @@ export const UserEditModal: React.FC<UserEditModalProps> = ({
   // Alta de rol gestionada aquí para poder enviar también `isPrimary`.
   const { mutate: addRole, isPending: addingRole } = useAddUserRole({
     onSuccess: () => toast.success('Role added successfully'),
-    onError: () => toast.error('Error adding role'),
+    // Muestra el mensaje real del servidor (p.ej. "Role already exists for this
+    // user" en un 409) en lugar del genérico, para que los errores sean visibles.
+    onError: (error) => toast.error(serverErrorMessage(error, 'Error adding role')),
   })
 
   // Alterna el cargo primario/secundario de un rol existente.

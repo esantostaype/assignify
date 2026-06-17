@@ -91,7 +91,7 @@ export const UsersList: React.FC<UsersListProps> = ({
             No synced designers yet.
           </p>
         ) : (
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-1 lg:grid-cols-2 xl:grid-cols-3">
             {syncedUsers.map((user) => (
               <SyncedDesignerCard
                 key={user.clickupId}

@@ -12,6 +12,7 @@ import {
   Progress,
   Alert,
   Spinner,
+  FormSeparator,
 } from "@/components/ui";
 import {
   Icon,
@@ -20,10 +21,6 @@ import {
   PiWarning,
   PiInfo,
   PiArrowsClockwise,
-  PiClock,
-  PiSquaresFour,
-  PiBriefcase,
-  type IconComponent,
 } from "@/lib/icons";
 import {
   useSettings,
@@ -323,18 +320,6 @@ export const SettingsForm: React.FC = () => {
     };
   };
 
-  // Group icons
-  const getGroupIcon = (groupName: string): IconComponent => {
-    switch (groupName) {
-      case "work_schedule":
-        return PiClock;
-      case "task_assignment":
-        return PiBriefcase;
-      default:
-        return PiGear;
-    }
-  };
-
   // Group name mapping
   const getGroupDisplayName = (groupName: string) => {
     const mapping: Record<string, string> = {
@@ -388,10 +373,8 @@ export const SettingsForm: React.FC = () => {
     <>
 
       {/* Settings Groups */}
-      <div className="space-y-6">
+      <div className="space-y-8">
         {filteredSettings.map(([groupName, settings]) => {
-          const GroupIcon = getGroupIcon(groupName);
-
           // Excluir tier_info de los settings a mostrar
           const settingsToShow = settings.filter(s => s.key !== 'tier_info');
 
@@ -400,105 +383,85 @@ export const SettingsForm: React.FC = () => {
           }
 
           return (
-            <div key={groupName}>
-              <div className="flex items-center gap-2 mb-4">
-                <Icon
-                  icon={GroupIcon}
-                  size={20}
-                  className="text-primary-600"
-                />
-                <h2 className="text-lg font-medium">
-                  {getGroupDisplayName(groupName)}
-                </h2>
-              </div>
+            <section key={groupName} className="space-y-4">
+              <FormSeparator>{getGroupDisplayName(groupName)}</FormSeparator>
 
               {settingsToShow.length > 0 && (
-                <div className="border border-(--color-border-default) rounded-lg p-4">
-                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-x-6 gap-y-4">
-                    {settingsToShow.map((setting) => {
-                      const { label, tooltip } = getSettingDisplayInfo(setting);
-                      const settingKey = `${setting.category}.${setting.key}`;
-                      const hasChanged = settingValues[settingKey]?.hasChanged ?? false;
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-x-6 gap-y-4">
+                  {settingsToShow.map((setting) => {
+                    const { label, tooltip } = getSettingDisplayInfo(setting);
+                    const settingKey = `${setting.category}.${setting.key}`;
+                    const hasChanged = settingValues[settingKey]?.hasChanged ?? false;
 
-                      return (
-                        <div key={settingKey} className="flex flex-col gap-1.5 min-w-0">
-                          <div className="flex items-center gap-2 text-sm font-medium text-(--color-text-muted)">
-                            <span className="truncate">{label}</span>
-                            {hasChanged && (
-                              <div
-                                className="w-2 h-2 bg-orange-500 rounded-full shrink-0"
-                                title="Changed"
-                              />
-                            )}
-                            <Tooltip content={tooltip}>
-                              <span className="inline-flex cursor-help text-(--color-text-subtle) shrink-0">
-                                <Icon icon={PiInfo} size={14} />
-                              </span>
-                            </Tooltip>
-                          </div>
-                          {renderSettingInput(setting)}
+                    return (
+                      <div key={settingKey} className="flex flex-col gap-1.5 min-w-0">
+                        <div className="flex items-center gap-2 text-sm font-medium text-(--color-text-muted)">
+                          <span className="truncate">{label}</span>
+                          {hasChanged && (
+                            <div
+                              className="w-2 h-2 bg-orange-500 rounded-full shrink-0"
+                              title="Changed"
+                            />
+                          )}
+                          <Tooltip content={tooltip}>
+                            <span className="inline-flex cursor-help text-(--color-text-subtle) shrink-0">
+                              <Icon icon={PiInfo} size={14} />
+                            </span>
+                          </Tooltip>
                         </div>
-                      );
-                    })}
-                  </div>
+                        {renderSettingInput(setting)}
+                      </div>
+                    );
+                  })}
                 </div>
               )}
-            </div>
+            </section>
           );
         })}
 
         {/* Tier Settings */}
-        <div>
-          <div className="flex items-center gap-2 mb-4">
-            <Icon
-              icon={PiSquaresFour}
-              size={20}
-              className="text-primary-600"
-            />
-            <h2 className="text-lg font-medium">Tier Durations</h2>
-          </div>
+        <section className="space-y-4">
+          <FormSeparator>Tier Durations</FormSeparator>
 
           {loadingTiers ? (
             <Progress />
           ) : (
-            <div className="border border-(--color-border-default) rounded-lg p-4">
-              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
-                {tiers.map((tier) => {
-                  const hasChanged = tierChanges[tier.id] !== undefined;
-                  const currentDuration = tierChanges[tier.id] ?? tier.duration;
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
+              {tiers.map((tier) => {
+                const hasChanged = tierChanges[tier.id] !== undefined;
+                const currentDuration = tierChanges[tier.id] ?? tier.duration;
 
-                  return (
-                    <div key={tier.id} className="flex flex-col gap-1.5 min-w-0">
-                      <div className="flex items-center gap-2 text-sm font-medium text-(--color-text-muted)">
-                        <span className="truncate">Tier {tier.name}</span>
-                        {hasChanged && (
-                          <div
-                            className="w-2 h-2 bg-orange-500 rounded-full shrink-0"
-                            title="Changed"
-                          />
-                        )}
-                      </div>
-                      <Input
-                        type="number"
-                        value={currentDuration.toString()}
-                        onChange={(e) => {
-                          const value = parseFloat(e.target.value);
-                          if (!isNaN(value) && value > 0) {
-                            handleTierDurationChange(tier.id, value);
-                          }
-                        }}
-                        min={0.1}
-                        step={0.1}
-                        size="sm"
-                        className={`w-full${hasChanged ? " border-warning-500" : ""}`}
-                      />
+                return (
+                  <div key={tier.id} className="flex flex-col gap-1.5 min-w-0">
+                    <div className="flex items-center gap-2 text-sm font-medium text-(--color-text-muted)">
+                      <span className="truncate">Tier {tier.name}</span>
+                      {hasChanged && (
+                        <div
+                          className="w-2 h-2 bg-orange-500 rounded-full shrink-0"
+                          title="Changed"
+                        />
+                      )}
                     </div>
-                  );
-                })}
-              </div>
+                    <Input
+                      type="number"
+                      value={currentDuration.toString()}
+                      onChange={(e) => {
+                        const value = parseFloat(e.target.value);
+                        if (!isNaN(value) && value > 0) {
+                          handleTierDurationChange(tier.id, value);
+                        }
+                      }}
+                      min={0.1}
+                      step={0.1}
+                      size="sm"
+                      className={`w-full${hasChanged ? " border-warning-500" : ""}`}
+                    />
+                  </div>
+                );
+              })}
             </div>
           )}
-        </div>
+        </section>
       </div>
 
       {/* Header */}
@@ -541,13 +504,6 @@ export const SettingsForm: React.FC = () => {
           </div>
         </Alert>
       )}
-
-      {/* Footer Info */}
-      <div className="mt-8 pt-4 border-t border-(--color-border-default)">
-        <p className="text-sm text-(--color-text-muted) text-center">
-          Changes will take effect immediately after saving
-        </p>
-      </div>
     </>
   );
 };

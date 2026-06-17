@@ -1,8 +1,30 @@
 /* eslint-disable @typescript-eslint/no-unused-vars */
 // src/components/designers/AddVacationForm.tsx - ENHANCED VERSION
 import React, { useState, useEffect } from 'react';
-import { Button, Input, Alert } from '@/components/ui';
+import { Button, Alert } from '@/components/ui';
+import { DateField } from '@/components/ui/date/DateField';
 import { Icon, PiPlus, PiWarning } from '@/lib/icons';
+
+/**
+ * Las vacaciones son fechas de calendario; el padre (y el endpoint) esperan
+ * cadenas 'YYYY-MM-DD'. El DatePicker trabaja con `Date` a medianoche LOCAL,
+ * así que convertimos usando componentes locales (NO `toISOString`, que correría
+ * el día en zonas con offset negativo, justo lo que el backend evita).
+ */
+const toDateString = (d: Date | null): string => {
+  if (!d) return '';
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
+};
+
+/** Parsea 'YYYY-MM-DD' a un `Date` a medianoche local (par del DatePicker). */
+const parseDateString = (s: string): Date | null => {
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(s);
+  if (!m) return null;
+  return new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]));
+};
 
 interface Vacation {
   id: number
@@ -129,10 +151,10 @@ export const AddVacationForm: React.FC<AddVacationFormProps> = ({
     return true;
   };
 
-  // ✅ Get today's date for min attribute
-  const getTodayString = () => {
-    const today = new Date();
-    return today.toISOString().split('T')[0];
+  // ✅ Today at local midnight — used as the `min` bound for the pickers.
+  const getTodayDate = () => {
+    const t = new Date();
+    return new Date(t.getFullYear(), t.getMonth(), t.getDate());
   };
 
   const handleAdd = () => {
@@ -145,15 +167,17 @@ export const AddVacationForm: React.FC<AddVacationFormProps> = ({
     }
   };
 
-  const handleStartDateChange = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const newStartDate = event.target.value;
+  const handleStartDateChange = (date: Date | null) => {
+    const newStartDate = toDateString(date);
     setStartDate(newStartDate);
 
     // Auto-adjust end date if it's before start date
     if (endDate && newStartDate && new Date(newStartDate) >= new Date(endDate)) {
-      const nextDay = new Date(newStartDate);
-      nextDay.setDate(nextDay.getDate() + 1);
-      setEndDate(nextDay.toISOString().split('T')[0]);
+      const nextDay = parseDateString(newStartDate);
+      if (nextDay) {
+        nextDay.setDate(nextDay.getDate() + 1);
+        setEndDate(toDateString(nextDay));
+      }
     }
   };
 
@@ -169,23 +193,21 @@ export const AddVacationForm: React.FC<AddVacationFormProps> = ({
     <div className="space-y-4">
       <div className="flex gap-2 items-end">
         <div className="flex-1">
-          <Input
+          <DateField
             label="Start Date"
-            type="date"
-            value={startDate}
+            value={parseDateString(startDate)}
             onChange={handleStartDateChange}
-            min={getTodayString()}
+            min={getTodayDate()}
             size="sm"
           />
         </div>
 
         <div className="flex-1">
-          <Input
+          <DateField
             label="End Date"
-            type="date"
-            value={endDate}
-            onChange={(event) => setEndDate(event.target.value)}
-            min={startDate || getTodayString()}
+            value={parseDateString(endDate)}
+            onChange={(date) => setEndDate(toDateString(date))}
+            min={parseDateString(startDate) ?? getTodayDate()}
             size="sm"
           />
         </div>

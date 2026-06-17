@@ -79,18 +79,25 @@ export async function POST(req: Request) {
     });
 
     if (existingRole) {
+      // Mensaje específico: este chequeo es la ÚNICA guardia para roles globales
+      // (brandId NULL), porque el índice UNIQUE de SQLite trata NULL como distinto
+      // y no bloquea duplicados de rol global.
+      const scope = brandId ? `for "${existingType.name}" in this brand` : `for "${existingType.name}" (Global)`;
       return NextResponse.json({
-        error: 'Role already exists for this user'
+        error: `This user already has a role ${scope}.`
       }, { status: 409 });
     }
 
-    // Crear el rol
+    // Crear el rol. Normalizamos brandId: '' (cadena vacía que puede llegar del
+    // Select "Global") → null, para no violar la FK a brand.
+    const normalizedBrandId = brandId && brandId.trim() !== '' ? brandId : null;
+
     const [created] = await db
       .insert(userRole)
       .values({
         userId: userId,
         typeId: typeId,
-        brandId: brandId || null,
+        brandId: normalizedBrandId,
         isPrimary: isPrimary ?? false
       })
       .returning();
@@ -114,7 +121,13 @@ export async function POST(req: Request) {
       }
     });
 
-    console.log(`✅ Role created successfully: ${newRole!.type.name} ${newRole!.brand ? `for ${newRole!.brand.name}` : '(Global)'}`);
+    if (!newRole) {
+      // No debería pasar (acabamos de insertar), pero evitamos un crash por
+      // desreferenciar null si la relectura no encuentra la fila.
+      return NextResponse.json(created, { status: 201 });
+    }
+
+    console.log(`✅ Role created successfully: ${newRole.type.name} ${newRole.brand ? `for ${newRole.brand.name}` : '(Global)'}`);
 
     return NextResponse.json(newRole, { status: 201 });
 

@@ -291,14 +291,6 @@ export const TaskTypesForm: React.FC = () => {
           </Button>
         </div>
       </div>
-
-      {/* Instructions */}
-      <div className="mt-6 pt-4 border-t border-(--color-border-default)">
-        <p className="text-sm text-(--color-text-muted) text-center">
-          Click on a task type name to edit it • Press Enter to save • Press
-          Escape to cancel
-        </p>
-      </div>
     </div>
   );
 };

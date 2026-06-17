@@ -64,6 +64,11 @@ export const GlobalConfirmation: React.FC = () => {
         if (!loading) closeConfirmation()
       }}
       size="sm"
+      // El diálogo de confirmación suele abrirse DENTRO de otro modal (p.ej.
+      // borrar un rol/vacación desde el modal de edición). El Modal usa z-index
+      // 200 por defecto, así que sin esto la confirmación quedaba al mismo nivel
+      // y TAPADA por el modal anfitrión. La elevamos por encima de todo.
+      zIndex={300}
       className="!max-w-[420px]"
       density="compact"
       staticBackdrop={loading}

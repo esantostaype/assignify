@@ -6,6 +6,7 @@ export type ModalSize = 'sm' | 'md' | 'lg'
 interface ModalState {
   isOpen: boolean
   title: string
+  description?: React.ReactNode
   content: React.ReactNode | null
   size: ModalSize
   onClose?: () => void
@@ -14,6 +15,7 @@ interface ModalState {
 interface ModalActions {
   openModal: (config: {
     title: string
+    description?: React.ReactNode
     content: React.ReactNode
     size?: ModalSize
     onClose?: () => void
@@ -26,6 +28,7 @@ export const useModalStore = create<ModalState & ModalActions>((set, get) => ({
   // State
   isOpen: false,
   title: '',
+  description: undefined,
   content: null,
   size: 'md',
   onClose: undefined,
@@ -35,6 +38,7 @@ export const useModalStore = create<ModalState & ModalActions>((set, get) => ({
     set({
       isOpen: true,
       title: config.title,
+      description: config.description,
       content: config.content,
       size: config.size || 'md',
       onClose: config.onClose,
@@ -49,6 +53,7 @@ export const useModalStore = create<ModalState & ModalActions>((set, get) => ({
     set({
       isOpen: false,
       title: '',
+      description: undefined,
       content: null,
       onClose: undefined,
     })

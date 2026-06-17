@@ -14,10 +14,16 @@ const SIZE_MAP: Record<'sm' | 'md' | 'lg', ModalSize> = {
 }
 
 export const GlobalModal: React.FC = () => {
-  const { isOpen, title, content, size, closeModal } = useModalStore()
+  const { isOpen, title, description, content, size, closeModal } = useModalStore()
 
   return (
-    <Modal open={isOpen} onClose={closeModal} title={title} size={SIZE_MAP[size] ?? 'lg'}>
+    <Modal
+      open={isOpen}
+      onClose={closeModal}
+      title={title}
+      description={description}
+      size={SIZE_MAP[size] ?? 'lg'}
+    >
       {content}
     </Modal>
   )
