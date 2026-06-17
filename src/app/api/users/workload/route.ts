@@ -5,7 +5,6 @@
 // kanban, sin depender de la copia local (que puede estar desincronizada).
 import { NextResponse } from 'next/server'
 import { prisma } from '@/utils/prisma'
-import { getNextAvailableStart } from '@/utils/task-calculation-utils'
 import { fetchActiveClickUpTasks, type ActiveClickUpTask } from '@/services/clickup-tasks.service'
 
 // Lee ClickUp en vivo: nunca pre-renderizar/cachear en build.
@@ -56,17 +55,17 @@ export async function GET() {
         const approvalCount = userTasks.filter((t) => t.status === 'ON_APPROVAL').length
         const taskCount = pendingTasks.length
 
-        // Se libera tras su última entrega pendiente (no antes de hoy); salta findes/festivos.
+        // "Se libera" = la fecha de su última entrega PENDIENTE (cuándo termina su
+        // última tarea), no antes de hoy. No avanzamos al siguiente día laborable:
+        // el usuario lo lee como la deadline real que ve en las tarjetas de tareas.
         let availableFrom: Date
         if (pendingTasks.length > 0) {
           const lastDeadline = Math.max(
             ...pendingTasks.map((t) => new Date(t.dueDate).getTime())
           )
-          availableFrom = await getNextAvailableStart(
-            new Date(Math.max(lastDeadline, now.getTime()))
-          )
+          availableFrom = new Date(Math.max(lastDeadline, now.getTime()))
         } else {
-          availableFrom = await getNextAvailableStart(now)
+          availableFrom = now
         }
         const availableInDays = Math.max(
           0,

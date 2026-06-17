@@ -9,6 +9,16 @@ interface CreateVacationRequest {
 }
 
 /**
+ * Las vacaciones son fechas de calendario (sin hora). El input envía 'YYYY-MM-DD'.
+ * `new Date('YYYY-MM-DD')` las interpreta a medianoche UTC, lo que en zonas con
+ * offset negativo (p. ej. Perú UTC-5) corre el día al anterior. Anclamos a
+ * mediodía UTC para que el día se preserve en cualquier zona razonable.
+ */
+function parseCalendarDate(s: string): Date {
+  return /^\d{4}-\d{2}-\d{2}$/.test(s) ? new Date(`${s}T12:00:00.000Z`) : new Date(s);
+}
+
+/**
  * POST /api/users/vacations
  * Agrega un nuevo período de vacaciones a un usuario
  */
@@ -27,9 +37,9 @@ export async function POST(req: Request) {
 
     console.log(`🔄 Adding vacation to user ${userId}: ${startDate} to ${endDate}`);
 
-    // Convertir fechas
-    const startDateObj = new Date(startDate);
-    const endDateObj = new Date(endDate);
+    // Convertir fechas (ancladas a mediodía UTC para no correr el día por zona horaria)
+    const startDateObj = parseCalendarDate(startDate);
+    const endDateObj = parseCalendarDate(endDate);
 
     // Validar fechas
     if (isNaN(startDateObj.getTime()) || isNaN(endDateObj.getTime())) {
