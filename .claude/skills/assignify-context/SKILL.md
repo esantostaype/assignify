@@ -71,6 +71,17 @@ Separa dos preguntas:
 - `OCCUPYING_STATUSES = [TO_DO, IN_PROGRESS]`.
 - **Fechas de calendario** (vacaciones): se anclan a **mediodía UTC** para que el día no se corra (zona Perú UTC-5).
 
+### Configuración editable (Settings en Turso)
+`WORK_HOURS` y `TASK_ASSIGNMENT_THRESHOLDS` ya NO son constantes fijas: viven en `system_settings` (Turso) y las lee `getAppSettings()` (`src/services/app-settings.service.ts`, cacheado 60s, con FALLBACK a `@/config` si la DB falla). El horario se edita en **hora local + huso** y se convierte a UTC (`utcHour = localHour - utcOffset`). Catálogo en `src/config/settings-catalog.ts`. Modal de Settings accesible desde el Header. `app-settings.service` es **solo-servidor** (no importar en componentes cliente). PATCH/reset invalidan la cache.
+
+### Niveles de diseñador (Jr/Mid/Sr)
+`user.level` (`JUNIOR`/`MID`/`SENIOR`, en Turso; enum `Level` en `src/db/enums.ts`). Se elige al crear la tarea (`LevelSelect`; NO se persiste en la tarea) y se edita por diseñador (UserEditModal → `PATCH /api/users/[userId]`). El motor (`selectBestUserWithVacationLogic`) asigna a nivel **≥ el requerido**; si el mejor del nivel pedido se libera más de `levelEscalationDays` (Settings, def 3) después que el de un nivel superior, **escala** (Jr→Mid→Sr; Mid→Sr; Sr solo Sr). El override manual (asignar a mano) ignora el nivel. Especialista/generalista quedó como desempate dentro del mismo nivel.
+
+### Tags de ClickUp con significado
+- `ongoing` → tarea continua sin fecha fija; **excluida** de `fetchActiveClickUpTasks` (no la ve el motor, el panel ni el kanban).
+- `keep` → tarea On Approval que NO debe auto-completarse.
+- Cron `GET /api/cron/complete-stale-approvals` (Vercel cron diario via `vercel.json`; protegido con `CRON_SECRET`): pasa a Complete las On Approval con deadline + 14 días, salvo tag `keep`.
+
 ## Tiempo real
 `/api/clickup-webhook` recibe eventos de ClickUp y solo hace `publishTaskUpdate` (Pusher) — **ya no escribe en la DB**. En el cliente, `usePusherTaskSync` (montado por `RealtimeListener`) invalida las queries `taskKeys.clickup()` y `workloadKeys.all` → el kanban y el panel "Carga del equipo" se repintan solos.
 
