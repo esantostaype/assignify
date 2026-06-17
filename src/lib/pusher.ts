@@ -19,6 +19,9 @@ export interface TaskUpdatePayload {
   name?: string
   status?: string
   event?: string
+  /** Estado anterior y nuevo (de history_items) para notificar "X → Y". */
+  fromStatus?: string
+  toStatus?: string
 }
 
 /**

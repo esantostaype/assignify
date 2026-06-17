@@ -80,11 +80,18 @@ export async function POST(req: Request) {
     // Notificar a los clientes en tiempo real (Pusher). La DB ya no se toca:
     // el tablero y el motor de asignación leen las tareas en vivo de ClickUp.
     if (event === 'taskDeleted' || MUTATING_EVENTS.includes(event)) {
+      // El cambio de estado viene en history_items (before/after); lo pasamos para
+      // que la notificación diga "To Do → In Progress" en vez de solo "updated".
+      const statusItem = Array.isArray(body.history_items)
+        ? body.history_items.find((h: any) => h?.field === 'status')
+        : null
       await publishTaskUpdate({
         taskId,
         name: body.task?.name,
         status: body.task?.status?.status,
         event,
+        fromStatus: statusItem?.before?.status,
+        toStatus: statusItem?.after?.status,
       })
     }
 

@@ -15,6 +15,8 @@ interface TaskUpdatePayload {
   name?: string
   status?: string
   event?: string
+  fromStatus?: string
+  toStatus?: string
 }
 
 // Conexión Pusher ÚNICA a nivel de módulo. Evita que React StrictMode (dev) o
@@ -65,16 +67,27 @@ export const usePusherTaskSync = () => {
       lastNotified.taskId = payload?.taskId
       lastNotified.at = now
 
-      const action =
-        payload?.event === 'taskCreated'
-          ? 'created'
-          : payload?.event === 'taskDeleted'
-            ? 'deleted'
-            : 'updated'
-      const message = taskName ? `Task "${taskName}" ${action}` : 'Task board updated'
+      // "in progress" → "In Progress" (los estados de ClickUp vienen en minúsculas).
+      const titleCase = (s?: string) =>
+        s ? s.replace(/\b\w/g, (c) => c.toUpperCase()) : s
+      const label = taskName ? `"${taskName}"` : 'A task'
+
+      // Descripción detallada: el cambio de estado si lo tenemos, si no la acción.
+      let body: string
+      if (payload?.event === 'taskCreated') {
+        body = `${label} was created`
+      } else if (payload?.event === 'taskDeleted') {
+        body = `${label} was deleted`
+      } else if (payload?.fromStatus && payload?.toStatus) {
+        body = `${label}: ${titleCase(payload.fromStatus)} → ${titleCase(payload.toStatus)}`
+      } else if (payload?.toStatus) {
+        body = `${label} → ${titleCase(payload.toStatus)}`
+      } else {
+        body = `${label} was updated`
+      }
 
       // UNA notificación del navegador + sonido (alert.mp3). Sin toast.
-      notifyTaskChange('Assignify · ClickUp', message)
+      notifyTaskChange('Assignify · ClickUp', body)
     }
 
     // Rebind defensivo: quita cualquier handler previo del evento antes de
