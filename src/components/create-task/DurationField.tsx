@@ -7,7 +7,6 @@ import { Typography } from '@/components/ui/typography'
 import { Icon, PiClock } from '@/lib/icons'
 import { FormValues } from '@/interfaces'
 import { formatDaysToReadable } from '@/utils/duration-utils'
-import { TextFieldError, TextFieldHelp } from '@/components'
 
 interface DurationFieldProps {
   fetchingSuggestion: boolean
@@ -64,6 +63,22 @@ export const DurationField: React.FC<DurationFieldProps> = ({
 
   const statusIndicator = getStatusIndicator()
 
+  // Texto de ayuda mostrado bajo el campo (vía la prop `helper` del Input de ui).
+  // Mismo contenido que antes mostraba <TextFieldHelp>: duración efectiva por
+  // usuario cuando hay varios asignados, o duración total cuando hay uno solo.
+  let durationHelper: React.ReactNode = null
+  if (numberOfAssignees > 1 && originalDuration > 0) {
+    durationHelper = (
+      <>
+        Effective duration per user: <strong>{formatDaysToReadable(effectiveDuration)}</strong>
+        <br />
+        ({numberOfAssignees} users working in parallel)
+      </>
+    )
+  } else if (numberOfAssignees === 1 && originalDuration > 0) {
+    durationHelper = <>Total duration: {formatDaysToReadable(originalDuration)}</>
+  }
+
   const handleInputChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const newValue = event.target.value
     setLocalInputValue(newValue)
@@ -109,25 +124,10 @@ export const DurationField: React.FC<DurationFieldProps> = ({
         onChange={handleInputChange}
         onBlur={handleBlur}
         placeholder={fetchingSuggestion ? 'Calculating suggested duration...' : 'Duration in days'}
-        invalid={touched && !!error}
+        error={touched && error ? error : undefined}
+        helper={durationHelper}
         step={0.1}
       />
-
-      {numberOfAssignees > 1 && originalDuration > 0 && (
-        <TextFieldHelp>
-          Effective duration per user: <strong>{formatDaysToReadable(effectiveDuration)}</strong>
-          <br />
-          ({numberOfAssignees} users working in parallel)
-        </TextFieldHelp>
-      )}
-
-      {numberOfAssignees === 1 && originalDuration > 0 && (
-        <TextFieldHelp>
-          Total duration: {formatDaysToReadable(originalDuration)}
-        </TextFieldHelp>
-      )}
-
-      {touched && error && <TextFieldError label={error} />}
     </div>
   )
 }

@@ -1,39 +1,21 @@
-export const DesignerCardSkeleton: React.FC = () => {
-  return (
-    <div className="p-6 rounded-lg bg-primary-500/10 border-2 border-transparent animate-pulse">
-      {/* Selection checkbox */}
-      <div className="absolute top-4 left-4">
-        <div className="w-4 h-4 bg-(--color-surface-hover) rounded"></div>
-      </div>
+// src/components/designers/DesignerCardSkeleton.tsx
+import { Skeleton } from '@/components/ui'
 
-      {/* Avatar */}
-      <div className="flex flex-col items-center gap-4">
-        <div className="w-20 h-20 bg-(--color-surface-hover) rounded-full"></div>
+// Refleja la forma de UserCard: avatar, nombre, estado, email, id y "Active".
+export const DesignerCardSkeleton = () => (
+  <div className="p-6 rounded-lg bg-primary-500/10 border-2 border-transparent flex flex-col items-center gap-4">
+    <Skeleton variant="circle" width={80} height={80} />
 
-        {/* User Info */}
-        <div className="flex-1 text-center space-y-2">
-          <div className="h-5 bg-(--color-surface-hover) rounded w-32 mx-auto"></div>
-          <div className="flex items-center gap-1 justify-center">
-            <div className="w-4 h-4 bg-(--color-surface-hover) rounded"></div>
-            <div className="h-3 bg-(--color-surface-hover) rounded w-16"></div>
-          </div>
-        </div>
-
-        {/* User Details */}
-        <div className="space-y-2 w-full">
-          <div className="flex items-center gap-1 justify-center">
-            <div className="w-4 h-4 bg-(--color-surface-hover) rounded"></div>
-            <div className="h-3 bg-(--color-surface-hover) rounded w-32"></div>
-          </div>
-          <div className="flex items-center gap-1 justify-center">
-            <div className="w-4 h-4 bg-(--color-surface-hover) rounded"></div>
-            <div className="h-3 bg-(--color-surface-hover) rounded w-20"></div>
-          </div>
-        </div>
-
-        {/* Last Active */}
-        <div className="h-3 bg-(--color-surface-hover) rounded w-24"></div>
-      </div>
+    <div className="flex flex-col items-center gap-2">
+      <Skeleton variant="text" width={140} height={18} />
+      <Skeleton variant="text" width={90} />
     </div>
-  );
-};
+
+    <div className="flex w-full flex-col items-center gap-2">
+      <Skeleton variant="text" width="70%" />
+      <Skeleton variant="text" width="45%" />
+    </div>
+
+    <Skeleton variant="text" width={100} />
+  </div>
+)

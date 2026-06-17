@@ -8,7 +8,6 @@ import { Icon, PiPlus, PiTrash } from "@/lib/icons";
 import { useTaskDataInvalidation } from "@/hooks/useTaskData";
 import axios from "axios";
 import toast from "react-hot-toast";
-import { TableTd, TableTh } from "@/components";
 import { useConfirmationStore } from "@/stores/confirmationStore";
 
 interface TaskType {
@@ -22,15 +21,15 @@ interface TaskType {
 // Agregar este componente dentro del archivo, antes del componente principal:
 const TaskTypeSkeleton: React.FC = () => (
   <tr className="border-t border-(--color-border-default) animate-pulse">
-    <TableTd>
+    <td className="p-2 first:pl-4 last:pr-4">
       <div className="h-3 bg-(--color-surface-hover) rounded w-32"></div>
-    </TableTd>
-    <TableTd>
+    </td>
+    <td className="p-2 first:pl-4 last:pr-4">
       <div className="h-3 bg-(--color-surface-hover) rounded w-20"></div>
-    </TableTd>
-    <TableTd>
+    </td>
+    <td className="p-2 first:pl-4 last:pr-4">
       <div className="size-8 bg-(--color-surface-hover) rounded"></div>
-    </TableTd>
+    </td>
   </tr>
 );
 
@@ -190,15 +189,15 @@ export const TaskTypesForm: React.FC = () => {
             <table className="w-full text-sm">
               <thead className="bg-(--color-surface-hover)">
                 <tr>
-                  <TableTh>
+                  <th className="p-2 first:pl-4 last:pr-4 text-left text-sm font-medium text-gray-300">
                     <span>Name</span>
-                  </TableTh>
-                  <TableTh>
+                  </th>
+                  <th className="p-2 first:pl-4 last:pr-4 text-left text-sm font-medium text-gray-300">
                     <span>Categories</span>
-                  </TableTh>
-                  <TableTh actions>
+                  </th>
+                  <th className="p-2 first:pl-4 last:pr-4 text-left text-sm font-medium text-gray-300 w-[5rem]">
                     <span>Actions</span>
-                  </TableTh>
+                  </th>
                 </tr>
               </thead>
               <tbody>
@@ -211,7 +210,7 @@ export const TaskTypesForm: React.FC = () => {
                   // Datos reales
                   types.map((type) => (
                     <tr key={type.id} className="border-t border-(--color-border-default)">
-                      <TableTd>
+                      <td className="p-2 first:pl-4 last:pr-4">
                         {editingId === type.id ? (
                           <Input
                             value={editingName}
@@ -231,15 +230,15 @@ export const TaskTypesForm: React.FC = () => {
                             {type.name}
                           </span>
                         )}
-                      </TableTd>
-                      <TableTd>
+                      </td>
+                      <td className="p-2 first:pl-4 last:pr-4">
                         <div>
                           <span className="text-sm text-(--color-text-muted)">
                             {type.categories?.length || 0} categories
                           </span>
                         </div>
-                      </TableTd>
-                      <TableTd>
+                      </td>
+                      <td className="p-2 first:pl-4 last:pr-4">
                         <div>
                           <IconButton
                             aria-label="Delete task type"
@@ -256,7 +255,7 @@ export const TaskTypesForm: React.FC = () => {
                             )}
                           </IconButton>
                         </div>
-                      </TableTd>
+                      </td>
                     </tr>
                   ))
                 )}

@@ -2,7 +2,6 @@
 import React from "react";
 import { IconButton } from "@/components/ui";
 import { Icon, PiTrash } from "@/lib/icons";
-import { TableTd } from "@/components";
 import { useConfirmationStore } from "@/stores/confirmationStore";
 
 interface UserRoleRowProps {
@@ -26,9 +25,9 @@ export const UserRoleRow: React.FC<UserRoleRowProps> = ({
 
   return (
     <tr className="border-b border-(--color-border-default) text-sm">
-      <TableTd>{loading ? "Loading..." : role.type.name}</TableTd>
-      <TableTd>{loading ? "Loading..." : role.brand?.name || "Global"}</TableTd>
-      <TableTd>
+      <td className="p-2 first:pl-4 last:pr-4">{loading ? "Loading..." : role.type.name}</td>
+      <td className="p-2 first:pl-4 last:pr-4">{loading ? "Loading..." : role.brand?.name || "Global"}</td>
+      <td className="p-2 first:pl-4 last:pr-4">
         {loading ? (
           "Loading..."
         ) : (
@@ -56,7 +55,7 @@ export const UserRoleRow: React.FC<UserRoleRowProps> = ({
             <Icon icon={PiTrash} size={16} />
           </IconButton>
         )}
-      </TableTd>
+      </td>
     </tr>
   );
 };

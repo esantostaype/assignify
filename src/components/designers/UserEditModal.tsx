@@ -7,7 +7,6 @@ import { AddVacationForm } from './AddVacationForm'
 import { Icon, PiUser, PiCalendarBlank } from '@/lib/icons'
 import { useUserDetails, useTaskTypes, useBrands } from '@/hooks/queries/useUsers'
 import { Alert } from '@/components/ui'
-import { TableTh } from '@/components'
 
 interface UserEditModalProps {
   userId: string
@@ -113,9 +112,9 @@ export const UserEditModal: React.FC<UserEditModalProps> = ({
           <table className="w-full">
             <thead className="bg-(--color-surface-hover)">
               <tr>
-                <TableTh>Type</TableTh>
-                <TableTh>Brand</TableTh>
-                <TableTh actions>Actions</TableTh>
+                <th className="p-2 first:pl-4 last:pr-4 text-left text-sm font-medium text-gray-300">Type</th>
+                <th className="p-2 first:pl-4 last:pr-4 text-left text-sm font-medium text-gray-300">Brand</th>
+                <th className="p-2 first:pl-4 last:pr-4 text-left text-sm font-medium text-gray-300 w-[5rem]">Actions</th>
               </tr>
             </thead>
             <tbody>
@@ -165,10 +164,10 @@ export const UserEditModal: React.FC<UserEditModalProps> = ({
           <table className="w-full">
             <thead className="bg-(--color-surface-hover)">
               <tr>
-                <TableTh>Start Date</TableTh>
-                <TableTh>End Date</TableTh>
-                <TableTh>Duration</TableTh>
-                <TableTh actions>Actions</TableTh>
+                <th className="p-2 first:pl-4 last:pr-4 text-left text-sm font-medium text-gray-300">Start Date</th>
+                <th className="p-2 first:pl-4 last:pr-4 text-left text-sm font-medium text-gray-300">End Date</th>
+                <th className="p-2 first:pl-4 last:pr-4 text-left text-sm font-medium text-gray-300">Duration</th>
+                <th className="p-2 first:pl-4 last:pr-4 text-left text-sm font-medium text-gray-300 w-[5rem]">Actions</th>
               </tr>
             </thead>
             <tbody>

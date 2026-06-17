@@ -2,7 +2,6 @@ import React from 'react'
 import { Select } from '@/components/ui'
 import { Typography } from '@/components/ui/typography'
 import { Icon, PiTarget } from '@/lib/icons'
-import { TextFieldError } from '@/components'
 
 interface PrioritySelectProps {
   value: string
@@ -34,8 +33,7 @@ export const PrioritySelect: React.FC<PrioritySelectProps> = ({
       onChange={(val) => onChange(val)}
       placeholder="Normal"
       options={PRIORITY_OPTIONS}
-      invalid={touched && !!error}
+      error={touched && error ? error : undefined}
     />
-    { touched && error && ( <TextFieldError label={ error } /> )}
 </div>
 )

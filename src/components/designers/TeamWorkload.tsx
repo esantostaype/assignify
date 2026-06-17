@@ -2,7 +2,7 @@
 // src/components/designers/TeamWorkload.tsx
 // Vista "de un vistazo" de la carga y disponibilidad de cada diseñador.
 import React from 'react'
-import { Card, Chip, Progress, Avatar, Tooltip } from '@/components/ui'
+import { Card, Chip, Progress, Avatar, Tooltip, Skeleton } from '@/components/ui'
 import { Icon, PiCalendarBlank, PiClock, PiCheckCircle, PiSparkle, PiArrowsClockwise } from '@/lib/icons'
 import { useUsersWorkload, type UserWorkload, type WorkloadStatus } from '@/hooks/queries/useWorkload'
 
@@ -102,7 +102,18 @@ export function TeamWorkload() {
     return (
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
         {Array.from({ length: 3 }).map((_, i) => (
-          <div key={i} className="h-36 rounded-lg skeleton-shimmer" />
+          <Card key={i} variant="outlined" padding="md" className="flex flex-col gap-3">
+            <div className="flex items-center gap-3">
+              <Skeleton variant="circle" width={44} height={44} />
+              <div className="flex flex-1 flex-col gap-1.5">
+                <Skeleton variant="text" width="60%" />
+                <Skeleton variant="text" width="40%" />
+              </div>
+              <Skeleton variant="rect" width={72} height={22} className="rounded-full" />
+            </div>
+            <Skeleton variant="rect" height={8} className="rounded-full" />
+            <Skeleton variant="text" width="50%" />
+          </Card>
         ))}
       </div>
     )

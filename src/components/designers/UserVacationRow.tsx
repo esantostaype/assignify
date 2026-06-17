@@ -2,7 +2,6 @@
 import React from "react";
 import { IconButton } from "@/components/ui";
 import { Icon, PiTrash } from "@/lib/icons";
-import { TableTd } from "@/components";
 import { useConfirmationStore } from "@/stores/confirmationStore";
 
 interface UserVacationRowProps {
@@ -32,12 +31,12 @@ export const UserVacationRow: React.FC<UserVacationRowProps> = ({
 
   return (
     <tr className="border-b border-(--color-border-default) text-sm">
-      <TableTd>
+      <td className="p-2 first:pl-4 last:pr-4">
         {loading ? "Loading..." : startDate.toLocaleDateString()}
-      </TableTd>
-      <TableTd>{loading ? "Loading..." : endDate.toLocaleDateString()}</TableTd>
-      <TableTd>{loading ? "Loading..." : `${durationDays} days`}</TableTd>
-      <TableTd>
+      </td>
+      <td className="p-2 first:pl-4 last:pr-4">{loading ? "Loading..." : endDate.toLocaleDateString()}</td>
+      <td className="p-2 first:pl-4 last:pr-4">{loading ? "Loading..." : `${durationDays} days`}</td>
+      <td className="p-2 first:pl-4 last:pr-4">
         {loading ? (
           "Loading..."
         ) : (
@@ -61,7 +60,7 @@ export const UserVacationRow: React.FC<UserVacationRowProps> = ({
             <Icon icon={PiTrash} size={16} />
           </IconButton>
         )}
-      </TableTd>
+      </td>
     </tr>
   );
 };

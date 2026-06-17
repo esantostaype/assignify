@@ -3,7 +3,6 @@ import { Select } from "@/components/ui";
 import { Typography } from "@/components/ui/typography";
 import { Brand } from "@/interfaces";
 import { Icon, PiTag } from "@/lib/icons";
-import { TextFieldError } from "@/components";
 
 interface BrandSelectProps {
   brands: Brand[];
@@ -32,9 +31,8 @@ export const BrandSelect: React.FC<BrandSelectProps> = ({
       onChange={(val) => onChange(val)}
       placeholder={loading ? "Loading brands..." : "Select a brand"}
       disabled={loading}
-      invalid={touched && !!error}
+      error={touched && error ? error : undefined}
       options={brands.map((brand) => ({ value: brand.id, label: brand.name }))}
     />
-    {touched && error && <TextFieldError label={error} />}
   </div>
 );

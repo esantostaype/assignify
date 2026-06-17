@@ -1,43 +1,32 @@
-export const TaskCardSkeleton: React.FC = () => {
-  return (
-    <div className="p-4 rounded-lg bg-primary-500/10 border-2 border-transparent animate-pulse">
-      {/* Header with checkbox and status */}
-      <div className="flex justify-between items-center mb-4">
-        <div className="size-6 bg-(--color-surface-hover) rounded"></div>
-        <div className="flex items-center gap-1">
-          <div className="w-4 h-4 bg-(--color-surface-hover) rounded"></div>
-          <div className="w-16 h-3 bg-(--color-surface-hover) rounded"></div>
-        </div>
-      </div>
+// src/components/tasks/TaskCardSkeleton.tsx
+import { Skeleton } from '@/components/ui'
 
-      {/* Task title */}
-      <div className="space-y-2 mb-4">
-        <div className="h-4 bg-(--color-surface-hover) rounded w-3/4"></div>
-        <div className="h-3 bg-(--color-surface-hover) rounded w-1/2"></div>
-      </div>
+// Refleja la forma de TaskCard: título (2 líneas), lista, asignados, fecha, prioridad.
+export const TaskCardSkeleton = () => (
+  <div className="p-4 rounded-lg bg-primary-500/10 border-2 border-transparent flex flex-col">
+    {/* Título */}
+    <Skeleton variant="text" height={16} width="80%" />
+    <Skeleton variant="text" height={16} width="55%" className="mt-1.5" />
 
-      {/* Space/List info */}
-      <div className="h-3 bg-(--color-surface-hover) rounded w-2/3 mb-4"></div>
+    {/* Lista */}
+    <Skeleton variant="text" width="35%" className="mt-3" />
 
-      {/* Assignees */}
-      <div className="flex items-center gap-2 mb-4">
-        <div className="w-4 h-4 bg-(--color-surface-hover) rounded"></div>
-        <div className="flex -space-x-2">
-          <div className="w-6 h-6 bg-(--color-surface-hover) rounded-full"></div>
-        </div>
-      </div>
-
-      {/* Due date */}
-      <div className="flex items-center gap-2 mb-6">
-        <div className="w-4 h-4 bg-(--color-surface-hover) rounded"></div>
-        <div className="h-3 bg-(--color-surface-hover) rounded w-20"></div>
-      </div>
-
-      {/* Priority */}
-      <div className="flex items-center gap-1">
-        <div className="w-4 h-4 bg-(--color-surface-hover) rounded"></div>
-        <div className="h-3 bg-(--color-surface-hover) rounded w-16"></div>
-      </div>
+    {/* Asignados */}
+    <div className="flex items-center gap-2 my-4">
+      <Skeleton variant="circle" width={16} height={16} />
+      <Skeleton variant="circle" width={24} height={24} />
     </div>
-  );
-};
+
+    {/* Fecha */}
+    <div className="flex items-center gap-2">
+      <Skeleton variant="circle" width={16} height={16} />
+      <Skeleton variant="text" width="50%" />
+    </div>
+
+    {/* Prioridad */}
+    <div className="mt-6 flex items-center gap-2">
+      <Skeleton variant="circle" width={16} height={16} />
+      <Skeleton variant="text" width="30%" />
+    </div>
+  </div>
+)

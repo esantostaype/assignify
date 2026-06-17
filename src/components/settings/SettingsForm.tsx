@@ -33,8 +33,6 @@ import {
 import { useTaskDataInvalidation } from "@/hooks/useTaskData"; // ✅ NUEVO IMPORT
 import axios from "axios";
 import toast from "react-hot-toast";
-import { TableTh } from "../TableTh";
-import { TableTd } from "../TableTd";
 
 interface SettingValue {
   category: string;
@@ -452,7 +450,7 @@ export const SettingsForm: React.FC = () => {
                           const hasChanged = settingValues[settingKey]?.hasChanged ?? false;
 
                           return (
-                            <TableTh key={settingKey}>
+                            <th key={settingKey} className="p-2 first:pl-4 last:pr-4 text-left text-sm font-medium text-gray-300">
                               <div className="flex items-center gap-2">
                                 <span>{label}</span>
                                 {hasChanged && (
@@ -470,7 +468,7 @@ export const SettingsForm: React.FC = () => {
                                   </span>
                                 </Tooltip>
                               </div>
-                            </TableTh>
+                            </th>
                           );
                         })}
                       </tr>
@@ -481,11 +479,11 @@ export const SettingsForm: React.FC = () => {
                           const settingKey = `${setting.category}.${setting.key}`;
 
                           return (
-                            <TableTd key={settingKey}>
+                            <td key={settingKey} className="p-2 first:pl-4 last:pr-4">
                               <div className="py-2 w-full">
                                 {renderSettingInput(setting)}
                               </div>
-                            </TableTd>
+                            </td>
                           );
                         })}
                       </tr>
@@ -519,7 +517,7 @@ export const SettingsForm: React.FC = () => {
                       const hasChanged = tierChanges[tier.id] !== undefined;
 
                       return (
-                        <TableTh key={tier.id}>
+                        <th key={tier.id} className="p-2 first:pl-4 last:pr-4 text-left text-sm font-medium text-gray-300">
                           <div className="flex items-center gap-2">
                             <span>Tier {tier.name}</span>
                             {hasChanged && (
@@ -529,7 +527,7 @@ export const SettingsForm: React.FC = () => {
                               />
                             )}
                           </div>
-                        </TableTh>
+                        </th>
                       );
                     })}
                   </tr>
@@ -542,7 +540,7 @@ export const SettingsForm: React.FC = () => {
                         tierChanges[tier.id] ?? tier.duration;
 
                       return (
-                        <TableTd key={tier.id}>
+                        <td key={tier.id} className="p-2 first:pl-4 last:pr-4">
                           <div className="py-2 px-2 w-full">
                             <Input
                               type="number"
@@ -559,7 +557,7 @@ export const SettingsForm: React.FC = () => {
                               className={`w-18${hasChanged ? " border-warning-500" : ""}`}
                             />
                           </div>
-                        </TableTd>
+                        </td>
                       );
                     })}
                   </tr>

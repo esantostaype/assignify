@@ -3,7 +3,6 @@ import React from "react";
 import { Select } from "@/components/ui";
 import { Typography } from "@/components/ui/typography";
 import { Icon, PiSteps } from "@/lib/icons";
-import { TextFieldError } from "@/components";
 import { formatDaysToReadable } from "@/utils/duration-utils";
 import { TierInfo } from "@/interfaces";
 
@@ -47,7 +46,7 @@ export const TierSelect: React.FC<TierSelectProps> = ({
         value={value ?? undefined}
         onChange={(val) => onChange(val)}
         disabled={loading}
-        invalid={!!(touched && error)}
+        error={touched && error ? error : undefined}
         options={sortedTiers.map((tier) => ({
           value: tier.id.toString(),
           label: (
@@ -61,8 +60,6 @@ export const TierSelect: React.FC<TierSelectProps> = ({
           searchValue: tier.name,
         }))}
       />
-
-      {touched && error && <TextFieldError label={error} />}
     </div>
   );
 };

@@ -15,7 +15,6 @@ import {
   PiLightning,
 } from "@/lib/icons";
 import type { IconComponent } from "@/lib/icons";
-import { TextFieldError } from "@/components";
 import { useEnhancedUsers } from "@/hooks";
 
 interface UserAssignmentSelectProps {
@@ -372,12 +371,9 @@ export const UserAssignmentSelect: React.FC<UserAssignmentSelectProps> = ({
         onChange={(val) => onChange(val)}
         placeholder={getPlaceholder()}
         disabled={isLoading || !info?.tierId || !info?.brandId}
-        invalid={!!(touched && error)}
+        error={touched && error ? error : undefined}
         noResultsLabel="No compatible designers found"
       />
-
-      {/* Error display */}
-      {touched && error && <TextFieldError label={error} />}
     </div>
   );
 };

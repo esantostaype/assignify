@@ -4,11 +4,10 @@
 import React, { useState, useEffect, FC, Dispatch, SetStateAction } from "react";
 import axios from "axios";
 import { Formik, Form, useFormikContext } from "formik";
-import { Button, Typography } from "@/components/ui";
+import { Button, Typography, LoadingOverlay, Spinner } from "@/components/ui";
 import toast from "react-hot-toast";
 import { useQueryClient } from "@tanstack/react-query";
 
-import { SpinnerCreatingTask, SpinnerSearching } from "@/components";
 import {
   TaskKindSwitch,
   TaskNameField,
@@ -225,8 +224,13 @@ export const CreateTaskForm: FC = () => {
 
   return (
     <aside className="bg-(--color-surface-app) sticky w-[28rem] p-10 h-dvh overflow-y-auto top-0 border-l border-l-(--color-border-default)">
-      <SpinnerCreatingTask isActive={loading} />
-      <SpinnerSearching isActive={fetchingSuggestion} />
+      <LoadingOverlay open={loading} label="Creating Task..." />
+      {fetchingSuggestion && (
+        <div className="mb-4 flex items-center gap-2 rounded-lg bg-primary-500/10 px-3 py-2 text-sm text-primary-600">
+          <Spinner size={16} colorClassName="text-primary-600" />
+          Buscando diseñador sugerido...
+        </div>
+      )}
       <Formik
         initialValues={initialValues}
         validationSchema={validationSchema}

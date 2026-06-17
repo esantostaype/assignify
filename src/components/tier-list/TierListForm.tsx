@@ -8,7 +8,6 @@ import { Icon, PiDownloadSimple, PiWarning } from "@/lib/icons";
 import { useTaskDataInvalidation } from "@/hooks/useTaskData";
 import axios from "axios";
 import toast from "react-hot-toast";
-import { TableTd, TableTh } from "@/components";
 
 interface TierData {
   id: number;
@@ -21,22 +20,22 @@ interface TierData {
 const TierSkeleton: React.FC = () => {
   // Crear 4 columnas de skeleton para simular los tiers
   const skeletonColumns = Array.from({ length: 6 }, (_, index) => (
-    <TableTh key={index}>
+    <th key={index} className="p-2 first:pl-4 last:pr-4 text-left text-sm font-medium text-gray-300">
       <div className="flex items-center gap-2 justify-center animate-pulse">
         <div className="h-4 bg-(--color-surface-hover) rounded w-16"></div>
       </div>
-    </TableTh>
+    </th>
   ));
 
   const skeletonInputs = Array.from({ length: 6 }, (_, index) => (
-    <TableTd key={index}>
+    <td key={index} className="p-2 first:pl-4 last:pr-4">
       <div className="pt-2 w-full flex justify-center animate-pulse">
         <div className="flex flex-col items-center gap-1">
           <div className="h-10 bg-(--color-surface-hover) rounded w-24"></div>
           <div className="h-3 bg-(--color-surface-hover) rounded w-8"></div>
         </div>
       </div>
-    </TableTd>
+    </td>
   ));
 
   return (
@@ -157,7 +156,7 @@ export const TierListForm: React.FC = () => {
                     const hasChanged = tierChanges[tier.id] !== undefined;
 
                     return (
-                      <TableTh key={tier.id}>
+                      <th key={tier.id} className="p-2 first:pl-4 last:pr-4 text-left text-sm font-medium text-gray-300">
                         <div className="flex items-center gap-2 justify-center">
                           <span>Tier {tier.name}</span>
                           {hasChanged && (
@@ -167,7 +166,7 @@ export const TierListForm: React.FC = () => {
                             />
                           )}
                         </div>
-                      </TableTh>
+                      </th>
                     );
                   })}
                 </tr>
@@ -180,7 +179,7 @@ export const TierListForm: React.FC = () => {
                       tierChanges[tier.id] ?? tier.duration;
 
                     return (
-                      <TableTd key={tier.id}>
+                      <td key={tier.id} className="p-2 first:pl-4 last:pr-4">
                         <div className="pt-2 w-full flex justify-center">
                           <div className="flex flex-col items-center gap-1">
                             <Input
@@ -202,7 +201,7 @@ export const TierListForm: React.FC = () => {
                             <span className="text-xs text-(--color-text-muted)">days</span>
                           </div>
                         </div>
-                      </TableTd>
+                      </td>
                     );
                   })}
                 </tr>
