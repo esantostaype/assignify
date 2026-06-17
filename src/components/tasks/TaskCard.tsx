@@ -7,6 +7,18 @@ import {
 } from "@/lib/icons";
 import { Avatar } from "@/components/ui";
 
+// Color del avatar: usa el color real de ClickUp; si el usuario no tiene uno
+// asignado (ClickUp lo devuelve vacío), genera uno determinista a partir de su id
+// para que cada persona tenga un color consistente y distinto (como hace ClickUp).
+function avatarColor(color: string | undefined, seed: string): string {
+  if (color && color.trim()) return color;
+  let hash = 0;
+  for (let i = 0; i < seed.length; i++) {
+    hash = seed.charCodeAt(i) + ((hash << 5) - hash);
+  }
+  return `hsl(${Math.abs(hash) % 360}, 60%, 45%)`;
+}
+
 interface TaskCardProps {
   task: {
     clickupId: string;
@@ -120,7 +132,7 @@ export const TaskCard: React.FC<TaskCardProps> = ({ task }) => {
                 src={assignee.profilePicture || undefined}
                 title={`${assignee.name} (${assignee.email})`}
                 style={{
-                  backgroundColor: assignee.color,
+                  backgroundColor: avatarColor(assignee.color, assignee.id),
                   fontSize: "0.7rem",
                   zIndex: task.assignees.length - index,
                 }}
