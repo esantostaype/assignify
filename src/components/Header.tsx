@@ -1,12 +1,12 @@
 'use client'
 import { useState } from 'react'
 import { Queue01Icon, Settings01Icon, SwatchIcon, UserGroup03Icon } from '@hugeicons/core-free-icons'
-import Image from 'next/image'
 import { NavItem, SettingsForm, TaskTypesForm } from '@/components'
 import { Button, Modal, AlertDialog } from '@/components/ui'
 import { Icon, PiUser, PiSignOut } from '@/lib/icons'
 import { useAuth } from '@/contexts/AuthContext'
 import { ThemeToggle } from '@/components/ThemeToggle'
+import { Logo } from '@/components/Logo'
 
 export const Header = () => {
   const { logout, user } = useAuth()
@@ -37,7 +37,7 @@ export const Header = () => {
     <>
       <header className="sticky top-0 bg-(--color-surface-header) z-50 flex items-center justify-between px-4 border-b border-b-(--color-border-default)">
         <div className='flex items-center gap-4'>
-          <Image src="/images/logo.svg" alt="Assignify" width={132} height={38} />
+          <Logo width={132} height={38} />
           <ul className="flex items-center gap-3 text-sm mb-[-1px]">
             {navItems.map((item, index) => (
               <NavItem key={item.href || index} {...item} />

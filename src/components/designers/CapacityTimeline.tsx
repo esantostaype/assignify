@@ -137,7 +137,7 @@ export const CapacityTimeline: React.FC<CapacityTimelineProps> = ({ workload, lo
                 {u.name}
               </div>
 
-              <div className="relative h-7 flex-1 overflow-hidden rounded bg-(--color-surface-subtle)">
+              <div className="relative h-7 flex-1 overflow-hidden rounded bg-black/[0.04] dark:bg-white/[0.06]">
                 {/* Bandas de vacaciones (al fondo). */}
                 {vacations.map((v, i) => {
                   const left = pos(v.startDate);

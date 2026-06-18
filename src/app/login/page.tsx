@@ -4,7 +4,7 @@ import React, { useState } from "react";
 import { signIn } from "next-auth/react";
 import { Button, Input, Alert } from "@/components/ui";
 import { Icon, PiUser, PiLock, PiSignOut } from "@/lib/icons";
-import Image from "next/image";
+import { Logo } from "@/components/Logo";
 
 export default function LoginPage() {
   const [email, setEmail] = useState("");
@@ -41,7 +41,7 @@ export default function LoginPage() {
   return (
       <div className="flex min-h-screen items-center justify-center p-4">
         <div className="w-full max-w-md bg-(--color-surface-card) p-10 rounded-lg">
-          <Image src="/images/logo.svg" alt="Assignify" width={160} height={38} className="mx-auto mb-8" />
+          <Logo width={160} height={38} className="mx-auto mb-8" />
           {error && (
             <Alert tone="error" className="mb-4">
               {error}

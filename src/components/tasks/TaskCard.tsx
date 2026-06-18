@@ -110,7 +110,7 @@ export const TaskCard: React.FC<TaskCardProps> = ({ task }) => {
   })();
 
   return (
-    <div className="p-4 rounded-lg relative border-2 border-transparent flex flex-col justify-between bg-primary-500/10">
+    <div className="p-4 rounded-lg relative border border-(--color-border-default) flex flex-col justify-between bg-(--color-surface-card)">
       {/* Task Info */}
       <h3 className="font-semibold leading-tight line-clamp-2 mb-1 text-sm">{task.name}</h3>
 
