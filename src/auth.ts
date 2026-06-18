@@ -79,9 +79,32 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
     // con el token de cada quien). Side-effect: no altera el JWT.
     async signIn({ account, user, profile }) {
       if (account?.provider !== 'clickup' || !account.access_token || !user?.id) return
+      const token = account.access_token
       const cu = (profile as ClickUpProfile | undefined)?.user
-      const enc = encryptSecret(account.access_token)
+      const enc = encryptSecret(token)
       const now = new Date()
+
+      // Workspace activo: consultamos los workspaces autorizados del usuario y
+      // guardamos el primero (un picker para multi-workspace es fase posterior).
+      // Si falla, NO bloqueamos el login; el workspace se completará luego.
+      let workspaceId: string | null = null
+      let workspaceName: string | null = null
+      try {
+        const res = await fetch('https://api.clickup.com/api/v2/team', {
+          headers: { Authorization: `Bearer ${token}` },
+        })
+        if (res.ok) {
+          const data = (await res.json()) as { teams?: { id: string | number; name?: string }[] }
+          const team = data.teams?.[0]
+          if (team) {
+            workspaceId = String(team.id)
+            workspaceName = team.name ?? null
+          }
+        }
+      } catch {
+        /* sin bloquear el login */
+      }
+
       await db
         .insert(clickupConnection)
         .values({
@@ -89,6 +112,8 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
           email: cu?.email ?? user.email ?? null,
           username: cu?.username ?? user.name ?? null,
           accessTokenEnc: enc,
+          workspaceId,
+          workspaceName,
         })
         .onConflictDoUpdate({
           target: clickupConnection.clickupUserId,
@@ -96,6 +121,8 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
             accessTokenEnc: enc,
             email: cu?.email ?? user.email ?? null,
             username: cu?.username ?? user.name ?? null,
+            // Solo sobreescribe el workspace si lo pudimos resolver ahora.
+            ...(workspaceId ? { workspaceId, workspaceName } : {}),
             updatedAt: now,
           },
         })
