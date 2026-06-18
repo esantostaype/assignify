@@ -98,23 +98,22 @@ tareas, y todo queda **aislado por inquilino** (un usuario nunca ve datos de otr
       el PK debería ser (workspaceId, id). Migración posterior.
     - Unicidad real por (workspaceId, …) en task_type/tier_list/system_settings.
   - Requiere `DEFAULT_WORKSPACE_ID=90170099166` en `.env`/Vercel.
-- **Fase 3 — apenas la BASE; el grueso PENDIENTE (2 blockers):**
-  - Hecho: `getCurrentClickUpContext()` (token de ClickUp por usuario + teamId;
-    fallback al token global para el admin email/password).
-  - **PENDIENTE (grueso):** enhebrar `{token, teamId}` por TODA la capa de ClickUp
-    (`clickup-tasks.service`: `cu`/`fetchActiveClickUpTasks` con token + crawl acotado
-    al teamId + cache por team; `clickup.service`: `createTaskInClickUp`; el motor
-    `getVacationAwareUserSlots` ← suggestion/parallel; workload; kanban sync;
-    sync-users) para que cada inquilino lea/cree con SU token y SU workspace.
-  - **BLOCKER 1 — ids de workspace NO alineados con ClickUp**: la config de Turso
-    quedó etiquetada con **90170099166** (= `brand.team_id`, probablemente STALE),
-    pero el token ve los teams REALES **"Inszoneins"=9017044866** y "OAuth"=90171327636.
-    Para Fase 3 el `workspaceId` DEBE ser el **team id real de ClickUp**. Primera tarea
-    de Fase 3: confirmar el team real (casi seguro **9017044866**), re-backfillear Turso
-    a ese id y ajustar `DEFAULT_WORKSPACE_ID`. (Fase 2 funciona igual: es consistente
-    internamente.)
-  - **BLOCKER 2 — testabilidad**: validar el aislamiento real requiere un SEGUNDO
-    workspace con tareas/miembros propios (el "OAuth" está vacío).
+- **Fase 3 — HECHA (threading completo); falta validar en vivo + hardening):**
+  - `getCurrentClickUpContext()` → `{ token, teamId }` (token de ClickUp del usuario,
+    descifrado; fallback global+DEFAULT_WORKSPACE_ID para el admin email/password).
+  - Enhebrado `{token, teamId}` por TODA la capa: `clickup-tasks.service`
+    (`fetchActiveClickUpTasks`/`getActiveClickUpTasksByUser` con token + crawl acotado
+    al teamId + **caché por workspace**), `clickup.service` (`createTaskInClickUp` con
+    el token del usuario), `parallel-priority-insertion`, el motor
+    (`getVacationAwareUserSlots`/`getRankedCandidates`/`getBestUserWithCache`), y las
+    rutas suggestion/parallel/workload/kanban-sync/sync-users.
+  - **Alineación de ids RESUELTA**: el `brand.team_id` 90170099166 era STALE.
+    Verificado que los brand-lists viven bajo **"Inszoneins" = 9017044866** (ese es el
+    team real). Re-backfill aplicado a 9017044866. → `DEFAULT_WORKSPACE_ID=9017044866`.
+    El workspace de pruebas "Inszone Insurance" (ex-"OAuth") = 90171327636.
+  - **Pendiente**: validar en vivo (admin Inszone vs login ClickUp del workspace de
+    pruebas); hardening de Fase 2 (settings por workspace, sub-rutas, PK de user,
+    uniques); selector multi-workspace; webhooks por workspace (Fase 4).
   - **OJO discrepancia de ids**: el token global ve "Inszoneins"=9017044866 y
     "OAuth"=90171327636, pero los brands traen team_id 90170099166. Para Fase 2
     basta la CONSISTENCIA interna (todo etiquetado 90170099166 + `DEFAULT_WORKSPACE_ID`
