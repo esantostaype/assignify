@@ -57,6 +57,20 @@ tareas, y todo queda **aislado por inquilino** (un usuario nunca ve datos de otr
 5. **Onboarding:** primer login → conectar ClickUp → sincronizar miembros/listas →
    definir task types / tiers → empezar a asignar.
 
+## Progreso
+
+- **Rama:** `feat/saas-multi-tenant`.
+- **Fase 1 — EN CURSO (scaffolding hecho, falta probar con creds reales):**
+  - Provider `clickup` (OAuth) en `src/auth.ts` (+ botón "Continue with ClickUp" en login).
+  - Tabla `clickup_connection` (token cifrado por usuario) en `src/db/schema.ts`.
+  - `src/lib/crypto.ts` (AES-256-GCM, clave de `ENCRYPTION_KEY`/`AUTH_SECRET`).
+  - `events.signIn` guarda el token cifrado al loguear con ClickUp.
+  - **PENDIENTE para activarlo:** crear la OAuth app en ClickUp y definir
+    `AUTH_CLICKUP_ID` / `AUTH_CLICKUP_SECRET` (+ `ENCRYPTION_KEY` recomendado);
+    correr `npx drizzle-kit push` para crear `clickup_connection` en Turso;
+    probar el flujo (el provider es custom y puede necesitar ajuste fino).
+  - El login email/password sigue intacto (no se rompió el single-tenant).
+
 ## Plan por fases (sugerido)
 
 1. **Auth ClickUp OAuth** (login + token cifrado por usuario) conviviendo con el

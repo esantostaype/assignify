@@ -132,6 +132,24 @@ export const authUser = sqliteTable('auth_user', {
   updatedAt: updatedAt(),
 })
 
+// [SaaS v2] Conexión de ClickUp por usuario: guarda el token (CIFRADO) que devuelve
+// el OAuth de ClickUp al iniciar sesión con ClickUp. Es la base del modo
+// multi-inquilino (cada usuario opera su propio workspace con SU token). El token
+// de ClickUp no expira. NO se guarda jamás en claro.
+export const clickupConnection = sqliteTable('clickup_connection', {
+  // id de usuario en ClickUp (== id de la cuenta cuando se loguea con ClickUp).
+  clickupUserId: text('clickup_user_id').primaryKey(),
+  email: text('email'),
+  username: text('username'),
+  // Token de acceso de ClickUp cifrado (AES-256-GCM); ver src/lib/crypto.ts.
+  accessTokenEnc: text('access_token_enc').notNull(),
+  // Workspace activo del usuario (se completa en fase 2; por ahora opcional).
+  workspaceId: text('workspace_id'),
+  workspaceName: text('workspace_name'),
+  createdAt: createdAt(),
+  updatedAt: updatedAt(),
+})
+
 export const syncLog = sqliteTable('sync_log', {
   id: integer('id').primaryKey({ autoIncrement: true }),
   entityType: text('entity_type').notNull(),
