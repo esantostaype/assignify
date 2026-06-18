@@ -41,7 +41,7 @@ interface CapacityTimelineProps {
 }
 
 export const CapacityTimeline: React.FC<CapacityTimelineProps> = ({ workload, loading }) => {
-  const { windowStart, spanMs, ticks, rows } = useMemo(() => {
+  const { windowStart, spanMs, ticks, rows, weekends } = useMemo(() => {
     const start = startOfToday();
     let maxEnd = start + MIN_DAYS * DAY_MS;
     for (const u of workload) {
@@ -59,9 +59,26 @@ export const CapacityTimeline: React.FC<CapacityTimelineProps> = ({ workload, lo
       tickList.push({ leftPct: ((d * DAY_MS) / span) * 100, label: fmt(start + d * DAY_MS) });
     }
 
+    // Bandas de fin de semana (sáb/dom): explican los huecos entre tareas, que el
+    // motor genera al saltar los días no laborables. Se agrupan días consecutivos.
+    const weekendList: { leftPct: number; widthPct: number }[] = [];
+    for (let d = 0; d < totalDays; ) {
+      const dow = new Date(start + d * DAY_MS).getDay();
+      if (dow === 0 || dow === 6) {
+        let len = 1;
+        while (d + len < totalDays) {
+          const next = new Date(start + (d + len) * DAY_MS).getDay();
+          if (next === 0 || next === 6) len++;
+          else break;
+        }
+        weekendList.push({ leftPct: ((d * DAY_MS) / span) * 100, widthPct: ((len * DAY_MS) / span) * 100 });
+        d += len;
+      } else d++;
+    }
+
     // Más cargados arriba (mayor fecha de liberación primero) → los cuellos de botella saltan a la vista.
     const sorted = [...workload].sort((a, b) => b.availableInDays - a.availableInDays);
-    return { windowStart: start, spanMs: span, ticks: tickList, rows: sorted };
+    return { windowStart: start, spanMs: span, ticks: tickList, rows: sorted, weekends: weekendList };
   }, [workload]);
 
   const clampPct = (p: number) => Math.max(0, Math.min(100, p));
@@ -138,6 +155,15 @@ export const CapacityTimeline: React.FC<CapacityTimelineProps> = ({ workload, lo
               </div>
 
               <div className="relative h-7 flex-1 overflow-hidden rounded bg-black/[0.04] dark:bg-white/[0.06]">
+                {/* Fines de semana (capa más al fondo): explican los huecos. */}
+                {weekends.map((w, i) => (
+                  <div
+                    key={`w${i}`}
+                    className="absolute inset-y-0 bg-(--color-text-muted)/[0.12]"
+                    style={{ left: `${w.leftPct}%`, width: `${w.widthPct}%` }}
+                  />
+                ))}
+
                 {/* Bandas de vacaciones (al fondo). */}
                 {vacations.map((v, i) => {
                   const left = pos(v.startDate);
