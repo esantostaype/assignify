@@ -71,6 +71,28 @@ tareas, y todo queda **aislado por inquilino** (un usuario nunca ve datos de otr
     probar el flujo (el provider es custom y puede necesitar ajuste fino).
   - El login email/password sigue intacto (no se rompió el single-tenant).
 
+- **Fase 2 — base hecha; falta el SWEEP de scoping:**
+  - Workspace activo se resuelve y guarda al loguear (`clickup_connection.workspaceId`).
+  - Mapeo de estados robusto por `type` de ClickUp (3 buckets) + tests.
+  - Columnas `workspace_id` (nullable) en `user`, `task_type`, `tier_list`, `brand`,
+    `system_settings`, `task_meta` (solo ALTER ADD; uniques intactos).
+  - `getCurrentWorkspaceId()` en `src/lib/workspace.ts` (ClickUp → su workspace;
+    email/password → `DEFAULT_WORKSPACE_ID`).
+  - `scripts/backfill-workspace.js` aplicado; data actual etiquetada al workspace
+    de Inszone **90170099166** (= `brand.team_id`).
+  - **PENDIENTE (el grueso): el SWEEP** — filtrar por `workspaceId` en CADA query de
+    config y enhebrarlo por los servicios (motor `task-assignment`, `getAppSettings`,
+    rutas `/api/users|types|tiers|brands|users/workload|tasks/parallel|suggestion`).
+    Es donde un olvido = fuga entre inquilinos → hacerlo archivo por archivo.
+  - **OJO discrepancia de ids**: el token global ve "Inszoneins"=9017044866 y
+    "OAuth"=90171327636, pero los brands traen team_id 90170099166. Para Fase 2
+    basta la CONSISTENCIA interna (todo etiquetado 90170099166 + `DEFAULT_WORKSPACE_ID`
+    = 90170099166 → el admin ve su data). Resolver cuál es el id "real" de ClickUp
+    es asunto de Fase 3 (lectura de tareas por token/workspace).
+  - **Para activar/probar Fase 2**: poner `DEFAULT_WORKSPACE_ID=90170099166` en `.env`
+    (y Vercel). El usuario que entra por ClickUp cae en su workspace propio (vacío);
+    para ver la data de Inszone, entrar con email/password (→ DEFAULT).
+
 ## Plan por fases (sugerido)
 
 1. **Auth ClickUp OAuth** (login + token cifrado por usuario) conviviendo con el
