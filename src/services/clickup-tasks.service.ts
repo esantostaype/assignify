@@ -75,8 +75,9 @@ function isSyncableTask(t: any): boolean {
   if (isOngoing) return false
 
   const s = t.status?.status || ''
-  if (!isActiveTaskStatus(s)) return false
-  const mapped = mapClickUpStatusToLocal(s)
+  const sType = t.status?.type || ''
+  if (!isActiveTaskStatus(s, sType)) return false
+  const mapped = mapClickUpStatusToLocal(s, sType)
   const valid = mapped !== null && getValidLocalStatuses().includes(mapped)
   return valid && !!t.start_date && !!t.due_date
 }
@@ -147,7 +148,7 @@ export async function fetchActiveClickUpTasks(): Promise<ActiveClickUpTask[]> {
     result.push({
       clickupId: t.id,
       name: t.name,
-      status: mapClickUpStatusToLocal(t.status?.status || '') as LocalTaskStatus,
+      status: mapClickUpStatusToLocal(t.status?.status || '', t.status?.type || '') as LocalTaskStatus,
       priority: t.priority?.priority || 'normal',
       priorityColor: t.priority?.color || '#6366f1',
       assignees: (t.assignees || []).map((a: any) => ({

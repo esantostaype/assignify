@@ -7,8 +7,20 @@ export type LocalTaskStatus = 'TO_DO' | 'IN_PROGRESS' | 'ON_APPROVAL' | 'COMPLET
  * @param clickupStatus - The status string from ClickUp
  * @returns Local status or null if task should be excluded (completed)
  */
-export function mapClickUpStatusToLocal(clickupStatus: string): LocalTaskStatus | null {
+export function mapClickUpStatusToLocal(
+  clickupStatus: string,
+  clickupType?: string
+): LocalTaskStatus | null {
   const statusLower = clickupStatus.toLowerCase().trim();
+
+  // ✅ MULTI-TENANT: ClickUp marca cada estado con un `type`
+  // (open | custom | done | closed). Es la señal MÁS fiable y NO depende del
+  // nombre (que varía por workspace). Si está cerrado/terminado → se excluye,
+  // sin importar cómo lo llamen.
+  const type = (clickupType || '').toLowerCase().trim();
+  if (type === 'done' || type === 'closed') {
+    return null; // tarea terminada → excluida
+  }
 
   // ✅ ON APPROVAL - Estados de revisión/aprobación (PRIMERO para evitar conflictos)
   if (statusLower === 'on approval' || 
@@ -50,8 +62,9 @@ export function mapClickUpStatusToLocal(clickupStatus: string): LocalTaskStatus 
     return null; // Exclude completed tasks
   }
 
-  // Por defecto, estados desconocidos van a TO DO
-  return 'TO_DO';
+  // Sin coincidencia de nombre: decidir por el `type` de ClickUp.
+  // 'custom' suele ser un estado intermedio del flujo → IN_PROGRESS; el resto → TO_DO.
+  return type === 'custom' ? 'IN_PROGRESS' : 'TO_DO';
 }
 
 /**
@@ -90,8 +103,8 @@ export function mapLocalStatusToColumn(localStatus: LocalTaskStatus): string | n
  * @param clickupStatus - The status string from ClickUp
  * @returns true if task is active, false if completed
  */
-export function isActiveTaskStatus(clickupStatus: string): boolean {
-  const mapped = mapClickUpStatusToLocal(clickupStatus);
+export function isActiveTaskStatus(clickupStatus: string, clickupType?: string): boolean {
+  const mapped = mapClickUpStatusToLocal(clickupStatus, clickupType);
   return mapped !== null; // null means completed/excluded
 }
 
