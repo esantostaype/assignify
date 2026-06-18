@@ -1,0 +1,81 @@
+---
+name: assignify-saas-roadmap
+description: >-
+  Plan y decisiones de diseño para convertir Assignify (hoy SINGLE-TENANT: un
+  solo workspace de ClickUp vía CLICKUP_API_TOKEN global) en un SaaS
+  MULTI-INQUILINO donde cada usuario inicia sesión con ClickUp (OAuth) y opera su
+  PROPIO workspace, con datos aislados. CONSULTA esta skill cuando se trabaje en la
+  transformación multi-tenant de Assignify: login con ClickUp OAuth, tokens por
+  usuario, aislamiento de datos por workspace, webhooks por workspace, o el
+  renombrado de "Designers" a "Team/Members". NO aplica al funcionamiento
+  single-tenant actual (para eso usa la skill assignify-context).
+---
+
+# Assignify → SaaS multi-inquilino (roadmap v2)
+
+> Estado: **PLANEADO, no implementado.** La app en producción es single-tenant
+> (un workspace de ClickUp, `CLICKUP_API_TOKEN` global). Este documento captura el
+> diseño acordado para transformarla en un SaaS donde cada persona conecta su
+> propio ClickUp. Trabajar esto en una **rama aparte**; no romper el single-tenant.
+
+## Objetivo
+
+Cualquier persona/empresa puede usar Assignify con **su propio workspace de
+ClickUp**: inicia sesión con ClickUp, la app sincroniza SUS miembros / listas /
+tareas, y todo queda **aislado por inquilino** (un usuario nunca ve datos de otro).
+
+## Decisiones tomadas
+
+- **Login = "Conectar con ClickUp" (ClickUp OAuth).** Un solo paso autentica a la
+  persona Y vincula su workspace + token. El email/password (y Google) quedan
+  opcionales o se eliminan. Auth.js soporta ClickUp como **provider OAuth custom**
+  (ClickUp expone OAuth2; sus tokens **no expiran** → no hay refresh que manejar).
+- **Sí es SaaS multi-inquilino** (terceros con su propio ClickUp), no solo sumar
+  operadores de Inszone al mismo workspace.
+- **Renombrar "Designers" → "Team" / "Members"** (la app deja de ser específica de
+  diseño). Los `task_type` (UX/UI, Graphic) y `tier_list` pasan a ser **config por
+  workspace** que cada usuario define.
+
+## Cambios de arquitectura (alto nivel)
+
+1. **Auth (ClickUp OAuth):** provider custom en `auth.ts`; guardar el `access_token`
+   de ClickUp **cifrado** por usuario. La cuenta se identifica por el user id de
+   ClickUp. Vars nuevas: `AUTH_CLICKUP_ID` / `AUTH_CLICKUP_SECRET`.
+2. **Aislamiento por tenant:** añadir `workspaceId` (u `ownerId`) a TODAS las tablas
+   de config hoy globales y filtrar por él en cada query:
+   `user`(→members), `user_role`, `user_vacation`, `task_type`, `tier_list`,
+   `brand`, `system_settings`, `task_meta`. (`auth_user` se reemplaza/extiende por
+   la cuenta ligada a ClickUp.)
+3. **Servicios + motor por token:** dejar de leer `CLICKUP_API_TOKEN` global; enhebrar
+   el token del usuario actual por toda la capa: `clickup-tasks.service`,
+   `clickup.service`, `task-assignment.service`/`assignment-ranking` (el motor),
+   `/api/users/workload`, el timeline. El crawl y la caché pasan a ser **por
+   workspace** (clave de caché incluye workspaceId).
+4. **Webhooks por workspace:** hoy hay UN webhook con `CLICKUP_WEBHOOK_SECRET`. Al
+   conectar un workspace, **registrar su webhook** vía la API OAuth de ClickUp y
+   enrutar/validar por workspace.
+5. **Onboarding:** primer login → conectar ClickUp → sincronizar miembros/listas →
+   definir task types / tiers → empezar a asignar.
+
+## Plan por fases (sugerido)
+
+1. **Auth ClickUp OAuth** (login + token cifrado por usuario) conviviendo con el
+   single-tenant detrás de un flag.
+2. **Modelo multi-tenant en DB**: columnas `workspaceId` + migración; scoping en
+   todas las queries de config.
+3. **Servicios/motor por token**: quitar el token global; pasar el del usuario.
+4. **Webhooks por workspace** + caché por workspace.
+5. **Onboarding + renombrado** Designers→Team y UI de config por workspace.
+6. **Cuotas/escala**: rate-limits de ClickUp ahora por token de usuario (mejor que
+   uno global), pero vigilar el crawl por workspace.
+
+## Gotchas / a vigilar
+
+- **No romper producción single-tenant** mientras se construye: rama separada + flag.
+- ClickUp OAuth: definir bien el **redirect** (`/api/auth/callback/clickup`) y los
+  scopes; el token no expira (guardar cifrado, permitir "reconectar").
+- Cada query que hoy asume "todos los activos / todas las tareas" debe quedar
+  **acotada al workspace**; un olvido = fuga de datos entre inquilinos.
+- El motor (`assignment-ranking` es puro y no cambia; lo que cambia es de DÓNDE
+  salen los slots: por workspace).
+- Reusar la skill `assignify-context` para el detalle del motor/flujo actual.
