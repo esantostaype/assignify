@@ -40,7 +40,7 @@ const COLOR: Record<AvatarColor, string> = {
 
 export function Avatar({
   src, alt, children, size = 'md', color = 'primary', shape = 'circle',
-  className, ...rest
+  className, style, ...rest
 }: AvatarProps) {
   const cls = cn(
     'inline-flex items-center justify-center font-semibold overflow-hidden shrink-0',
@@ -48,9 +48,12 @@ export function Avatar({
     SIZE[size], COLOR[color], className,
   );
   if (src) {
-    return <img src={src} alt={alt ?? ''} data-component="Avatar" data-size={size} data-color={color} data-shape={shape} className={cls} {...rest} />;
+    return <img src={src} alt={alt ?? ''} data-component="Avatar" data-size={size} data-color={color} data-shape={shape} className={cls} style={style} {...rest} />;
   }
-  return <span aria-label={alt} data-component="Avatar" data-size={size} data-color={color} data-shape={shape} className={cls}>{children}</span>;
+  // IMPORTANTE: el `style` (p.ej. backgroundColor + color del badge de ClickUp)
+  // también se aplica al fallback de INICIALES; antes solo lo recibía el <img>,
+  // así que los avatares sin foto ignoraban el color custom y quedaban tonales.
+  return <span aria-label={alt} data-component="Avatar" data-size={size} data-color={color} data-shape={shape} className={cls} style={style}>{children}</span>;
 }
 
 /** Group of avatars rendered with - small negative overlap. */
