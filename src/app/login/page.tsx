@@ -1,13 +1,14 @@
 "use client";
 
 import React, { useState } from "react";
+import { signIn } from "next-auth/react";
 import { Button, Input, Alert } from "@/components/ui";
 import { Icon, PiUser, PiLock, PiSignOut } from "@/lib/icons";
 import Image from "next/image";
 
 export default function LoginPage() {
-  const [email, setEmail] = useState("esantos@inszoneins.com");
-  const [password, setPassword] = useState("Ersa#123!");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
@@ -17,25 +18,20 @@ export default function LoginPage() {
     setError("");
 
     try {
-      const response = await fetch("/api/auth/login", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ email, password }),
-        credentials: "include",
+      const res = await signIn("credentials", {
+        email,
+        password,
+        redirect: false,
       });
 
-      const data = await response.json();
-
-      if (data.success) {
-        // Immediate redirect without delay
-        window.location.href = '/tasks';
+      if (res?.error) {
+        setError("Invalid email or password");
       } else {
-        setError(data.message || "Login failed");
+        // Sesión creada: vamos al tablero (full reload para tomar la cookie).
+        window.location.href = "/tasks";
       }
     } catch (error) {
-      console.error("❌ Network error:", error);
+      console.error("❌ Login error:", error);
       setError("Connection failed. Please try again.");
     } finally {
       setLoading(false);

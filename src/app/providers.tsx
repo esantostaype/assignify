@@ -1,44 +1,29 @@
-/* eslint-disable @typescript-eslint/no-unused-vars */
-// src/app/providers.tsx - MEJORADO
+// src/app/providers.tsx
 "use client";
+import { SessionProvider } from "next-auth/react";
+import { usePathname } from "next/navigation";
 import { RealtimeListener } from "@/components/RealtimeListener";
 import { QueryProvider } from "@/providers/QueryProvider";
 import { UiThemeProvider } from "@/providers/UiThemeProvider";
-import { AuthProvider, useAuth } from "@/contexts/AuthContext";
-import { usePathname } from "next/navigation";
 import { HotToaster } from "@/lib/hotToast";
 
-// Wrapper condicional para AuthProvider
-function ConditionalAuthWrapper({ children }: { children: React.ReactNode }) {
+// El listener de tiempo real (Pusher) no hace falta en la pantalla de login.
+function ConditionalRealtime() {
   const pathname = usePathname();
-  
-  // Rutas que NO necesitan AuthProvider
-  const publicRoutes = ['/login'];
-  const isPublicRoute = pathname ? publicRoutes.includes(pathname) : false;
-  
-  if (isPublicRoute) {
-    console.log(`🔓 Public route: ${pathname} - Skipping AuthProvider`);
-    return <>{children}</>;
-  }
-  
-  console.log(`🔒 Protected route: ${pathname} - Using AuthProvider`);
-  return (
-    <AuthProvider>
-      <RealtimeListener />
-      {children}
-    </AuthProvider>
-  );
+  if (pathname === "/login") return null;
+  return <RealtimeListener />;
 }
 
 export const Providers = ({ children }: { children: React.ReactNode }) => {
   return (
-    <UiThemeProvider>
-      <QueryProvider>
-        <ConditionalAuthWrapper>
+    <SessionProvider>
+      <UiThemeProvider>
+        <QueryProvider>
+          <ConditionalRealtime />
           {children}
           <HotToaster />
-        </ConditionalAuthWrapper>
-      </QueryProvider>
-    </UiThemeProvider>
+        </QueryProvider>
+      </UiThemeProvider>
+    </SessionProvider>
   );
 };

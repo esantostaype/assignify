@@ -117,6 +117,21 @@ export const taskMeta = sqliteTable('task_meta', {
   createdAt: createdAt(),
 })
 
+// Usuarios que INICIAN SESIÓN en Assignify (operadores/managers), separados de
+// `user` (que son los diseñadores de ClickUp, datos del motor — esos no loguean).
+// La autenticación (Auth.js + credenciales) valida contra esta tabla.
+export const authUser = sqliteTable('auth_user', {
+  id: text('id').primaryKey().$defaultFn(() => crypto.randomUUID()),
+  email: text('email').notNull().unique(),
+  // Hash bcrypt de la contraseña (NUNCA la contraseña en claro).
+  passwordHash: text('password_hash').notNull(),
+  name: text('name'),
+  role: text('role').notNull().default('admin'),
+  active: integer('active', { mode: 'boolean' }).notNull().default(true),
+  createdAt: createdAt(),
+  updatedAt: updatedAt(),
+})
+
 export const syncLog = sqliteTable('sync_log', {
   id: integer('id').primaryKey({ autoIncrement: true }),
   entityType: text('entity_type').notNull(),
