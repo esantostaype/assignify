@@ -280,7 +280,7 @@ export const CreateTaskForm: FC = () => {
     tiers.find((t) => t.id.toString() === tierId)?.duration;
 
   return (
-    <aside className="bg-(--color-surface-app) sticky w-[28rem] p-10 h-dvh overflow-y-auto top-0 border-l border-l-(--color-border-default)">
+    <aside className="bg-(--color-surface-card) sticky w-[28rem] p-10 h-dvh overflow-y-auto top-0 border-l border-l-(--color-border-default)">
       <LoadingOverlay open={loading} label="Creating Task..." />
 
       {/* Bloqueo del formulario mientras el motor busca diseñador: fondo oscuro

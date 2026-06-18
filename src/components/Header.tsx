@@ -6,6 +6,7 @@ import { NavItem, SettingsForm, TaskTypesForm } from '@/components'
 import { Button, Modal, AlertDialog } from '@/components/ui'
 import { Icon, PiUser, PiSignOut } from '@/lib/icons'
 import { useAuth } from '@/contexts/AuthContext'
+import { ThemeToggle } from '@/components/ThemeToggle'
 
 export const Header = () => {
   const { logout, user } = useAuth()
@@ -34,7 +35,7 @@ export const Header = () => {
 
   return (
     <>
-      <header className="sticky top-0 bg-(--color-surface-app)/70 backdrop-blur-lg z-50 flex items-center justify-between px-4 border-b border-b-(--color-border-default)">
+      <header className="sticky top-0 bg-(--color-surface-header) z-50 flex items-center justify-between px-4 border-b border-b-(--color-border-default)">
         <div className='flex items-center gap-4'>
           <Image src="/images/logo.svg" alt="Assignify" width={132} height={38} />
           <ul className="flex items-center gap-3 text-sm mb-[-1px]">
@@ -45,6 +46,8 @@ export const Header = () => {
         </div>
 
         <div className="flex items-center gap-3">
+          <ThemeToggle />
+
           {/* User info - opcional */}
           {user && (
             <span className="text-sm text-(--color-text-muted) hidden sm:flex sm:items-center sm:gap-1">

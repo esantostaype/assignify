@@ -86,11 +86,9 @@ export const TaskCard: React.FC<TaskCardProps> = ({ task }) => {
     const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
 
     if (diffDays < 0 && task.status !== 'in_progress') {
-      return "text-red-400"; // Overdue
-    } else if (diffDays === 0) {
-      return "text-orange-400"; // Due today
+      return "text-error-600"; // Overdue
     } else if (diffDays <= 1) {
-      return "text-yellow-400"; // Due soon
+      return "text-warning-600"; // Due today / soon
     } else {
       return "text-(--color-text-subtle)"; // Normal
     }
@@ -98,6 +96,18 @@ export const TaskCard: React.FC<TaskCardProps> = ({ task }) => {
 
   const dateRange = formatDateRange();
   const dateColor = getDateColor();
+
+  // Color de prioridad por TOKEN semántico (legible en light y dark), en vez del
+  // color crudo de ClickUp —pálido sobre fondo blanco en light mode.
+  const priorityClass = (() => {
+    switch ((task.priority || "").toLowerCase()) {
+      case "urgent": return "text-error-600";
+      case "high": return "text-warning-600";
+      case "low": return "text-(--color-text-subtle)";
+      case "normal":
+      default: return "text-(--color-text-muted)";
+    }
+  })();
 
   return (
     <div className="p-4 rounded-lg relative border-2 border-transparent flex flex-col justify-between bg-primary-500/10">
@@ -164,7 +174,7 @@ export const TaskCard: React.FC<TaskCardProps> = ({ task }) => {
 
       {/* Status and Priority Header */}
       <div className="flex items-center justify-between mt-6 capitalize">
-        <div className="flex items-center gap-1 text-sm" style={{ color: task.priorityColor }}>
+        <div className={`flex items-center gap-1 text-sm font-medium ${priorityClass}`}>
           <span>
             <Icon
               icon={PiTarget}
