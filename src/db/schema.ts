@@ -24,6 +24,11 @@ export const tierList = sqliteTable('tier_list', {
   id: integer('id').primaryKey({ autoIncrement: true }),
   name: text('name', { enum: TIER_NAMES }).notNull().unique(),
   duration: real('duration').notNull(),
+  // [SaaS] Workspace dueño de esta config (nullable; backfill rellena los datos
+  // actuales con el workspace de Inszone). Solo se AGREGA la columna (ALTER seguro);
+  // los `unique` actuales se mantienen — la unicidad por (workspaceId, name) es una
+  // migración posterior (recrear tabla) que NO hacemos ahora sobre la DB de prod.
+  workspaceId: text('workspace_id'),
   createdAt: createdAt(),
   updatedAt: updatedAt(),
 })
@@ -36,6 +41,8 @@ export const user = sqliteTable('user', {
   // Nivel del diseñador (Junior/Mid/Senior). Decide el escalado de asignación.
   // Los users existentes toman 'MID' por defecto.
   level: text('level', { enum: LEVEL_NAMES }).notNull().default('MID'),
+  // [SaaS] Workspace al que pertenece el miembro (nullable; backfill).
+  workspaceId: text('workspace_id'),
   createdAt: createdAt(),
   updatedAt: updatedAt(),
 })
@@ -58,6 +65,8 @@ export const userVacation = sqliteTable(
 export const taskType = sqliteTable('task_type', {
   id: integer('id').primaryKey({ autoIncrement: true }),
   name: text('name').notNull().unique(),
+  // [SaaS] Workspace dueño del tipo (nullable; backfill).
+  workspaceId: text('workspace_id'),
 })
 
 export const brand = sqliteTable('brand', {
@@ -69,6 +78,8 @@ export const brand = sqliteTable('brand', {
   isActive: integer('is_active', { mode: 'boolean' }).notNull().default(true),
   description: text('description'),
   defaultStatus: text('default_status', { enum: STATUS_NAMES }).notNull().default('TO_DO'),
+  // [SaaS] Workspace dueño del brand/lista (nullable; backfill).
+  workspaceId: text('workspace_id'),
   createdAt: createdAt(),
   updatedAt: updatedAt(),
 })
@@ -114,6 +125,8 @@ export const taskMeta = sqliteTable('task_meta', {
   assignedUserIds: text('assigned_user_ids', { mode: 'json' }).$type<string[]>(),
   // true si el sugerido NO quedó entre los asignados reales (override humano).
   wasOverride: integer('was_override', { mode: 'boolean' }).notNull().default(false),
+  // [SaaS] Workspace dueño de la tarea (nullable; backfill).
+  workspaceId: text('workspace_id'),
   createdAt: createdAt(),
 })
 
@@ -178,6 +191,9 @@ export const systemSettings = sqliteTable(
     maxValue: real('max_value'),
     options: text('options', { mode: 'json' }),
     required: integer('required', { mode: 'boolean' }).notNull().default(true),
+    // [SaaS] Workspace dueño de la config (nullable; backfill). La unicidad real
+    // pasará a (workspaceId, category, key) en una migración posterior.
+    workspaceId: text('workspace_id'),
     createdAt: createdAt(),
     updatedAt: updatedAt(),
   },
