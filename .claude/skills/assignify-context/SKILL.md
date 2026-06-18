@@ -27,7 +27,8 @@ viven las tareas) y se despliega en **Vercel**.
 - **Datos: Drizzle ORM + Turso (libSQL/SQLite).** (Se migró desde Prisma/PostgreSQL — **Prisma ya NO existe**; no uses `prisma.*` ni `@prisma/client`.)
 - **ClickUp** REST API + webhook. **Pusher** para tiempo real.
 - **UI propia** en `src/components/ui` (Button, Modal, Input, Select, Card, Skeleton…), tokens en `src/app/globals.css`, tema claro/oscuro. Toasts: `react-hot-toast`. Iconos: Phosphor vía `@/lib/icons`.
-- Deploy: **push a `main` → Vercel** auto-deploy; el usuario prueba en la app desplegada. Repo **PÚBLICO** → nunca commitees secretos; `.env` está gitignored. Vars clave: `TURSO_DATABASE_URL`, `TURSO_AUTH_TOKEN`, `CLICKUP_API_TOKEN`, `CLICKUP_WEBHOOK_SECRET`, `PUSHER_*` / `NEXT_PUBLIC_PUSHER_*`.
+- **Auth: Auth.js v5 (next-auth) + Turso.** Login con credenciales (email/password) validadas contra la tabla `auth_user` (contraseñas **bcrypt**). `auth.config.ts` = config edge-safe (callbacks `authorized`/`jwt`/`session`, sin DB) que usa `middleware.ts` para **proteger TODAS las rutas en el edge**; `auth.ts` = provider de credenciales (bcrypt + DB, runtime Node). Rutas públicas: `/login`, `/api/auth/*`, `/api/clickup-webhook`, `/api/cron/*`. Sesión JWT (id/role). Sembrar usuarios: `node scripts/seed-auth-user.js` (lee `ADMIN_EMAIL`/`ADMIN_PASSWORD`). `auth_user` ≠ `user` (los `user` son diseñadores de ClickUp; no loguean).
+- Deploy: **push a `main` → Vercel** auto-deploy; el usuario prueba en la app desplegada. Repo **PÚBLICO** → nunca commitees secretos; `.env` está gitignored. Vars clave: `TURSO_DATABASE_URL`, `TURSO_AUTH_TOKEN`, `CLICKUP_API_TOKEN`, `CLICKUP_WEBHOOK_SECRET`, `PUSHER_*` / `NEXT_PUBLIC_PUSHER_*`, **`AUTH_SECRET`** (requerido por Auth.js; genera con `npx auth secret` u `openssl rand -base64 32`).
 
 ## Dónde vive cada dato (LO MÁS IMPORTANTE)
 
