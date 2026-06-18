@@ -9,7 +9,7 @@ import { user, userRole, userVacation, taskType } from '@/db/schema'
 import { eq, and, asc, gte } from 'drizzle-orm'
 import { fetchActiveClickUpTasks, type ActiveClickUpTask } from '@/services/clickup-tasks.service'
 import { mapClickUpPriority } from '@/utils/clickup-status-mapping-utils'
-import { getCurrentWorkspaceId } from '@/lib/workspace'
+import { getCurrentClickUpContext } from '@/lib/workspace'
 
 // Lee ClickUp en vivo: nunca pre-renderizar/cachear en build.
 export const dynamic = 'force-dynamic'
@@ -27,7 +27,7 @@ export async function GET() {
   try {
     const now = new Date()
     const overloadThreshold = new Date(now.getTime() + OVERLOAD_HORIZON_DAYS * DAY_MS)
-    const wsId = await getCurrentWorkspaceId()
+    const { token: clickupToken, teamId: wsId } = await getCurrentClickUpContext()
 
     // IMPORTANTE: consultas DIRECTAS (sin la query relacional `with` de Drizzle).
     // En el dev server (cliente libSQL reusado) la versión relacional devolvía
@@ -43,7 +43,7 @@ export async function GET() {
         where: gte(userVacation.endDate, now),
         orderBy: asc(userVacation.startDate),
       }),
-      fetchActiveClickUpTasks(),
+      fetchActiveClickUpTasks({ token: clickupToken, teamId: wsId }),
     ])
 
     const typeNameById = new Map(allTypes.map((t) => [t.id, t.name]))

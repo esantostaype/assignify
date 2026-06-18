@@ -41,7 +41,8 @@ function createMetadataTable(typeName: string, categoryName: string): string {
 async function createMetadataComment(
   taskId: string,
   typeName: string,
-  categoryName: string
+  categoryName: string,
+  token: string
 ): Promise<void> {
   try {
     const markdownTable = createMetadataTable(typeName, categoryName)
@@ -54,7 +55,7 @@ async function createMetadataComment(
       },
       {
         headers: {
-          'Authorization': CLICKUP_TOKEN,
+          'Authorization': token,
           'Content-Type': 'application/json',
         },
       }
@@ -257,8 +258,13 @@ async function prepareCustomFields(
   return customFieldsValues
 }
 
-export async function createTaskInClickUp(params: ClickUpTaskCreationParams & { customDurationDays?: number }): Promise<ClickUpTaskResponse> {
+export async function createTaskInClickUp(
+  params: ClickUpTaskCreationParams & { customDurationDays?: number },
+  token?: string
+): Promise<ClickUpTaskResponse> {
   const { name, description, priority, deadline, startDate, usersToAssign, tier, brand } = params
+  // [SaaS] Crea en el ClickUp del inquilino (su token); fallback al global.
+  const authToken = token ?? CLICKUP_TOKEN
 
   const clickupAssignees: number[] = []
   const assigneeDebugInfo: AssigneeDebugInfo[] = []
@@ -326,7 +332,7 @@ export async function createTaskInClickUp(params: ClickUpTaskCreationParams & { 
       clickUpPayload,
       {
         headers: {
-          'Authorization': CLICKUP_TOKEN,
+          'Authorization': authToken,
           'Content-Type': 'application/json',
         },
       }
@@ -335,11 +341,12 @@ export async function createTaskInClickUp(params: ClickUpTaskCreationParams & { 
     await createSyncLog('Task', null, response.data.id, 'CREATE', 'SUCCESS', undefined, response.data)
 
     // ✅ CREAR COMENTARIO CON TABLA SI ESTÁ HABILITADO
-    if (metadata.useTableComment) {
+    if (metadata.useTableComment && authToken) {
       await createMetadataComment(
         response.data.id,
         String(tier.name),
-        String(tier.name)
+        String(tier.name),
+        authToken
       )
     }
 
@@ -437,7 +444,8 @@ export async function updateTaskInClickUp(taskId: string, updatedTaskData: Task)
       await createMetadataComment(
         taskId,
         updatedTaskData.type.name,
-        String(updatedTaskData.tier.name)
+        String(updatedTaskData.tier.name),
+        CLICKUP_TOKEN as string
       )
     }
 

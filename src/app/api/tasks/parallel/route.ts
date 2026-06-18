@@ -8,7 +8,7 @@ import { NextResponse } from 'next/server'
 import { db } from '@/db'
 import { tierList, taskType as taskTypeTable, brand as brandTable, user as userTable, userRole, taskMeta } from '@/db/schema'
 import { eq, and, inArray, or, isNull } from 'drizzle-orm'
-import { getCurrentWorkspaceId } from '@/lib/workspace'
+import { getCurrentClickUpContext } from '@/lib/workspace'
 import { Level } from '@/db/enums'
 import { getBestUserWithCache } from '@/services/task-assignment.service'
 import { createTaskInClickUp } from '@/services/clickup.service'
@@ -56,8 +56,8 @@ export async function POST(req: Request) {
       ? levelParam
       : 'MID') as Level
 
-    // [SaaS] Workspace activo: toda la config se valida acotada a este inquilino.
-    const wsId = await getCurrentWorkspaceId()
+    // [SaaS] Contexto del inquilino: token de ClickUp + su workspace (== teamId).
+    const { token: clickupToken, teamId: wsId } = await getCurrentClickUpContext()
 
     // Config desde la DB (Drizzle/Turso), acotada al workspace.
     const [tier, type, brand] = await Promise.all([
@@ -104,7 +104,7 @@ export async function POST(req: Request) {
 
       usersToAssign = validUsers.map(user => user.id)
     } else {
-      const bestUser = await getBestUserWithCache(typeId, brandId, priority, durationDays, reqLevel, wsId)
+      const bestUser = await getBestUserWithCache(typeId, brandId, priority, durationDays, reqLevel, wsId, clickupToken)
 
       if (!bestUser) {
         return NextResponse.json({
@@ -122,7 +122,7 @@ export async function POST(req: Request) {
 
     const insertionResults = await Promise.all(
       usersToAssign.map(async (userId) => {
-        const result = await calculateParallelPriorityInsertion(userId, priority, userDuration)
+        const result = await calculateParallelPriorityInsertion(userId, priority, userDuration, { token: clickupToken, teamId: wsId })
         return { userId, ...result }
       })
     )
@@ -149,7 +149,7 @@ export async function POST(req: Request) {
       tier,
       brand: brandForClickUp,
       customDurationDays: isCustomDuration ? durationDays : undefined,
-    })
+    }, clickupToken)
 
     // Persistir la metadata SIDECAR (write-once): lo inmutable de creación que
     // ClickUp no puede representar (tier/duración real, nivel) + el rastro de la

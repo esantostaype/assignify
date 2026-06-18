@@ -8,7 +8,7 @@ import { RankedCandidate } from '@/interfaces';
 import { db } from '@/db';
 import { brand as brandTable } from '@/db/schema';
 import { and, eq } from 'drizzle-orm';
-import { getCurrentWorkspaceId } from '@/lib/workspace';
+import { getCurrentClickUpContext } from '@/lib/workspace';
 
 // Lee DB y ClickUp en vivo, usa request.url: nunca pre-renderizar/cachear en build.
 export const dynamic = 'force-dynamic';
@@ -45,8 +45,8 @@ export async function GET(req: Request) {
       }, { status: 400 });
     }
 
-    // [SaaS] Workspace activo: acota candidatos y brands a este inquilino.
-    const wsId = await getCurrentWorkspaceId();
+    // [SaaS] Contexto del inquilino: token de ClickUp + su workspace (== teamId).
+    const { token: clickupToken, teamId: wsId } = await getCurrentClickUpContext();
 
     // Usar brandId si está disponible; si no, buscar en todos los brands activos.
     let suggestedUserId: string | null = null;
@@ -54,7 +54,7 @@ export async function GET(req: Request) {
     let resolvedBrandId = brandId;
 
     if (brandId) {
-      const result = await getRankedCandidates(typeId, brandId, priority, durationDays, level, wsId);
+      const result = await getRankedCandidates(typeId, brandId, priority, durationDays, level, wsId, clickupToken);
       suggestedUserId = result.suggestedUserId;
       candidates = result.candidates;
     } else {
@@ -65,7 +65,7 @@ export async function GET(req: Request) {
       });
 
       for (const brand of activeBrands) {
-        const result = await getRankedCandidates(typeId, brand.id, priority, durationDays, level, wsId);
+        const result = await getRankedCandidates(typeId, brand.id, priority, durationDays, level, wsId, clickupToken);
         if (result.candidates.length > 0) {
           suggestedUserId = result.suggestedUserId;
           candidates = result.candidates;

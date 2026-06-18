@@ -10,38 +10,36 @@ import {
   isActiveTaskStatus,
   getValidLocalStatuses
 } from '@/utils/clickup-status-mapping-utils';
-
-const CLICKUP_TOKEN = process.env.CLICKUP_API_TOKEN;
+import { getCurrentClickUpContext } from '@/lib/workspace';
 
 // El tablero se lee en vivo de ClickUp: nunca pre-renderizar/cachear en build.
 export const dynamic = 'force-dynamic';
 
 export async function GET() {
-  if (!CLICKUP_TOKEN) {
+  // [SaaS] Token + workspace del inquilino (fallback global para el admin).
+  const { token: authToken, teamId } = await getCurrentClickUpContext();
+  if (!authToken) {
     return NextResponse.json({
       error: 'CLICKUP_API_TOKEN is not configured'
     }, { status: 500 });
   }
 
   try {
-    const teamsResponse = await axios.get(
-      `${API_CONFIG.CLICKUP_API_BASE}/team`,
-      {
-        headers: {
-          'Authorization': CLICKUP_TOKEN,
-          'Content-Type': 'application/json',
-        },
-      }
-    );
+    // Acotar a un team (multi-tenant) o recorrer todos los del token.
+    const teams = teamId
+      ? [{ id: teamId, name: '' }]
+      : (await axios.get(`${API_CONFIG.CLICKUP_API_BASE}/team`, {
+          headers: { 'Authorization': authToken, 'Content-Type': 'application/json' },
+        })).data.teams;
 
     const allSpaces = [];
-    for (const team of teamsResponse.data.teams) {
+    for (const team of teams) {
       try {
         const spacesResponse = await axios.get(
           `${API_CONFIG.CLICKUP_API_BASE}/team/${team.id}/space?archived=false`,
           {
             headers: {
-              'Authorization': CLICKUP_TOKEN,
+              'Authorization': authToken,
               'Content-Type': 'application/json',
             },
           }
@@ -64,7 +62,7 @@ export async function GET() {
             `${API_CONFIG.CLICKUP_API_BASE}/list/${list.id}/task`,
             {
               headers: {
-                'Authorization': CLICKUP_TOKEN,
+                'Authorization': authToken,
                 'Content-Type': 'application/json',
               },
               params: {
@@ -83,13 +81,14 @@ export async function GET() {
           // ✅ FILTROS MEJORADOS: Estado activo + Fechas requeridas + Incluir ON APPROVAL
           const filteredTasks = tasks.filter((task: any) => {
             const taskStatus = task.status?.status || '';
+            const taskType = task.status?.type || '';
 
             // ✅ MEJORADO: Usar nueva utilidad para verificar si está activa
-            if (!isActiveTaskStatus(taskStatus)) {
+            if (!isActiveTaskStatus(taskStatus, taskType)) {
               return false;
             }
 
-            const mappedStatus = mapClickUpStatusToLocal(taskStatus);
+            const mappedStatus = mapClickUpStatusToLocal(taskStatus, taskType);
 
             // ✅ MEJORADO: Incluir todas las tareas activas (TO_DO, IN_PROGRESS, ON_APPROVAL)
             const validStatuses = getValidLocalStatuses();
@@ -119,7 +118,7 @@ export async function GET() {
           `${API_CONFIG.CLICKUP_API_BASE}/space/${space.id}/folder?archived=false`,
           {
             headers: {
-              'Authorization': CLICKUP_TOKEN,
+              'Authorization': authToken,
               'Content-Type': 'application/json',
             },
           }
@@ -133,7 +132,7 @@ export async function GET() {
             `${API_CONFIG.CLICKUP_API_BASE}/space/${space.id}/list?archived=false`,
             {
               headers: {
-                'Authorization': CLICKUP_TOKEN,
+                'Authorization': authToken,
                 'Content-Type': 'application/json',
               },
             }
@@ -154,7 +153,7 @@ export async function GET() {
               `${API_CONFIG.CLICKUP_API_BASE}/folder/${folder.id}/list?archived=false`,
               {
                 headers: {
-                  'Authorization': CLICKUP_TOKEN,
+                  'Authorization': authToken,
                   'Content-Type': 'application/json',
                 },
               }
@@ -183,7 +182,7 @@ export async function GET() {
         return true;
       })
       .map(clickupTask => {
-        const mappedStatus = mapClickUpStatusToLocal(clickupTask.status?.status || '');
+        const mappedStatus = mapClickUpStatusToLocal(clickupTask.status?.status || '', clickupTask.status?.type || '');
 
         return {
           clickupId: clickupTask.id,

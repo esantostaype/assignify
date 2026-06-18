@@ -8,7 +8,7 @@ import { inArray } from 'drizzle-orm'
 import { API_CONFIG } from '@/config'
 import { db } from '@/db'
 import { taskMeta } from '@/db/schema'
-import { getFromCache, setInCache, deleteFromCache } from '@/utils/cache'
+import { getFromCache, setInCache, invalidateCacheByPrefix } from '@/utils/cache'
 import {
   mapClickUpStatusToLocal,
   isActiveTaskStatus,
@@ -20,14 +20,23 @@ const CLICKUP_TOKEN = process.env.CLICKUP_API_TOKEN
 
 // El crawl de ClickUp (team→space→folder→list, paginado) es CARO y lo consumen el
 // kanban, el panel de carga y el motor. Se cachea brevemente para que esas vistas
-// compartan UNA sola lectura en lugar de recorrer la API en cada request. La caché
-// se invalida al crear una tarea (invalidateAllCache) y desde el webhook de ClickUp.
-const ACTIVE_TASKS_CACHE_KEY = 'active-clickup-tasks'
+// compartan UNA sola lectura en lugar de recorrer la API en cada request. La clave
+// incluye el teamId → caché POR workspace (multi-inquilino). Se invalida al crear y
+// desde el webhook.
+const ACTIVE_TASKS_CACHE_PREFIX = 'active-clickup-tasks:'
 const ACTIVE_TASKS_TTL_SECONDS = 45
 
-/** Invalida la caché del crawl de ClickUp (llamar desde el webhook al cambiar tareas). */
+/** [SaaS] Token + workspace con los que leer ClickUp (ver getCurrentClickUpContext). */
+export interface ClickUpFetchOptions {
+  /** Token de ClickUp. Default: el global (CLICKUP_API_TOKEN). */
+  token?: string
+  /** Acota el crawl a ESTE team/workspace. Default: todos los del token. */
+  teamId?: string | null
+}
+
+/** Invalida la caché del crawl de ClickUp (todos los workspaces). */
 export function invalidateActiveClickUpTasksCache(): void {
-  deleteFromCache(ACTIVE_TASKS_CACHE_KEY)
+  invalidateCacheByPrefix(ACTIVE_TASKS_CACHE_PREFIX)
 }
 
 export interface ClickUpAssignee {
@@ -56,9 +65,9 @@ export interface ActiveClickUpTask {
   durationDays?: number
 }
 
-async function cu(path: string): Promise<any> {
+async function cu(path: string, token: string): Promise<any> {
   const res = await axios.get(`${API_CONFIG.CLICKUP_API_BASE}${path}`, {
-    headers: { Authorization: CLICKUP_TOKEN as string, 'Content-Type': 'application/json' },
+    headers: { Authorization: token, 'Content-Type': 'application/json' },
   })
   return res.data
 }
@@ -82,13 +91,14 @@ function isSyncableTask(t: any): boolean {
   return valid && !!t.start_date && !!t.due_date
 }
 
-async function collectListTasks(listId: string, out: any[]): Promise<void> {
+async function collectListTasks(listId: string, out: any[], token: string): Promise<void> {
   try {
     let page = 0
     let hasMore = true
     while (hasMore && page < 5) {
       const data = await cu(
-        `/list/${listId}/task?archived=false&page=${page}&order_by=updated&reverse=true&subtasks=true&include_closed=false`
+        `/list/${listId}/task?archived=false&page=${page}&order_by=updated&reverse=true&subtasks=true&include_closed=false`,
+        token
       )
       const tasks: any[] = data.tasks || []
       out.push(...tasks.filter(isSyncableTask))
@@ -100,20 +110,29 @@ async function collectListTasks(listId: string, out: any[]): Promise<void> {
   }
 }
 
-/** Devuelve todas las tareas activas (con fechas) de todos los spaces de ClickUp. */
-export async function fetchActiveClickUpTasks(): Promise<ActiveClickUpTask[]> {
-  if (!CLICKUP_TOKEN) return []
+/**
+ * Devuelve las tareas activas (con fechas) de ClickUp.
+ * [SaaS] Con `opts.token` usa el token de ESE usuario; con `opts.teamId` acota el
+ * crawl a ESE workspace. Sin opts → token global + todos los teams (single-tenant).
+ */
+export async function fetchActiveClickUpTasks(opts: ClickUpFetchOptions = {}): Promise<ActiveClickUpTask[]> {
+  const token = opts.token ?? CLICKUP_TOKEN
+  if (!token) return []
 
-  const cached = getFromCache<ActiveClickUpTask[]>(ACTIVE_TASKS_CACHE_KEY)
+  const cacheKey = `${ACTIVE_TASKS_CACHE_PREFIX}${opts.teamId ?? 'all'}`
+  const cached = getFromCache<ActiveClickUpTask[]>(cacheKey)
   if (cached !== undefined) return cached
 
   const raw: any[] = []
-  const teams: any[] = (await cu('/team')).teams || []
+  // Acotar a un team concreto (multi-tenant) o recorrer todos los del token.
+  const teams: any[] = opts.teamId
+    ? [{ id: opts.teamId }]
+    : (await cu('/team', token)).teams || []
 
   for (const team of teams) {
     let spaces: any[] = []
     try {
-      spaces = (await cu(`/team/${team.id}/space?archived=false`)).spaces || []
+      spaces = (await cu(`/team/${team.id}/space?archived=false`, token)).spaces || []
     } catch {
       continue
     }
@@ -121,17 +140,17 @@ export async function fetchActiveClickUpTasks(): Promise<ActiveClickUpTask[]> {
     for (const space of spaces) {
       // Listas directas del space
       try {
-        const lists: any[] = (await cu(`/space/${space.id}/list?archived=false`)).lists || []
-        for (const list of lists) await collectListTasks(list.id, raw)
+        const lists: any[] = (await cu(`/space/${space.id}/list?archived=false`, token)).lists || []
+        for (const list of lists) await collectListTasks(list.id, raw, token)
       } catch {
         /* sin listas directas */
       }
       // Listas dentro de folders
       try {
-        const folders: any[] = (await cu(`/space/${space.id}/folder?archived=false`)).folders || []
+        const folders: any[] = (await cu(`/space/${space.id}/folder?archived=false`, token)).folders || []
         for (const folder of folders) {
           const lists: any[] = folder.lists || []
-          for (const list of lists) await collectListTasks(list.id, raw)
+          for (const list of lists) await collectListTasks(list.id, raw, token)
         }
       } catch {
         /* sin folders */
@@ -186,7 +205,7 @@ export async function fetchActiveClickUpTasks(): Promise<ActiveClickUpTask[]> {
     }
   }
 
-  setInCache(ACTIVE_TASKS_CACHE_KEY, result, ACTIVE_TASKS_TTL_SECONDS)
+  setInCache(cacheKey, result, ACTIVE_TASKS_TTL_SECONDS)
   return result
 }
 
@@ -195,7 +214,10 @@ export async function fetchActiveClickUpTasks(): Promise<ActiveClickUpTask[]> {
  * Reusa `fetchActiveClickUpTasks` (cacheado) y filtra por asignado.
  * El id de ClickUp del asignado coincide con el user.id local.
  */
-export async function getActiveClickUpTasksByUser(userId: string): Promise<ActiveClickUpTask[]> {
-  const all = await fetchActiveClickUpTasks()
+export async function getActiveClickUpTasksByUser(
+  userId: string,
+  opts: ClickUpFetchOptions = {}
+): Promise<ActiveClickUpTask[]> {
+  const all = await fetchActiveClickUpTasks(opts)
   return all.filter((t) => t.assignees.some((a) => a.id === userId))
 }

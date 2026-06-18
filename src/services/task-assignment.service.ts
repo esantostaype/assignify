@@ -137,7 +137,8 @@ async function getVacationAwareUserSlots(
   brandId: string,
   taskDurationDays: number,
   reqPriority: Priority,
-  workspaceId: string | null
+  workspaceId: string | null,
+  clickupToken: string | undefined
 ): Promise<VacationAwareUserSlot[]> {
   const allUsersWithRoles = await db.query.user.findMany({
     // [SaaS] Solo los miembros del workspace activo (aislamiento multi-inquilino).
@@ -176,7 +177,8 @@ async function getVacationAwareUserSlots(
   // La disponibilidad y la carga de un diseñador dependen de TODAS sus tareas
   // pendientes (TO_DO/IN_PROGRESS) sin importar el tipo de la tarea nueva.
   // ON_APPROVAL se excluye: ya está entregado y no ocupa al diseñador.
-  const allClickUpTasks = await fetchActiveClickUpTasks();
+  // [SaaS] Lee SOLO las tareas del workspace activo, con el token de ese inquilino.
+  const allClickUpTasks = await fetchActiveClickUpTasks({ token: clickupToken, teamId: workspaceId });
 
   const tasksByUser: Record<string, ActiveClickUpTask[]> = {};
   for (const task of allClickUpTasks) {
@@ -329,7 +331,8 @@ export async function getBestUserWithCache(
   priority: Priority,
   durationDays?: number,
   reqLevel: Level = Level.MID,
-  workspaceId: string | null = null
+  workspaceId: string | null = null,
+  clickupToken?: string
 ): Promise<UserSlot | null> {
   const cacheKey = `${CACHE_KEYS.BEST_USER_SELECTION_PREFIX}${workspaceId ?? 'default'}-${typeId}-${brandId}-${priority}-vacation-${durationDays || 'no-duration'}-lvl-${reqLevel}`;
   let bestSlot = getFromCache<UserSlot | null>(cacheKey);
@@ -338,7 +341,7 @@ export async function getBestUserWithCache(
     return bestSlot;
   }
 
-  const vacationAwareSlots = await getVacationAwareUserSlots(typeId, brandId, durationDays || 0, priority, workspaceId);
+  const vacationAwareSlots = await getVacationAwareUserSlots(typeId, brandId, durationDays || 0, priority, workspaceId, clickupToken);
   const bestVacationSlot = await selectBestUserWithVacationLogic(vacationAwareSlots, reqLevel);
 
   if (!bestVacationSlot) {
@@ -414,7 +417,8 @@ export async function getRankedCandidates(
   priority: Priority,
   durationDays: number,
   reqLevel: Level = Level.MID,
-  workspaceId: string | null = null
+  workspaceId: string | null = null,
+  clickupToken?: string
 ): Promise<{ suggestedUserId: string | null; candidates: RankedCandidate[] }> {
   type Ranked = { suggestedUserId: string | null; candidates: RankedCandidate[] };
   // Cacheado igual que getBestUserWithCache: evita re-leer ClickUp en cada
@@ -423,7 +427,7 @@ export async function getRankedCandidates(
   const cached = getFromCache<Ranked>(cacheKey);
   if (cached !== undefined) return cached;
 
-  const slots = await getVacationAwareUserSlots(typeId, brandId, durationDays || 0, priority, workspaceId);
+  const slots = await getVacationAwareUserSlots(typeId, brandId, durationDays || 0, priority, workspaceId, clickupToken);
   const best = await selectBestUserWithVacationLogic(slots, reqLevel);
   const suggestedUserId = best?.userId ?? null;
 

@@ -6,12 +6,10 @@ import { db } from '@/db';
 import { user } from '@/db/schema';
 import { and, eq, inArray } from 'drizzle-orm';
 import { API_CONFIG } from '@/config';
-import { getCurrentWorkspaceId } from '@/lib/workspace';
+import { getCurrentClickUpContext } from '@/lib/workspace';
 
 // Lee/escribe DB y consulta ClickUp en vivo: nunca pre-renderizar/cachear en build.
 export const dynamic = 'force-dynamic';
-
-const CLICKUP_TOKEN = process.env.CLICKUP_API_TOKEN;
 
 interface ClickUpUser {
   id: number;
@@ -52,9 +50,11 @@ interface ClickUpTeamResponse {
  * Obtiene todos los usuarios de ClickUp y los compara con los usuarios locales
  */
 export async function GET() {
-  if (!CLICKUP_TOKEN) {
-    return NextResponse.json({ 
-      error: 'CLICKUP_API_TOKEN no configurado' 
+  // [SaaS] Token + workspace del inquilino (fallback global para el admin).
+  const { token: authToken, teamId } = await getCurrentClickUpContext();
+  if (!authToken) {
+    return NextResponse.json({
+      error: 'CLICKUP_API_TOKEN no configurado'
     }, { status: 500 });
   }
 
@@ -66,18 +66,23 @@ export async function GET() {
       `${API_CONFIG.CLICKUP_API_BASE}/team`,
       {
         headers: {
-          'Authorization': CLICKUP_TOKEN,
+          'Authorization': authToken,
           'Content-Type': 'application/json',
         },
       }
     );
 
-    console.log(`📊 Teams encontrados: ${teamsResponse.data.teams.length}`);
+    // Acotar a SU workspace (multi-tenant) o todos los del token.
+    const teams = teamId
+      ? teamsResponse.data.teams.filter((t) => String(t.id) === teamId)
+      : teamsResponse.data.teams;
+
+    console.log(`📊 Teams: ${teams.length}`);
 
     // Recopilar todos los usuarios únicos de todos los teams
     const allUsers = new Map<string, ClickUpUser>();
-    
-    teamsResponse.data.teams.forEach(team => {
+
+    teams.forEach(team => {
       console.log(`   Team: ${team.name} - ${team.members.length} miembros`);
       
       team.members.forEach((member, index) => {
@@ -122,7 +127,7 @@ export async function GET() {
     console.log(`👥 Usuarios únicos encontrados en ClickUp: ${uniqueUsers.length}`);
 
     // Obtener usuarios existentes en la DB local (del workspace activo).
-    const wsId = await getCurrentWorkspaceId();
+    const wsId = teamId;
     const localUsers = await db.query.user.findMany({
       where: eq(user.workspaceId, wsId ?? '__none__'),
       columns: { id: true, name: true, email: true, active: true }
@@ -188,7 +193,7 @@ export async function GET() {
         availableToSync: newCount,
         totalLocalUsers: localUsers.length
       },
-      teams: teamsResponse.data.teams.map(team => ({
+      teams: teams.map(team => ({
         id: team.id,
         name: team.name,
         memberCount: team.members.length
@@ -221,9 +226,10 @@ export async function GET() {
  * Sincroniza usuarios seleccionados de ClickUp a la base de datos local
  */
 export async function POST(req: Request) {
-  if (!CLICKUP_TOKEN) {
-    return NextResponse.json({ 
-      error: 'CLICKUP_API_TOKEN no configurado' 
+  const { token: authToken, teamId } = await getCurrentClickUpContext();
+  if (!authToken) {
+    return NextResponse.json({
+      error: 'CLICKUP_API_TOKEN no configurado'
     }, { status: 500 });
   }
 
@@ -246,7 +252,7 @@ export async function POST(req: Request) {
       `${API_CONFIG.CLICKUP_API_BASE}/team`,
       {
         headers: {
-          'Authorization': CLICKUP_TOKEN,
+          'Authorization': authToken,
           'Content-Type': 'application/json',
         },
       }
@@ -291,7 +297,7 @@ export async function POST(req: Request) {
     console.log(`✅ Datos obtenidos para ${usersData.length} usuarios (${notFoundUsers.length} no encontrados)`);
 
     // Verificar que los usuarios no existan ya en la DB local (del workspace activo).
-    const wsId = await getCurrentWorkspaceId();
+    const wsId = teamId;
     const existingUsers = await db.query.user.findMany({
       where: and(inArray(user.id, userIds), eq(user.workspaceId, wsId ?? '__none__')),
       columns: { id: true, name: true }
