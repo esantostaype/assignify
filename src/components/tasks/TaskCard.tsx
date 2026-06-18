@@ -102,7 +102,7 @@ export const TaskCard: React.FC<TaskCardProps> = ({ task }) => {
   return (
     <div className="p-4 rounded-lg relative border-2 border-transparent flex flex-col justify-between bg-primary-500/10">
       {/* Task Info */}
-      <h3 className="font-semibold leading-tight line-clamp-2 mb-2">{task.name}</h3>
+      <h3 className="font-semibold leading-tight line-clamp-2 mb-1 text-sm">{task.name}</h3>
 
       {/* Space and List */}
       <div className="text-xs text-(--color-text-muted)">

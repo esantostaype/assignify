@@ -9,7 +9,7 @@ export const TaskCardSkeleton = () => (
     <Skeleton variant="text" height={16} width="55%" className="mt-1.5" />
 
     {/* Lista */}
-    <Skeleton variant="text" width="35%" className="mt-3" />
+    <Skeleton variant="text" width="35%" className="mt-2" />
 
     {/* Asignados */}
     <div className="flex items-center gap-2 my-4">

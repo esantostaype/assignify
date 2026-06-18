@@ -61,7 +61,7 @@ export const TasksList: React.FC<TasksListProps> = ({ tasks, loading = false }) 
     return (
       <div className="flex align-baseline gap-6 h-[calc(100dvh-11.375rem)]">
         {columnOrder.map((column, index) => (
-          <div key={column} className="flex flex-[0_0_360px] flex-col overflow-y-auto relative pr-2">
+          <div key={column} className="flex flex-[0_0_280px] flex-col overflow-y-auto relative pr-2">
             <div className="sticky top-0 pb-2 bg-(--color-surface-app) flex items-center justify-between z-20">
               <h2 className="font-semibold text-lg">{column}</h2>
             </div>
@@ -107,9 +107,9 @@ export const TasksList: React.FC<TasksListProps> = ({ tasks, loading = false }) 
   return (
     <div className="flex align-baseline gap-6 h-[calc(100dvh-11.375rem)]">
       {columnOrder.map((column) => (
-        <div key={column} className="flex flex-[0_0_360px] flex-col overflow-y-auto relative pr-2">
+        <div key={column} className="flex flex-[0_0_280px] flex-col overflow-y-auto relative pr-2">
           <div className="sticky top-0 pb-2 bg-(--color-surface-app) flex items-center justify-between z-20">
-            <h2 className="font-semibold text-lg">{column}</h2>
+            <h2 className="font-semibold text-sm">{column}</h2>
             <span className="bg-primary-500/20 text-primary-600 text-xs px-2 py-1 rounded-full">
               {grouped[column]?.length || 0}
             </span>
