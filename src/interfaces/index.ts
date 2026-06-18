@@ -59,6 +59,36 @@ export interface VacationAwareUserSlot extends UserSlot {
    * Opcional para retrocompatibilidad con consumidores existentes.
    */
   roleAffinity?: 1 | 2 | 3
+  /**
+   * Nº de tareas pendientes del diseñador con prioridad IGUAL o MAYOR a la pedida.
+   * Sirve para no apilar urgentes en quien ya carga muchas: a igualdad (o cercanía)
+   * de fecha de liberación, gana quien tenga menos congestión de esta prioridad.
+   */
+  samePriorityOrHigherLoad?: number
+  /** Estado para la UI del selector. */
+  status?: DesignerStatus
+}
+
+/** Estado de un diseñador para los badges del selector de asignación. */
+export type DesignerStatus = 'available' | 'on_vacation' | 'overloaded'
+
+/**
+ * Candidato “aplanado” que el motor devuelve a la UI: misma fuente de verdad
+ * que la sugerencia (un solo origen). Alimenta tanto el diseñador sugerido como
+ * la lista de opciones (con su badge) del selector.
+ */
+export interface RankedCandidate {
+  userId: string
+  userName: string
+  status: DesignerStatus
+  /** Fecha (YYYY-MM-DD) desde la que el diseñador podría empezar la tarea. */
+  availableFrom: string
+  /** true para el diseñador que el motor sugiere. */
+  isSuggested: boolean
+  /** 1 primario / 2 secundario / 3 otro cargo, respecto al tipo pedido. */
+  roleAffinity: 1 | 2 | 3
+  /** Explicación legible de por qué el motor lo posiciona así (para la UI). */
+  reason: string
 }
 
 export interface AssignmentCandidate {
@@ -138,6 +168,10 @@ export interface TaskCreationParams {
   brandId: string
   assignedUserIds?: string[]
   durationDays: number
+  /** Nivel solicitado (Jr/Mid/Sr); decide el escalado de asignación automática. */
+  level?: string
+  /** Diseñador que el motor sugirió (para medir aciertos/override). No decide nada. */
+  suggestedUserId?: string | null
 }
 
 export interface TaskTimingResult {

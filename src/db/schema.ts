@@ -92,6 +92,31 @@ export const userRole = sqliteTable(
   (t) => ({ uniq: unique().on(t.userId, t.typeId, t.brandId) })
 )
 
+// Metadata SIDECAR de cada tarea creada por Assignify, keyed por el id de ClickUp.
+// NO es una copia de la tarea (estado/fechas/asignados viven y mutan en ClickUp y se
+// leen en vivo). Aquí solo va lo INMUTABLE de creación que ClickUp no puede
+// representar (tier/duración real, nivel pedido) + el rastro de la sugerencia para
+// medir el motor. Write-once: se inserta al crear y no se vuelve a tocar.
+export const taskMeta = sqliteTable('task_meta', {
+  // id de la tarea en ClickUp (clave de cruce con fetchActiveClickUpTasks).
+  clickupTaskId: text('clickup_task_id').primaryKey(),
+  typeId: integer('type_id').notNull(),
+  tierId: integer('tier_id').notNull(),
+  // Duración REAL con la que se creó la tarea (días). Resuelve "ClickUp no trae tier".
+  durationDays: real('duration_days').notNull(),
+  brandId: text('brand_id').notNull(),
+  priority: text('priority').notNull(),
+  // Nivel solicitado al crear (Jr/Mid/Sr); no se persiste en la tarea de ClickUp.
+  requestedLevel: text('requested_level', { enum: LEVEL_NAMES }).notNull().default('MID'),
+  // Rastro de la sugerencia, para medir aciertos/override del motor.
+  suggestedUserId: text('suggested_user_id'),
+  // Asignados REALES al crear (JSON). Solo "foto" de creación; la verdad vive en ClickUp.
+  assignedUserIds: text('assigned_user_ids', { mode: 'json' }).$type<string[]>(),
+  // true si el sugerido NO quedó entre los asignados reales (override humano).
+  wasOverride: integer('was_override', { mode: 'boolean' }).notNull().default(false),
+  createdAt: createdAt(),
+})
+
 export const syncLog = sqliteTable('sync_log', {
   id: integer('id').primaryKey({ autoIncrement: true }),
   entityType: text('entity_type').notNull(),

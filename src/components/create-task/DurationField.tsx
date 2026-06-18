@@ -9,7 +9,6 @@ import { FormValues } from '@/interfaces'
 import { formatDaysToReadable } from '@/utils/duration-utils'
 
 interface DurationFieldProps {
-  fetchingSuggestion: boolean
   touched?: boolean
   error?: string
   onDurationComplete?: (duration: string) => void
@@ -19,7 +18,6 @@ interface DurationFieldProps {
 }
 
 export const DurationField: React.FC<DurationFieldProps> = ({
-  fetchingSuggestion,
   touched,
   error,
   onDurationComplete,
@@ -51,10 +49,12 @@ export const DurationField: React.FC<DurationFieldProps> = ({
     setHasManualEdit(false)
   }, [values.tierId])
 
+  // La duración SIEMPRE viene del tier (instantáneo) o es manual: nunca se
+  // "calcula". Por eso no hay estado de carga aquí (lo que tardaba era la
+  // sugerencia de diseñador, no la duración).
   const getStatusIndicator = () => {
     if (isApplyingAutomatic) return { text: '(Applying...)', color: 'var(--color-primary-400)' }
     if (hasManualEdit) return { text: '(Manual)', color: 'var(--color-warning-500)' }
-    if (fetchingSuggestion) return { text: '(Calculating...)', color: 'var(--color-primary-500)' }
     if (localInputValue && tierDuration !== undefined && tierDuration.toString() === localInputValue) {
       return { text: '(From Tier)', color: 'var(--color-success-500)' }
     }
@@ -123,7 +123,7 @@ export const DurationField: React.FC<DurationFieldProps> = ({
         value={localInputValue}
         onChange={handleInputChange}
         onBlur={handleBlur}
-        placeholder={fetchingSuggestion ? 'Calculating suggested duration...' : 'Duration in days'}
+        placeholder="Duration in days"
         error={touched && error ? error : undefined}
         helper={durationHelper}
         step={0.1}

@@ -1,9 +1,12 @@
-// src/hooks/useTaskSuggestion.ts - VERSIÓN MEJORADA CON RE-CÁLCULO AUTOMÁTICO
+// src/hooks/useTaskSuggestion.ts
+// Sugerencia de diseñador + lista de candidatos (con su estado) en UNA sola
+// llamada a /api/tasks/suggestion/simple. Es la única fuente de verdad para el
+// selector de asignación: el "sugerido" y las opciones salen del mismo motor.
 
 import { useState, useEffect, useRef } from 'react'
 import axios from 'axios'
 import { hotToast as toast } from '@/lib/hotToast'
-import { SuggestedAssignment } from '@/interfaces'
+import { SuggestedAssignment, RankedCandidate } from '@/interfaces'
 
 export const useTaskSuggestion = (
   typeId: number | undefined,
@@ -14,40 +17,34 @@ export const useTaskSuggestion = (
   level?: string
 ) => {
   const [suggestedAssignment, setSuggestedAssignment] = useState<SuggestedAssignment | null>(null)
+  const [candidates, setCandidates] = useState<RankedCandidate[]>([])
   const [fetchingSuggestion, setFetchingSuggestion] = useState(false)
 
-  // ✅ NUEVO: Referencias para detectar cambios y debouncing
-  const lastValidSuggestion = useRef<SuggestedAssignment | null>(null)
   const debounceTimeout = useRef<NodeJS.Timeout | null>(null)
   const lastParams = useRef<string>('')
 
-  // ✅ NUEVO: Función para determinar si los parámetros son válidos
   const areParamsValid = (typeId: number | undefined, durationDays: string) => {
     if (!typeId || !durationDays) return false
     const duration = parseFloat(durationDays)
     return !isNaN(duration) && duration > 0
   }
 
-  // ✅ NUEVO: Función para crear clave de parámetros para detectar cambios
-  const createParamsKey = (typeId: number | undefined, durationDays: string, brandId?: string) => {
-    return `${typeId || 'none'}-${durationDays || 'none'}-${brandId || 'global'}-${priority || 'NORMAL'}-${level || 'MID'}`
-  }
+  // Clave de parámetros para detectar cambios reales (evita refetch innecesario).
+  const createParamsKey = (typeId: number | undefined, durationDays: string, brandId?: string) =>
+    `${typeId || 'none'}-${durationDays || 'none'}-${brandId || 'global'}-${priority || 'NORMAL'}-${level || 'MID'}`
 
-  // Suggestion fetching with debouncing
   const getSuggestion = async (immediate = false) => {
     const currentParams = createParamsKey(typeId, durationDays, brandId)
 
-    // Validar parámetros
     if (!areParamsValid(typeId, durationDays)) {
       setFetchingSuggestion(false)
-      // No limpiar la sugerencia inmediatamente, esperar a que llegue una duración válida
+      // No limpiar la sugerencia: esperamos a que llegue una duración válida.
       return
     }
 
     const duration = parseFloat(durationDays)
     lastParams.current = currentParams
 
-    // ✅ NUEVO: Implementar debouncing solo para cambios de duración manual
     if (!immediate && debounceTimeout.current) {
       clearTimeout(debounceTimeout.current)
     }
@@ -60,50 +57,40 @@ export const useTaskSuggestion = (
           typeId: typeId ?? 0,
           durationDays: duration,
           priority: priority || 'NORMAL',
-          level: level || 'MID'
+          level: level || 'MID',
+        }
+        if (brandId) params.brandId = brandId
+
+        const response = await axios.get(`/api/tasks/suggestion/simple`, { params })
+        const { suggestedUserId, candidates: nextCandidates } = response.data as {
+          suggestedUserId: string | null
+          candidates: RankedCandidate[]
         }
 
-        if (brandId) {
-          params.brandId = brandId
-        }
-
-        const response = await axios.get(`/api/tasks/suggestion/simple`, {
-          params
-        })
-
-        const { suggestedUserId } = response.data
-
-        const newSuggestion: SuggestedAssignment = {
-          userId: suggestedUserId,
-          durationDays: duration,
-        }
-
-        setSuggestedAssignment(newSuggestion)
-        lastValidSuggestion.current = newSuggestion
+        setCandidates(nextCandidates ?? [])
+        setSuggestedAssignment(
+          suggestedUserId ? { userId: suggestedUserId, durationDays: duration } : null
+        )
       } catch (error) {
         setSuggestedAssignment(null)
+        setCandidates([])
 
-        if (axios.isAxiosError(error)) {
-          // 400 = validation error while typing: stay quiet, no toast.
-          if (error.response?.status !== 400) {
-            toast.error({ title: 'Failed to get assignment suggestion.', description: 'No designer suggested.' })
-          }
+        // 400 = parámetros incompletos mientras se escribe: sin toast.
+        if (axios.isAxiosError(error) && error.response?.status !== 400) {
+          toast.error({ title: 'Failed to get assignment suggestion.', description: 'No designer suggested.' })
         }
       } finally {
         setFetchingSuggestion(false)
       }
     }
 
-    // ✅ NUEVO: Ejecutar inmediatamente o con debounce
     if (immediate) {
       await executeSuggestion()
     } else {
-      // Debounce de 300ms para cambios de duración manual
       debounceTimeout.current = setTimeout(executeSuggestion, 300)
     }
   }
 
-  // ✅ MEJORADO: Effect principal con mejor detección de cambios
   useEffect(() => {
     const currentParams = createParamsKey(typeId, durationDays, brandId)
     const paramsChanged = currentParams !== lastParams.current
@@ -113,22 +100,15 @@ export const useTaskSuggestion = (
       getSuggestion(shouldTriggerImmediate)
     }
 
-    // Cleanup timeout on unmount
     return () => {
-      if (debounceTimeout.current) {
-        clearTimeout(debounceTimeout.current)
-      }
+      if (debounceTimeout.current) clearTimeout(debounceTimeout.current)
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [typeId, durationDays, brandId, priority, triggerSuggestion, level])
-
-  // Force an immediate recalculation
-  const forceSuggestionUpdate = () => {
-    getSuggestion(true)
-  }
 
   return {
     suggestedAssignment,
+    candidates,
     fetchingSuggestion,
-    forceSuggestionUpdate
   }
 }

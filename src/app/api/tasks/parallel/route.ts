@@ -6,7 +6,7 @@
 
 import { NextResponse } from 'next/server'
 import { db } from '@/db'
-import { tierList, taskType as taskTypeTable, brand as brandTable, user as userTable, userRole } from '@/db/schema'
+import { tierList, taskType as taskTypeTable, brand as brandTable, user as userTable, userRole, taskMeta } from '@/db/schema'
 import { eq, inArray, or, isNull } from 'drizzle-orm'
 import { Level } from '@/db/enums'
 import { getBestUserWithCache } from '@/services/task-assignment.service'
@@ -38,6 +38,7 @@ export async function POST(req: Request) {
       brandId,
       assignedUserIds,
       durationDays,
+      suggestedUserId,
     }: TaskCreationParams = body
 
     if (!name || !typeId || !tierId || !priority || !brandId || typeof durationDays !== 'number' || durationDays <= 0) {
@@ -145,6 +146,27 @@ export async function POST(req: Request) {
       brand: brandForClickUp,
       customDurationDays: isCustomDuration ? durationDays : undefined,
     })
+
+    // Persistir la metadata SIDECAR (write-once): lo inmutable de creación que
+    // ClickUp no puede representar (tier/duración real, nivel) + el rastro de la
+    // sugerencia para medir el motor. Si falla, NO rompemos la creación (la tarea ya
+    // existe en ClickUp); solo lo registramos.
+    try {
+      await db.insert(taskMeta).values({
+        clickupTaskId,
+        typeId,
+        tierId,
+        durationDays,
+        brandId,
+        priority,
+        requestedLevel: reqLevel,
+        suggestedUserId: suggestedUserId ?? null,
+        assignedUserIds: usersToAssign,
+        wasOverride: suggestedUserId ? !usersToAssign.includes(suggestedUserId) : false,
+      })
+    } catch (metaError) {
+      console.error('No se pudo guardar task_meta (la tarea sí se creó en ClickUp):', metaError)
+    }
 
     // Notificar en tiempo real (el tablero se lee en vivo de ClickUp).
     await publishTaskUpdate({

@@ -7,6 +7,7 @@ import React, { useState, useMemo } from 'react'
 import { hotToast as toast } from '@/lib/hotToast'
 import { DesignersHeader } from './DesignersHeader'
 import { UsersList } from './UsersList'
+import { CapacityTimeline } from './CapacityTimeline'
 import { UserEditModal } from './UserEditModal'
 import { Modal } from '@/components/ui'
 import {
@@ -164,6 +165,8 @@ export const ClickUpUsersSync: React.FC = () => {
       />
 
       <div className="p-6 flex-1 flex flex-col gap-8">
+        <CapacityTimeline workload={workload} loading={workloadLoading} />
+
         <UsersList
           users={filteredUsers}
           selectedUsers={selectedUsers}

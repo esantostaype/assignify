@@ -13,6 +13,7 @@ import React, {
 import axios from "axios";
 import { Formik, Form, useFormikContext } from "formik";
 import { Button, Typography, LoadingOverlay, Spinner } from "@/components/ui";
+import { Icon, PiSparkle } from "@/lib/icons";
 import { hotToast as toast } from "@/lib/hotToast";
 import { useQueryClient } from "@tanstack/react-query";
 
@@ -35,35 +36,38 @@ import { taskKeys } from "@/hooks/queries/useTasks";
 // rompiendo el prerender (Element type is invalid).
 import { getTypeKind } from "@/utils/taskUtils";
 import { validationSchema } from "@/validation/taskValidation";
-import { FormValues, User, TaskType } from "@/interfaces";
+import { FormValues, User, TaskType, RankedCandidate } from "@/interfaces";
 
 interface FormikSuggestionLogicProps {
   setSuggestedAssignment: Dispatch<
     SetStateAction<{ userId: string; durationDays: number } | null>
   >;
+  setCandidates: Dispatch<SetStateAction<RankedCandidate[]>>;
   setFetchingSuggestion: Dispatch<SetStateAction<boolean>>;
   userHasManuallyChanged: boolean;
   currentTypeId?: number;
   triggerSuggestion: number;
   isSubmitting: boolean;
   setFieldValue: (field: string, value: any) => void;
-  setSuggestionChanged: Dispatch<SetStateAction<boolean>>;
 }
 
-// Lógica de sugerencia de usuario: depende del tipo (del kind) + duración + brand.
+// Lógica de sugerencia de usuario: depende del tipo (del kind) + duración + brand
+// + prioridad + nivel. Llama al motor (vía useTaskSuggestion) y eleva el resultado
+// (sugerido + candidatos) al formulario. La SELECCIÓN automática del sugerido la
+// hace UserAssignmentSelect (sigue a la sugerencia mientras no se cambie a mano).
 const FormikSuggestionLogic: FC<FormikSuggestionLogicProps> = ({
   setSuggestedAssignment,
+  setCandidates,
   setFetchingSuggestion,
   userHasManuallyChanged,
   currentTypeId,
   triggerSuggestion,
   isSubmitting,
   setFieldValue,
-  setSuggestionChanged,
 }) => {
   const { values } = useFormikContext<FormValues>();
 
-  const { suggestedAssignment, fetchingSuggestion } = useTaskSuggestion(
+  const { suggestedAssignment, candidates, fetchingSuggestion } = useTaskSuggestion(
     isSubmitting ? undefined : currentTypeId,
     isSubmitting ? "" : (values.durationDays as string),
     isSubmitting ? undefined : values.brandId || undefined,
@@ -76,19 +80,10 @@ const FormikSuggestionLogic: FC<FormikSuggestionLogicProps> = ({
     if (isSubmitting) return;
 
     setFetchingSuggestion(fetchingSuggestion);
-
-    const changed =
-      suggestedAssignment &&
-      values.assignedUserIds.length > 0 &&
-      values.assignedUserIds[0] !== suggestedAssignment.userId;
-
-    if (changed) {
-      setSuggestionChanged(true);
-      setTimeout(() => setSuggestionChanged(false), 4000);
-    }
-
     setSuggestedAssignment(suggestedAssignment);
+    setCandidates(candidates);
 
+    // Si el motor no puede sugerir a nadie y el usuario no eligió a mano, limpia.
     if (
       !fetchingSuggestion &&
       !userHasManuallyChanged &&
@@ -99,14 +94,15 @@ const FormikSuggestionLogic: FC<FormikSuggestionLogicProps> = ({
     }
   }, [
     suggestedAssignment,
+    candidates,
     fetchingSuggestion,
     setFieldValue,
     setSuggestedAssignment,
+    setCandidates,
     setFetchingSuggestion,
     values.assignedUserIds,
     userHasManuallyChanged,
     isSubmitting,
-    setSuggestionChanged,
   ]);
 
   return null;
@@ -163,9 +159,9 @@ export const CreateTaskForm: FC = () => {
     userId: string;
     durationDays: number;
   } | null>(null);
+  const [candidates, setCandidates] = useState<RankedCandidate[]>([]);
   const [fetchingSuggestion, setFetchingSuggestion] = useState(false);
   const [userHasManuallyChanged, setUserHasManuallyChanged] = useState(false);
-  const [suggestionChanged, setSuggestionChanged] = useState(false);
 
   // Reinicia TODO el estado local del formulario a su valor inicial. Se usa
   // tanto tras crear con éxito como en la auto-limpieza por inactividad.
@@ -174,13 +170,9 @@ export const CreateTaskForm: FC = () => {
     setSelectedKind("UX/UI");
     setTriggerSuggestion(0);
     setSuggestedAssignment(null);
+    setCandidates([]);
     setUserHasManuallyChanged(false);
-    setSuggestionChanged(false);
   }, []);
-
-  const suggestedUser = suggestedAssignment
-    ? users.find((u) => u.id === suggestedAssignment.userId)
-    : null;
 
   // El tipo se determina por el kind seleccionado (UX/UI o Graphic).
   const filteredTypes = (types as TaskType[]).filter(
@@ -188,15 +180,16 @@ export const CreateTaskForm: FC = () => {
   );
   const currentTypeId = filteredTypes.length > 0 ? filteredTypes[0].id : undefined;
 
+  // Formulario SIEMPRE vacío al abrir/limpiar: el usuario elige cada campo.
   const initialValues: FormValues = {
-    name: "Task 1",
+    name: "",
     description: "",
     tierId: "",
-    priority: "NORMAL",
+    priority: "",
     brandId: "",
     assignedUserIds: [],
     durationDays: "",
-    level: "MID",
+    level: "",
   };
 
   const handleSubmit = async (values: FormValues, { resetForm }: any) => {
@@ -230,6 +223,8 @@ export const CreateTaskForm: FC = () => {
         durationDays: finalDurationDays,
         // Nivel solicitado: solo decide el diseñador en asignación automática (no se persiste).
         level: values.level,
+        // Lo que el motor sugirió en pantalla (para medir aciertos vs. override). No decide nada.
+        suggestedUserId: suggestedAssignment?.userId ?? null,
       };
 
       setLoading(true);
@@ -274,13 +269,11 @@ export const CreateTaskForm: FC = () => {
 
   const handleUserSelectionChange = (selectedUserIds: string[]) => {
     setUserHasManuallyChanged(true);
-    setSuggestionChanged(false);
     return selectedUserIds;
   };
 
   const applySuggestion = () => {
     setUserHasManuallyChanged(false);
-    setSuggestionChanged(false);
   };
 
   const selectedTierDuration = (tierId: string) =>
@@ -289,10 +282,22 @@ export const CreateTaskForm: FC = () => {
   return (
     <aside className="bg-(--color-surface-app) sticky w-[28rem] p-10 h-dvh overflow-y-auto top-0 border-l border-l-(--color-border-default)">
       <LoadingOverlay open={loading} label="Creating Task..." />
+
+      {/* Bloqueo del formulario mientras el motor busca diseñador: fondo oscuro
+          al 70% + blur, con icono y mensaje al centro. */}
       {fetchingSuggestion && (
-        <div className="mb-4 flex items-center gap-2 rounded-lg bg-primary-500/10 px-3 py-2 text-sm text-primary-600">
-          <Spinner size={16} colorClassName="text-primary-600" />
-          Finding suggested designer...
+        <div className="absolute inset-0 z-20 flex flex-col items-center justify-center gap-4 bg-black/70 backdrop-blur-sm">
+          <div className="relative flex items-center justify-center">
+            <Spinner size={48} colorClassName="text-white" />
+            <Icon
+              icon={PiSparkle}
+              size={20}
+              className="absolute text-white"
+            />
+          </div>
+          <Typography variant="bodySm" color="white" className="font-medium">
+            Finding suggested designer...
+          </Typography>
         </div>
       )}
       <Formik
@@ -305,8 +310,8 @@ export const CreateTaskForm: FC = () => {
           const resetDependentFields = () => {
             setFieldValue("assignedUserIds", []);
             setSuggestedAssignment(null);
+            setCandidates([]);
             setUserHasManuallyChanged(false);
-            setSuggestionChanged(false);
           };
 
           // Auto-limpieza por inactividad: reinicia Formik + estado local y avisa.
@@ -320,13 +325,13 @@ export const CreateTaskForm: FC = () => {
             <Form className="flex flex-col gap-4">
               <FormikSuggestionLogic
                 setSuggestedAssignment={setSuggestedAssignment}
+                setCandidates={setCandidates}
                 setFetchingSuggestion={setFetchingSuggestion}
                 userHasManuallyChanged={userHasManuallyChanged}
                 currentTypeId={currentTypeId}
                 triggerSuggestion={triggerSuggestion}
                 isSubmitting={isSubmitting}
                 setFieldValue={setFieldValue}
-                setSuggestionChanged={setSuggestionChanged}
               />
 
               <FormikInactivityReset
@@ -396,7 +401,6 @@ export const CreateTaskForm: FC = () => {
               />
 
               <DurationField
-                fetchingSuggestion={fetchingSuggestion}
                 touched={touched.durationDays}
                 error={errors.durationDays}
                 onDurationComplete={() => setTriggerSuggestion((prev) => prev + 1)}
@@ -405,12 +409,14 @@ export const CreateTaskForm: FC = () => {
 
               <UserAssignmentSelect
                 users={users}
+                candidates={candidates}
+                suggestedUserId={suggestedAssignment?.userId ?? null}
                 values={values.assignedUserIds}
                 onChange={(selectedUserIds) => {
                   const newSelection = handleUserSelectionChange(selectedUserIds);
                   setFieldValue("assignedUserIds", newSelection);
                 }}
-                suggestedUser={suggestedUser}
+                onAutoApply={(ids) => setFieldValue("assignedUserIds", ids)}
                 fetchingSuggestion={fetchingSuggestion}
                 touched={touched.assignedUserIds}
                 error={
@@ -421,11 +427,6 @@ export const CreateTaskForm: FC = () => {
                 loading={dataLoading}
                 userHasManuallyChanged={userHasManuallyChanged}
                 onApplySuggestion={applySuggestion}
-                typeId={currentTypeId}
-                brandId={values.brandId || undefined}
-                durationDays={
-                  values.durationDays ? parseFloat(values.durationDays as string) : undefined
-                }
                 info={{ tierId: values.tierId, brandId: values.brandId }}
               />
 

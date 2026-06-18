@@ -1,7 +1,10 @@
 // src/app/api/tasks/suggestion/simple/route.ts
+// FUENTE ÚNICA de la UI de asignación: devuelve el diseñador sugerido por el motor
+// y la lista completa de candidatos (con estado) para pintar opciones + badges.
 import { NextResponse } from 'next/server';
 import { Priority, Level } from '@/db/enums';
-import { getBestUserWithCache } from '@/services/task-assignment.service';
+import { getRankedCandidates } from '@/services/task-assignment.service';
+import { RankedCandidate } from '@/interfaces';
 import { db } from '@/db';
 import { brand as brandTable } from '@/db/schema';
 import { eq } from 'drizzle-orm';
@@ -41,43 +44,34 @@ export async function GET(req: Request) {
       }, { status: 400 });
     }
 
-    // ✅ LÓGICA FLEXIBLE: Usar brandId si está disponible, sino buscar globalmente
-    let bestSlot;
+    // Usar brandId si está disponible; si no, buscar en todos los brands activos.
+    let suggestedUserId: string | null = null;
+    let candidates: RankedCandidate[] = [];
+    let resolvedBrandId = brandId;
 
     if (brandId) {
-      // Con brand específico
-      bestSlot = await getBestUserWithCache(
-        typeId,
-        brandId,
-        priority,
-        durationDays,
-        level
-      );
+      const result = await getRankedCandidates(typeId, brandId, priority, durationDays, level);
+      suggestedUserId = result.suggestedUserId;
+      candidates = result.candidates;
     } else {
-      // ✅ FALLBACK: Buscar en todos los brands activos
+      // FALLBACK: probar cada brand activo hasta encontrar candidatos.
       const activeBrands = await db.query.brand.findMany({
         where: eq(brandTable.isActive, true),
         columns: { id: true, name: true }
       });
 
-      // Intentar con cada brand hasta encontrar un usuario
       for (const brand of activeBrands) {
-        const candidateSlot = await getBestUserWithCache(
-          typeId,
-          brand.id,
-          priority,
-          durationDays,
-          level
-        );
-
-        if (candidateSlot) {
-          bestSlot = candidateSlot;
+        const result = await getRankedCandidates(typeId, brand.id, priority, durationDays, level);
+        if (result.candidates.length > 0) {
+          suggestedUserId = result.suggestedUserId;
+          candidates = result.candidates;
+          resolvedBrandId = brand.id;
           break;
         }
       }
     }
 
-    if (!bestSlot) {
+    if (candidates.length === 0) {
       return NextResponse.json({
         error: 'Could not find an optimal designer',
         details: brandId
@@ -86,25 +80,15 @@ export async function GET(req: Request) {
       }, { status: 400 });
     }
 
-    // ✅ RESPUESTA EXITOSA
     return NextResponse.json({
-      suggestedUserId: bestSlot.userId,
-      userInfo: {
-        id: bestSlot.userId,
-        name: bestSlot.userName,
-        currentLoad: bestSlot.cargaTotal,
-        isSpecialist: bestSlot.isSpecialist,
-        availableFrom: bestSlot.availableDate.toISOString(),
-        totalAssignedDurationDays: bestSlot.totalAssignedDurationDays,
-        level: bestSlot.level
-      },
+      suggestedUserId,
+      candidates,
       metadata: {
-        typeId: typeId,
-        durationDays: durationDays,
-        brandId: brandId || 'global',
+        typeId,
+        durationDays,
+        brandId: resolvedBrandId || 'global',
         requestedLevel: level,
-        generatedAt: new Date().toISOString(),
-        algorithm: 'duration-balanced-assignment-flexible'
+        algorithm: 'duration-balanced-priority-aware'
       }
     });
 

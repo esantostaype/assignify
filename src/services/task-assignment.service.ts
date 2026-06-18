@@ -6,24 +6,24 @@ import { db } from '@/db';
 import { user as userTable, userRole, userVacation } from '@/db/schema';
 import { eq, or, isNull, gte } from 'drizzle-orm';
 import { Priority, Status, Level } from '@/db/enums';
-import { UserSlot, UserWithRoles, Task, TaskTimingResult, UserVacation, VacationAwareUserSlot } from '@/interfaces';
+import { UserSlot, UserWithRoles, Task, TaskTimingResult, UserVacation, VacationAwareUserSlot, RankedCandidate, DesignerStatus } from '@/interfaces';
 import { getNextAvailableStart, calculateWorkingDeadline, OCCUPYING_STATUSES } from '@/utils/task-calculation-utils';
 import { CACHE_KEYS } from '@/config';
 import { getAppSettings } from '@/services/app-settings.service';
 import { getFromCache, setInCache } from '@/utils/cache';
 import { fetchActiveClickUpTasks, type ActiveClickUpTask } from '@/services/clickup-tasks.service';
+import { mapClickUpPriority } from '@/utils/clickup-status-mapping-utils';
+import { pickBestAcrossAffinity, PRIORITY_RANK } from '@/services/assignment-ranking';
 import usHolidays from '@/data/usHolidays.json'
 
-// Rango numérico de cada nivel para el escalado de asignación.
-// JUNIOR < MID < SENIOR. Una tarea solo se asigna en automático a niveles >= al pedido.
-const LEVEL_RANK: Record<Level, number> = {
-  JUNIOR: 1,
-  MID: 2,
-  SENIOR: 3,
-};
+// Duración a asumir para una tarea pendiente cuyo `durationDays` no conocemos
+// (creada fuera de Assignify, sin fila en task_meta). 1 día = el viejo "1 por tarea".
+const FALLBACK_TASK_DURATION_DAYS = 1;
 
-// Orden de escalado, de menor a mayor.
-const LEVELS_ASCENDING: Level[] = [Level.JUNIOR, Level.MID, Level.SENIOR];
+// Carga pendiente (en "días"; 1 por tarea) a partir de la cual un diseñador se
+// considera SATURADO para los badges del selector. No cambia a quién se elige
+// (eso lo decide la fecha de liberación + congestión de prioridad).
+const OVERLOAD_THRESHOLD_DAYS = 10;
 
 // Estados de ClickUp que cuentan como trabajo pendiente (ocupan al diseñador).
 // ON_APPROVAL ya está entregado: no cuenta ni para carga ni para disponibilidad.
@@ -76,6 +76,17 @@ function calculateWorkingDaysBetween(startDate: Date, endDate: Date, excludeVaca
   return workingDays;
 }
 
+// Duración (días) de una tarea pendiente para la métrica de carga:
+//   1) la REAL de task_meta si la creó Assignify (la más fiable, refleja el tier);
+//   2) si no, la derivamos de sus fechas REALES start→due (días hábiles) — así TODAS
+//      las tareas no completadas pesan algo realista sin depender de task_meta;
+//   3) piso de FALLBACK por si las fechas no dan un span > 0.
+function estimateTaskDurationDays(task: ActiveClickUpTask): number {
+  if (task.durationDays !== undefined) return task.durationDays;
+  const fromDates = calculateWorkingDaysBetween(new Date(task.startDate), new Date(task.dueDate));
+  return fromDates > 0 ? fromDates : FALLBACK_TASK_DURATION_DAYS;
+}
+
 async function getNextAvailableStartAfterVacations(
   baseDate: Date,
   vacations: UserVacation[],
@@ -124,7 +135,8 @@ async function getNextAvailableStartAfterVacations(
 async function getVacationAwareUserSlots(
   typeId: number,
   brandId: string,
-  taskDurationDays: number
+  taskDurationDays: number,
+  reqPriority: Priority
 ): Promise<VacationAwareUserSlot[]> {
   const allUsersWithRoles = await db.query.user.findMany({
     where: eq(userTable.active, true),
@@ -193,21 +205,37 @@ async function getVacationAwareUserSlots(
       endDate: new Date(v.endDate)
     }));
 
-    // Calculate when user would be available
+    // CARRIL DE PRIORIDAD (mismo modelo que el motor de fechas): la tarea nueva se
+    // encola tras las de prioridad IGUAL o MAYOR y corre EN PARALELO con las de
+    // menor. Por eso la disponibilidad se mide sobre ESE carril, no sobre toda la
+    // cola — así QUIÉN y CUÁNDO concuerdan (un URGENT puede empezar antes que la
+    // última deadline absoluta del diseñador si lo que tiene por delante es de menor
+    // prioridad).
+    const reqRank = PRIORITY_RANK[reqPriority];
+    const laneTasks = userTasks.filter(
+      (t) => PRIORITY_RANK[mapClickUpPriority(t.priority)] >= reqRank
+    );
+
     let baseAvailableDate: Date;
-    let totalAssignedDurationDays = 0;
     let lastDeadline: Date | undefined;
-
-    if (userTasks.length > 0) {
-      // Se libera tras su última entrega pendiente (la deadline MÁS lejana de su cola).
-      lastDeadline = new Date(Math.max(...userTasks.map((t) => new Date(t.dueDate).getTime())));
+    if (laneTasks.length > 0) {
+      // Se libera tras la última entrega del CARRIL (la deadline más lejana en él).
+      lastDeadline = new Date(Math.max(...laneTasks.map((t) => new Date(t.dueDate).getTime())));
       baseAvailableDate = await getNextAvailableStart(lastDeadline);
-
-      // ClickUp no trae tier: 1 día por tarea pendiente es suficiente para el desempate.
-      totalAssignedDurationDays = userTasks.length;
     } else {
       baseAvailableDate = await getNextAvailableStart(new Date());
     }
+
+    // Carga total = suma de duraciones de TODAS sus tareas pendientes: la REAL de
+    // task_meta cuando existe, o la derivada de las fechas start→due si no (cubre
+    // las tareas creadas fuera de Assignify sin depender de la tabla).
+    const totalAssignedDurationDays = userTasks.reduce(
+      (sum, t) => sum + estimateTaskDurationDays(t),
+      0
+    );
+    // Congestión del carril: cuántas de prioridad ≥ la pedida ya tiene (para no
+    // apilar urgentes en quien ya carga muchas cuando se liberan en fechas parecidas).
+    const samePriorityOrHigherLoad = laneTasks.length;
 
     // Ajustar la fecha de inicio para SALTAR las vacaciones (en lugar de excluir al usuario).
     // Si la tarea —empezando cuando el usuario se libera de su cola— choca con una vacación,
@@ -228,6 +256,21 @@ async function getVacationAwareUserSlots(
     const matchingRoles = user.roles.filter(role => role.typeId === typeId);
     const isSpecialist = matchingRoles.length === 1 && user.roles.length === 1;
 
+    // Estado para los badges del selector (no decide a quién se elige):
+    //   on_vacation → ahora mismo de vacaciones, o la tarea se corrió por una vacación.
+    //   overloaded  → más de OVERLOAD_THRESHOLD_DAYS de trabajo pendiente.
+    const now = new Date();
+    const onVacationNow = upcomingVacations.some(
+      (v) => v.startDate <= now && v.endDate >= now
+    );
+    const shiftedByVacation = availableDate.getTime() !== baseAvailableDate.getTime();
+    const hasVacationConflict = onVacationNow || shiftedByVacation;
+    const status: DesignerStatus = hasVacationConflict
+      ? 'on_vacation'
+      : totalAssignedDurationDays > OVERLOAD_THRESHOLD_DAYS
+        ? 'overloaded'
+        : 'available';
+
     eligibleSlots.push({
       userId: user.id,
       userName: user.name,
@@ -243,197 +286,39 @@ async function getVacationAwareUserSlots(
       upcomingVacations,
       potentialTaskStart: availableDate,
       potentialTaskEnd,
-      hasVacationConflict: false,
+      hasVacationConflict,
       workingDaysUntilAvailable,
       vacationConflictDetails: undefined,
       totalAssignedDurationDays,
       // Afinidad de cargo (1 primario / 2 secundario / 3 otro): eje superior al de nivel.
       roleAffinity,
+      samePriorityOrHigherLoad,
+      status,
     });
   }
 
   return eligibleSlots;
 }
 
-// Disponible antes primero (fecha ya ajustada por cola + vacaciones + festivos);
-// a igualdad de fecha, el de menor carga acumulada.
-function sortByAvailability(users: VacationAwareUserSlot[]): VacationAwareUserSlot[] {
-  return [...users].sort((a, b) => {
-    const dateDiff = a.availableDate.getTime() - b.availableDate.getTime();
-    if (dateDiff !== 0) return dateDiff;
-    return a.totalAssignedDurationDays - b.totalAssignedDurationDays;
-  });
-}
-
 /**
- * Mejor candidato DENTRO de un mismo nivel. La regla de niveles manda; la de
- * especialista/generalista queda como DESEMPATE dentro del nivel: si el mejor
- * especialista se libera mucho más tarde que el mejor generalista
- * (umbral DEADLINE_DIFFERENCE_TO_FORCE_GENERALIST), se prefiere el generalista.
- * En caso normal gana simplemente el de antes-disponible / menos-carga.
- */
-function pickBestInLevel(
-  slots: VacationAwareUserSlot[],
-  forceGeneralistThresholdDays: number
-): VacationAwareUserSlot | null {
-  if (slots.length === 0) return null;
-
-  const sorted = sortByAvailability(slots);
-  const bestOverall = sorted[0];
-
-  const bestSpecialist = sorted.find((s) => s.isSpecialist) ?? null;
-  const bestGeneralist = sorted.find((s) => !s.isSpecialist) ?? null;
-
-  // Desempate especialista/generalista solo si el mejor del nivel es especialista
-  // y existe un generalista que se libera bastante antes.
-  if (bestSpecialist && bestGeneralist && bestOverall.isSpecialist) {
-    const daysLater =
-      (bestSpecialist.availableDate.getTime() - bestGeneralist.availableDate.getTime()) /
-      (1000 * 60 * 60 * 24);
-    if (daysLater > forceGeneralistThresholdDays) {
-      return bestGeneralist;
-    }
-  }
-
-  return bestOverall;
-}
-
-/**
- * Mejor candidato de un conjunto de slots aplicando el ESCALADO POR NIVEL.
- * (Antes era el cuerpo de `selectBestUserWithVacationLogic`; se extrajo para poder
- *  reutilizarlo dentro de cada grupo de afinidad de cargo.)
- * - Solo se consideran candidatos de nivel >= reqLevel (nunca uno inferior en automático).
- * - Se toma el mejor candidato de cada nivel (antes-disponible / menos-carga, con el
- *   desempate especialista/generalista interno).
- * - Se empieza por reqLevel y se compara contra el nivel inmediatamente superior:
- *   si el mejor del nivel actual se libera MÁS de `levelEscalationDays` días DESPUÉS
- *   que el mejor del nivel superior, se escala al superior. Se repite hacia SENIOR.
- */
-function pickBestByLevelEscalation(
-  slots: VacationAwareUserSlot[],
-  reqLevel: Level,
-  levelEscalationDays: number,
-  forceGeneralistThreshold: number
-): VacationAwareUserSlot | null {
-  if (slots.length === 0) return null;
-
-  const reqRank = LEVEL_RANK[reqLevel];
-
-  // Solo niveles >= al pedido, de menor a mayor.
-  const candidateLevels = LEVELS_ASCENDING.filter((lvl) => LEVEL_RANK[lvl] >= reqRank);
-
-  // Mejor candidato por nivel (los niveles sin candidatos quedan en null).
-  const bestByLevel: Partial<Record<Level, VacationAwareUserSlot>> = {};
-  for (const lvl of candidateLevels) {
-    const slotsOfLevel = slots.filter((s) => s.level === lvl);
-    const best = pickBestInLevel(slotsOfLevel, forceGeneralistThreshold);
-    if (best) {
-      bestByLevel[lvl] = best;
-    }
-  }
-
-  // Escalado: arrancamos en el primer nivel con candidato (>= reqLevel) y subimos.
-  let chosen: VacationAwareUserSlot | null = null;
-
-  for (const lvl of candidateLevels) {
-    const current = bestByLevel[lvl];
-    if (!current) continue; // este nivel no tiene a nadie; el bucle sigue al superior
-
-    if (!chosen) {
-      chosen = current;
-      continue;
-    }
-
-    // `chosen` es el mejor del/los niveles anteriores; `current` es el del nivel superior.
-    const daysLater =
-      (chosen.availableDate.getTime() - current.availableDate.getTime()) / (1000 * 60 * 60 * 24);
-
-    if (daysLater > levelEscalationDays) {
-      chosen = current;
-    }
-  }
-
-  return chosen;
-}
-
-// Grupos de afinidad de cargo, de mayor preferencia a menor: 1 primario → 2 secundario → 3 otro.
-const ROLE_AFFINITY_ASCENDING: Array<1 | 2 | 3> = [1, 2, 3];
-const AFFINITY_LABEL: Record<1 | 2 | 3, string> = {
-  1: 'primario',
-  2: 'secundario',
-  3: 'otro cargo',
-};
-
-/**
- * Selección con DOBLE ESCALADO: CARGO por encima de NIVEL.
- *
- * Eje de CARGO (nuevo, análogo al de nivel):
- * - Los slots se agrupan por `roleAffinity` (1 primario → 2 secundario → 3 otro cargo).
- * - Se arranca en el grupo de MENOR affinity con candidatos (1, normalmente los primarios)
- *   y se elige su mejor candidato con la lógica de nivel ya existente.
- * - ESCALADO entre cargos: si el mejor del grupo actual se libera MÁS de
- *   `DEADLINE_DIFFERENCE_TO_FORCE_GENERALIST` días DESPUÉS que el mejor del siguiente grupo
- *   (affinity superior), se considera también ese grupo (1→2→3). Es el MISMO umbral que
- *   separa especialista de generalista: "ve a otros cargos cuando los preferidos están saturados".
- *
- * Eje de NIVEL (sin cambios): dentro de cada grupo se aplica `pickBestByLevelEscalation`
- * (nivel >= reqLevel, quien se libera antes / menos carga, desempate especialista/generalista).
- *
- * El override MANUAL (asignar a mano) sigue ignorando cargo y nivel: no pasa por aquí.
+ * Selección del mejor diseñador (doble escalado CARGO sobre NIVEL + carril/congestión
+ * de prioridad). Capa fina de IO: solo lee los umbrales de Settings y delega TODA la
+ * decisión en el núcleo PURO `pickBestAcrossAffinity` (testeado aparte en
+ * assignment-ranking). El override MANUAL no pasa por aquí.
  */
 async function selectBestUserWithVacationLogic(
   userSlots: VacationAwareUserSlot[],
   reqLevel: Level
 ): Promise<VacationAwareUserSlot | null> {
-  if (userSlots.length === 0) {
-    return null;
-  }
+  if (userSlots.length === 0) return null;
 
   const settings = await getAppSettings();
-  const forceGeneralistThreshold = settings.thresholds.DEADLINE_DIFFERENCE_TO_FORCE_GENERALIST;
-  const levelEscalationDays = settings.levelEscalationDays;
-
-  // Mejor candidato por grupo de afinidad de cargo (resolviendo el nivel internamente).
-  // Los slots sin `roleAffinity` (datos antiguos) se tratan como afinidad 3 (fallback).
-  const bestByAffinity: Partial<Record<1 | 2 | 3, VacationAwareUserSlot>> = {};
-  for (const affinity of ROLE_AFFINITY_ASCENDING) {
-    const slotsOfAffinity = userSlots.filter((s) => (s.roleAffinity ?? 3) === affinity);
-    if (slotsOfAffinity.length === 0) {
-      continue;
-    }
-    const best = pickBestByLevelEscalation(
-      slotsOfAffinity,
-      reqLevel,
-      levelEscalationDays,
-      forceGeneralistThreshold
-    );
-    if (best) {
-      bestByAffinity[affinity] = best;
-    }
-  }
-
-  // Escalado entre cargos: arrancamos en el primer grupo con candidato y subimos de affinity.
-  let chosen: VacationAwareUserSlot | null = null;
-
-  for (const affinity of ROLE_AFFINITY_ASCENDING) {
-    const current = bestByAffinity[affinity];
-    if (!current) continue; // este cargo no tiene a nadie (con nivel suficiente); seguimos
-
-    if (!chosen) {
-      chosen = current;
-      continue;
-    }
-
-    // `chosen` es el mejor de cargos preferidos; `current` es el del cargo de menor preferencia.
-    const daysLater =
-      (chosen.availableDate.getTime() - current.availableDate.getTime()) / (1000 * 60 * 60 * 24);
-
-    if (daysLater > forceGeneralistThreshold) {
-      chosen = current;
-    }
-  }
-
-  return chosen;
+  return pickBestAcrossAffinity(
+    userSlots,
+    reqLevel,
+    settings.levelEscalationDays,
+    settings.thresholds.DEADLINE_DIFFERENCE_TO_FORCE_GENERALIST
+  );
 }
 
 export async function getBestUserWithCache(
@@ -450,7 +335,7 @@ export async function getBestUserWithCache(
     return bestSlot;
   }
 
-  const vacationAwareSlots = await getVacationAwareUserSlots(typeId, brandId, durationDays || 0);
+  const vacationAwareSlots = await getVacationAwareUserSlots(typeId, brandId, durationDays || 0, priority);
   const bestVacationSlot = await selectBestUserWithVacationLogic(vacationAwareSlots, reqLevel);
 
   if (!bestVacationSlot) {
@@ -472,5 +357,95 @@ export async function getBestUserWithCache(
 
   setInCache(cacheKey, compatibleSlot);
   return compatibleSlot;
+}
+
+// Orden de los badges al ordenar la lista del selector: disponibles primero.
+const STATUS_DISPLAY_RANK: Record<DesignerStatus, number> = {
+  available: 0,
+  overloaded: 1,
+  on_vacation: 2,
+};
+
+const ROLE_AFFINITY_REASON: Record<1 | 2 | 3, string> = {
+  1: 'primary role',
+  2: 'secondary role',
+  3: 'other role (fallback)',
+};
+
+// Explicación legible de por qué el motor posiciona a un candidato así. Es lo que
+// el selector muestra para que el humano confíe (o decida overridear con criterio).
+function buildReason(slot: VacationAwareUserSlot, priority: Priority): string {
+  const parts: string[] = [];
+  const availableFrom = slot.availableDate.toISOString().split('T')[0];
+  parts.push(`frees up ${availableFrom}`);
+
+  const congestion = slot.samePriorityOrHigherLoad ?? 0;
+  parts.push(
+    congestion === 0
+      ? `no ${priority}+ tasks queued`
+      : `${congestion} ${priority}+ task${congestion === 1 ? '' : 's'} queued`
+  );
+
+  parts.push(ROLE_AFFINITY_REASON[slot.roleAffinity ?? 3]);
+
+  if (slot.status === 'on_vacation') parts.push('on vacation');
+  else if (slot.status === 'overloaded') parts.push('heavy workload');
+
+  // Capitaliza la primera letra.
+  const text = parts.join(' · ');
+  return text.charAt(0).toUpperCase() + text.slice(1);
+}
+
+/**
+ * FUENTE ÚNICA para la UI de asignación: devuelve el diseñador sugerido por el
+ * motor (mismo criterio que `getBestUserWithCache`) JUNTO con la lista completa
+ * de candidatos y su estado, para que el selector pinte opciones y badges sin un
+ * segundo endpoint/criterio distinto.
+ *
+ * Orden de la lista: sugerido primero, luego disponibles, después por afinidad de
+ * cargo y, por último, quien se libera antes.
+ */
+export async function getRankedCandidates(
+  typeId: number,
+  brandId: string,
+  priority: Priority,
+  durationDays: number,
+  reqLevel: Level = Level.MID
+): Promise<{ suggestedUserId: string | null; candidates: RankedCandidate[] }> {
+  type Ranked = { suggestedUserId: string | null; candidates: RankedCandidate[] };
+  // Cacheado igual que getBestUserWithCache: evita re-leer ClickUp en cada
+  // recálculo de sugerencia (menos bloqueos en el formulario).
+  const cacheKey = `${CACHE_KEYS.BEST_USER_SELECTION_PREFIX}ranked-${typeId}-${brandId}-${priority}-${durationDays || 'no-duration'}-lvl-${reqLevel}`;
+  const cached = getFromCache<Ranked>(cacheKey);
+  if (cached !== undefined) return cached;
+
+  const slots = await getVacationAwareUserSlots(typeId, brandId, durationDays || 0, priority);
+  const best = await selectBestUserWithVacationLogic(slots, reqLevel);
+  const suggestedUserId = best?.userId ?? null;
+
+  const candidates: RankedCandidate[] = slots
+    .map((s) => ({
+      userId: s.userId,
+      userName: s.userName,
+      status: s.status ?? 'available',
+      availableFrom: s.availableDate.toISOString().split('T')[0],
+      isSuggested: s.userId === suggestedUserId,
+      roleAffinity: s.roleAffinity ?? 3,
+      reason: buildReason(s, priority),
+      // Campos privados para ordenar (no salen en el tipo público).
+      _availableMs: s.availableDate.getTime(),
+    }))
+    .sort((a, b) => {
+      if (a.isSuggested !== b.isSuggested) return a.isSuggested ? -1 : 1;
+      const statusDiff = STATUS_DISPLAY_RANK[a.status] - STATUS_DISPLAY_RANK[b.status];
+      if (statusDiff !== 0) return statusDiff;
+      if (a.roleAffinity !== b.roleAffinity) return a.roleAffinity - b.roleAffinity;
+      return a._availableMs - b._availableMs;
+    })
+    .map(({ _availableMs, ...c }) => c);
+
+  const result: Ranked = { suggestedUserId, candidates };
+  setInCache(cacheKey, result);
+  return result;
 }
 

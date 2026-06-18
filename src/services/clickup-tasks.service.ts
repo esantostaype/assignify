@@ -4,7 +4,11 @@
 // alimenta tanto el tablero como el panel de "Carga del equipo", de modo que
 // ambos muestren exactamente lo mismo (sin depender de la copia local).
 import axios from 'axios'
+import { inArray } from 'drizzle-orm'
 import { API_CONFIG } from '@/config'
+import { db } from '@/db'
+import { taskMeta } from '@/db/schema'
+import { getFromCache, setInCache, deleteFromCache } from '@/utils/cache'
 import {
   mapClickUpStatusToLocal,
   isActiveTaskStatus,
@@ -13,6 +17,18 @@ import {
 } from '@/utils/clickup-status-mapping-utils'
 
 const CLICKUP_TOKEN = process.env.CLICKUP_API_TOKEN
+
+// El crawl de ClickUp (team→space→folder→list, paginado) es CARO y lo consumen el
+// kanban, el panel de carga y el motor. Se cachea brevemente para que esas vistas
+// compartan UNA sola lectura en lugar de recorrer la API en cada request. La caché
+// se invalida al crear una tarea (invalidateAllCache) y desde el webhook de ClickUp.
+const ACTIVE_TASKS_CACHE_KEY = 'active-clickup-tasks'
+const ACTIVE_TASKS_TTL_SECONDS = 45
+
+/** Invalida la caché del crawl de ClickUp (llamar desde el webhook al cambiar tareas). */
+export function invalidateActiveClickUpTasksCache(): void {
+  deleteFromCache(ACTIVE_TASKS_CACHE_KEY)
+}
 
 export interface ClickUpAssignee {
   id: string
@@ -35,6 +51,9 @@ export interface ActiveClickUpTask {
   space: { id: string; name: string }
   url: string
   tags: string[]
+  // Duración REAL (días) si la tarea fue creada por Assignify (de task_meta).
+  // `undefined` para tareas creadas directo en ClickUp → el motor usa un fallback.
+  durationDays?: number
 }
 
 async function cu(path: string): Promise<any> {
@@ -83,6 +102,9 @@ async function collectListTasks(listId: string, out: any[]): Promise<void> {
 /** Devuelve todas las tareas activas (con fechas) de todos los spaces de ClickUp. */
 export async function fetchActiveClickUpTasks(): Promise<ActiveClickUpTask[]> {
   if (!CLICKUP_TOKEN) return []
+
+  const cached = getFromCache<ActiveClickUpTask[]>(ACTIVE_TASKS_CACHE_KEY)
+  if (cached !== undefined) return cached
 
   const raw: any[] = []
   const teams: any[] = (await cu('/team')).teams || []
@@ -143,11 +165,33 @@ export async function fetchActiveClickUpTasks(): Promise<ActiveClickUpTask[]> {
       tags: (t.tags || []).map((tag: any) => tag.name),
     })
   }
+
+  // Enriquecer con la duración REAL desde task_meta (left-join por id de ClickUp).
+  // Las tareas creadas fuera de Assignify simplemente no matchean → durationDays undefined.
+  const ids = result.map((r) => r.clickupId)
+  if (ids.length > 0) {
+    try {
+      const metas = await db
+        .select({ clickupTaskId: taskMeta.clickupTaskId, durationDays: taskMeta.durationDays })
+        .from(taskMeta)
+        .where(inArray(taskMeta.clickupTaskId, ids))
+      const durationById = new Map(metas.map((m) => [m.clickupTaskId, m.durationDays]))
+      for (const t of result) {
+        const d = durationById.get(t.clickupId)
+        if (d !== undefined) t.durationDays = d
+      }
+    } catch {
+      // Si la DB falla, seguimos sin duración real (el motor usa su fallback).
+    }
+  }
+
+  setInCache(ACTIVE_TASKS_CACHE_KEY, result, ACTIVE_TASKS_TTL_SECONDS)
   return result
 }
 
 /**
- * Tareas activas de ClickUp asignadas a un usuario concreto (sin caché).
+ * Tareas activas de ClickUp asignadas a un usuario concreto.
+ * Reusa `fetchActiveClickUpTasks` (cacheado) y filtra por asignado.
  * El id de ClickUp del asignado coincide con el user.id local.
  */
 export async function getActiveClickUpTasksByUser(userId: string): Promise<ActiveClickUpTask[]> {

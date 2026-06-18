@@ -8,6 +8,7 @@ import { db } from '@/db'
 import { user, userRole, userVacation, taskType } from '@/db/schema'
 import { eq, asc, gte } from 'drizzle-orm'
 import { fetchActiveClickUpTasks, type ActiveClickUpTask } from '@/services/clickup-tasks.service'
+import { mapClickUpPriority } from '@/utils/clickup-status-mapping-utils'
 
 // Lee ClickUp en vivo: nunca pre-renderizar/cachear en build.
 export const dynamic = 'force-dynamic'
@@ -127,6 +128,17 @@ export async function GET() {
           startDate: v.startDate.toISOString(),
           endDate: v.endDate.toISOString(),
         })),
+        // Barras para el timeline de capacidad (ordenadas por inicio).
+        pendingTasks: pendingTasks
+          .slice()
+          .sort((a, b) => new Date(a.startDate).getTime() - new Date(b.startDate).getTime())
+          .map((t) => ({
+            name: t.name,
+            startDate: t.startDate,
+            dueDate: t.dueDate,
+            priority: mapClickUpPriority(t.priority),
+            durationDays: t.durationDays,
+          })),
       }
     })
 

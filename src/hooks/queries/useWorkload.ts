@@ -28,6 +28,17 @@ export interface UserWorkload {
   status: WorkloadStatus
   currentVacation: { startDate: string; endDate: string } | null
   upcomingVacations: Array<{ startDate: string; endDate: string }>
+  /** Tareas pendientes (TO_DO/IN_PROGRESS) para el timeline de capacidad. */
+  pendingTasks: PendingTaskBar[]
+}
+
+export interface PendingTaskBar {
+  name: string
+  startDate: string
+  dueDate: string
+  priority: 'LOW' | 'NORMAL' | 'HIGH' | 'URGENT'
+  /** Duración real (días) si la tarea la creó Assignify; si no, undefined. */
+  durationDays?: number
 }
 
 export const workloadKeys = {

@@ -1,10 +1,10 @@
-/* eslint-disable react/no-unescaped-entities */
 "use client";
 
-import React, { useState, useEffect, useRef, useMemo } from "react";
+import React, { useEffect, useMemo, useRef } from "react";
 import { MultiSelect, Button, Alert } from "@/components/ui";
 import type { SelectOption } from "@/components/ui";
-import { User } from "@/interfaces";
+import { cn } from "@/lib/cn";
+import { User, RankedCandidate, DesignerStatus } from "@/interfaces";
 import {
   Icon,
   PiUserCheck,
@@ -12,262 +12,158 @@ import {
   PiSparkle,
   PiCalendarBlank,
   PiClock,
-  PiLightning,
 } from "@/lib/icons";
 import type { IconComponent } from "@/lib/icons";
-import { useEnhancedUsers } from "@/hooks";
 
 interface UserAssignmentSelectProps {
-  users: User[]; // Fallback users
+  users: User[]; // Fallback: nombres mientras no hay candidatos del motor.
+  candidates: RankedCandidate[]; // Fuente única: motor de sugerencia.
+  suggestedUserId?: string | null;
   values: string[];
-  info?: { tierId: string; brandId: string }
+  info?: { tierId: string; brandId: string };
   onChange: (value: string[]) => void;
-  suggestedUser?: User | null;
+  // Selección PROGRAMÁTICA (auto-seguir la sugerencia): no marca "cambio manual".
+  onAutoApply: (value: string[]) => void;
   fetchingSuggestion: boolean;
   touched: boolean | undefined;
   error: string | undefined;
   loading?: boolean;
   userHasManuallyChanged?: boolean;
   onApplySuggestion?: () => void;
-  // Props for enhanced analysis
-  typeId?: number;
-  brandId?: string;
-  durationDays?: number;
 }
+
+// "suggested" no es un DesignerStatus real: es un marcador visual para el
+// candidato que el motor recomienda.
+type BadgeKind = "suggested" | DesignerStatus;
+
+const BADGE_TEXT: Record<BadgeKind, string> = {
+  suggested: "Suggested",
+  available: "Available",
+  on_vacation: "On Vacation",
+  overloaded: "Overloaded",
+};
+
+const BADGE_CLASS: Record<BadgeKind, string> = {
+  suggested: "bg-success-100 text-success-700",
+  available: "bg-primary-100 text-primary-700",
+  on_vacation: "bg-warning-100 text-warning-700",
+  overloaded: "bg-error-100 text-error-700",
+};
+
+const BADGE_ICON: Record<BadgeKind, IconComponent> = {
+  suggested: PiSparkle,
+  available: PiUserCheck,
+  on_vacation: PiCalendarBlank,
+  overloaded: PiClock,
+};
 
 export const UserAssignmentSelect: React.FC<UserAssignmentSelectProps> = ({
   users,
+  candidates,
+  suggestedUserId,
   values,
   info,
   onChange,
-  suggestedUser,
+  onAutoApply,
   fetchingSuggestion,
   touched,
   error,
   loading = false,
   userHasManuallyChanged = false,
   onApplySuggestion,
-  typeId,
-  brandId,
-  durationDays,
 }) => {
-  // State for vacation warnings
-  const [vacationWarnings, setVacationWarnings] = useState<string[]>([]);
-
-  // ✅ NUEVO: Ref para trackear la última sugerencia aplicada
+  // Evita re-aplicar la misma sugerencia en bucle.
   const lastAppliedSuggestionRef = useRef<string | null>(null);
 
-  // ✅ NUEVO: Ref para trackear si estamos en proceso de cambio de categoría
-  const categoryChangeInProgressRef = useRef(false);
+  const candidateById = useMemo(
+    () => new Map(candidates.map((c) => [c.userId, c])),
+    [candidates]
+  );
 
-  // Enhanced users hook
-  const {
-    allUsers,
-    smartSuggestion,
-    totalAvailable,
-    loading: loadingEnhanced,
-    hasRequiredParams,
-    getUserById,
-    getVacationWarning,
-  } = useEnhancedUsers({
-    typeId,
-    brandId,
-    durationDays: durationDays ? parseFloat(durationDays.toString()) : undefined,
-    enabled: Boolean(typeId && durationDays),
-  });
+  const suggestedCandidate = suggestedUserId ? candidateById.get(suggestedUserId) : undefined;
+  const suggestedName =
+    suggestedCandidate?.userName ||
+    users.find((u) => u.id === suggestedUserId)?.name ||
+    null;
+  const suggestedReason = suggestedCandidate?.reason ?? null;
 
-  // Determine which users to show
-  const usersToShow = hasRequiredParams ? allUsers : users;
-  const isUsingEnhancedUsers = hasRequiredParams && !loadingEnhanced;
+  const isLoading = loading || fetchingSuggestion;
 
-  // Determine loading state
-  const isLoading = loading || loadingEnhanced || fetchingSuggestion;
-
-  // Detect when the selection is cleared (signals a category change)
+  // El selector SIGUE a la sugerencia mientras el usuario no la cambie a mano.
+  // Así nunca queda un diseñador "viejo" seleccionado cuando el motor sugiere otro.
   useEffect(() => {
-    if (values.length === 0 && !fetchingSuggestion) {
-      categoryChangeInProgressRef.current = true;
-      lastAppliedSuggestionRef.current = null;
-
-      // Reset flag after a short delay to allow new suggestions to be applied
-      const timeout = setTimeout(() => {
-        categoryChangeInProgressRef.current = false;
-      }, 200);
-
-      return () => clearTimeout(timeout);
-    }
-  }, [values.length, fetchingSuggestion]);
-
-  // ✅ MEJORADO: Auto-select suggested user cuando aparece sugerencia
-  useEffect(() => {
-    // No aplicar si estamos en proceso de búsqueda
-    if (fetchingSuggestion) {
+    if (fetchingSuggestion || !suggestedUserId || userHasManuallyChanged) return;
+    if (values.length === 1 && values[0] === suggestedUserId) {
+      lastAppliedSuggestionRef.current = suggestedUserId;
       return;
     }
+    if (lastAppliedSuggestionRef.current === suggestedUserId && values.length > 0) return;
 
-    // No aplicar si no hay sugerencia
-    if (!suggestedUser?.id) {
-      return;
-    }
-
-    // No aplicar si ya está seleccionado
-    if (values.includes(suggestedUser.id)) {
-      lastAppliedSuggestionRef.current = suggestedUser.id;
-      return;
-    }
-
-    // No aplicar si ya aplicamos esta misma sugerencia antes
-    if (lastAppliedSuggestionRef.current === suggestedUser.id) {
-      return;
-    }
-
-    // ✅ CONDICIÓN PRINCIPAL: Solo aplicar automáticamente si:
-    // 1. No hay selección actual (values.length === 0) O
-    // 2. Estamos en proceso de cambio de categoría Y no hay cambios manuales
-    const shouldAutoApply = (
-      values.length === 0 ||
-      (categoryChangeInProgressRef.current && !userHasManuallyChanged)
-    );
-
-    if (!shouldAutoApply) {
-      return;
-    }
-
-    // Apply with protection against sync loops
     requestAnimationFrame(() => {
-      onChange([suggestedUser.id]);
-      lastAppliedSuggestionRef.current = suggestedUser.id;
-      categoryChangeInProgressRef.current = false;
+      onAutoApply([suggestedUserId]);
+      lastAppliedSuggestionRef.current = suggestedUserId;
     });
+  }, [suggestedUserId, fetchingSuggestion, userHasManuallyChanged, values, onAutoApply]);
 
-  }, [
-    suggestedUser?.id, // ✅ Solo el ID para evitar re-renders innecesarios
-    fetchingSuggestion,
-    userHasManuallyChanged,
-    values.length, // ✅ Solo la longitud, no el array completo
-    onChange
-  ]);
+  // Aviso si el diseñador elegido a mano está de vacaciones.
+  const vacationWarnings = useMemo(() => {
+    return values
+      .map((id) => candidateById.get(id))
+      .filter((c): c is RankedCandidate => !!c && c.status === "on_vacation")
+      .map((c) => `${c.userName} is on vacation — the task would start on ${c.availableFrom}.`);
+  }, [values, candidateById]);
 
-  // Update vacation warnings when selected users change
-  useEffect(() => {
-    if (!isUsingEnhancedUsers || values.length === 0) {
-      setVacationWarnings([]);
-      return;
-    }
+  // Mostrar el aviso de sugerencia solo si el usuario eligió a alguien distinto.
+  const showSuggestionHint =
+    !fetchingSuggestion &&
+    suggestedUserId &&
+    suggestedName &&
+    userHasManuallyChanged &&
+    !values.includes(suggestedUserId);
 
-    const warnings: string[] = [];
-    values.forEach(userId => {
-      const warning = getVacationWarning(userId);
-      if (warning) {
-        warnings.push(warning);
-      }
-    });
-
-    setVacationWarnings(warnings);
-  }, [values, isUsingEnhancedUsers, getVacationWarning]);
-
-  const getPlaceholder = () => {
-    if (fetchingSuggestion) return "Searching for suggestion..";
-    if (loadingEnhanced) return "Analyzing availability...";
-    if (loading) return "Loading designers...";
-    return "Assign Designer(s)";
+  const badgeKindOf = (id: string): BadgeKind | null => {
+    if (id === suggestedUserId) return "suggested";
+    const cand = candidateById.get(id);
+    return cand ? cand.status : null;
   };
 
-  // Smart suggestion info
-  const shouldShowSmartSuggestion = () => {
-    return (
-      smartSuggestion &&
-      !fetchingSuggestion &&
-      !values.includes(smartSuggestion.userId) &&
-      totalAvailable === 0 // Only show when no immediately available users
-    );
-  };
-
-  // Regular suggestion info - only show if user has manually selected someone different
-  const shouldShowRegularSuggestion = () => {
-    return (
-      suggestedUser &&
-      !fetchingSuggestion &&
-      values.length > 0 && // User has selected someone
-      !values.includes(suggestedUser.id) && // But not the suggested user
-      userHasManuallyChanged && // ✅ NUEVO: Solo mostrar si usuario ha hecho cambios manuales
-      (!smartSuggestion || totalAvailable > 0) // Don't show if smart suggestion is more relevant
-    );
-  };
-
-  // Check if user is suggested
-  const isUserSuggested = (userId: string) => {
-    const isRegularSuggested = suggestedUser?.id === userId;
-    const isSmartSuggested = smartSuggestion?.userId === userId;
-    return isRegularSuggested || isSmartSuggested;
-  };
-
-  // Get user status info for display
-  const getUserStatusInfo = (userId: string) => {
-    if (!isUsingEnhancedUsers) {
-      // For fallback users, check if suggested
-      return isUserSuggested(userId) ? { status: 'suggested' } : null;
-    }
-
-    const userInfo = getUserById(userId);
-
-    // If user is suggested, override status
-    if (isUserSuggested(userId)) {
-      return { ...userInfo, status: 'suggested' };
-    }
-
-    return userInfo;
-  };
-
-  // Get status icon
-  const getStatusIcon = (status?: string): IconComponent => {
-    switch (status) {
-      case 'suggested': return PiSparkle;
-      case 'on_vacation': return PiCalendarBlank;
-      case 'overloaded': return PiClock;
-      default: return PiUserCheck;
-    }
-  };
-
-  // Build MultiSelect options from the users to show, embedding the rich
-  // status row (icon + name + status badge) as each option's label.
+  // Opciones: candidatos del motor; si aún no hay (sin tier/duración), los users
+  // como fallback plano. Se incluyen siempre los ya seleccionados para no perder chips.
   const options: SelectOption<string>[] = useMemo(() => {
-    return usersToShow.map((user) => {
-      const userStatus = getUserStatusInfo(user.id);
-      const StatusIcon = getStatusIcon(userStatus?.status);
+    const baseIds =
+      candidates.length > 0 ? candidates.map((c) => c.userId) : users.map((u) => u.id);
+    const ids = Array.from(new Set([...baseIds, ...values]));
+
+    return ids.map((id) => {
+      const name = candidateById.get(id)?.userName ?? users.find((u) => u.id === id)?.name ?? id;
+      const kind = badgeKindOf(id);
+      const BadgeIcon = kind ? BADGE_ICON[kind] : PiUserCheck;
 
       return {
-        value: user.id,
-        searchValue: user.name,
+        value: id,
+        searchValue: name,
         label: (
-          <div className="flex items-center justify-between w-full">
-            <div className="flex items-center gap-2">
-              <Icon icon={StatusIcon} size={16} />
-              <span>{user.name}</span>
-            </div>
-
-            <div className="flex items-center gap-1 text-xs">
-              {/* Status badge */}
-              <span className={`px-2 py-1 rounded text-xs ${
-                userStatus?.status === 'suggested' ? 'bg-green-900 text-green-300' :
-                userStatus?.status === 'available' ? 'bg-primary-900 text-primary-300' :
-                userStatus?.status === 'on_vacation' ? 'bg-yellow-900 text-yellow-300' :
-                userStatus?.status === 'overloaded' ? 'bg-red-900 text-red-300' :
-                'bg-neutral-900 text-neutral-300'
-              }`}>
-                {userStatus?.status === 'suggested' ? 'Suggested' :
-                 userStatus?.status === 'available' ? 'Available' :
-                 userStatus?.status === 'on_vacation' ? 'On Vacation' :
-                 userStatus?.status === 'overloaded' ? 'Overloaded' :
-                 'Unknown'}
+          <div className="flex w-full items-center justify-between gap-2">
+            <span className="flex items-center gap-2 min-w-0">
+              <Icon icon={BadgeIcon} size={16} className="shrink-0" />
+              <span className="truncate">{name}</span>
+            </span>
+            {kind && (
+              <span
+                className={cn(
+                  "shrink-0 rounded-sm px-1.5 py-px text-[10px] font-semibold uppercase tracking-wide leading-none",
+                  BADGE_CLASS[kind]
+                )}
+              >
+                {BADGE_TEXT[kind]}
               </span>
-            </div>
+            )}
           </div>
         ),
       };
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [usersToShow, suggestedUser?.id, smartSuggestion?.userId, isUsingEnhancedUsers, getUserById]);
+  }, [candidates, users, values, candidateById, suggestedUserId]);
 
   return (
     <div>
@@ -276,83 +172,36 @@ export const UserAssignmentSelect: React.FC<UserAssignmentSelectProps> = ({
         Assignee
       </label>
 
-      {/* Smart Suggestion Alert */}
-      {shouldShowSmartSuggestion() && smartSuggestion && (
-        <Alert
-          tone="info"
-          variant="soft"
-          className="mb-3"
-          icon={PiLightning}
-        >
-          <div>
-            <div className="font-medium">💡 Smart Suggestion</div>
-            <div className="text-sm mt-1">
-              {smartSuggestion.reason}
-              <br />
-              <strong>Alternative start date:</strong> {smartSuggestion.alternativeStartDate}
-            </div>
+      {showSuggestionHint && (
+        <div className="mb-3 flex items-start justify-between gap-2 rounded-lg bg-success-500/10 p-3">
+          <span className="text-sm text-(--color-text-default)">
+            Suggested: <strong>{suggestedName}</strong>
+            {suggestedReason && (
+              <span className="mt-0.5 block text-xs text-(--color-text-muted)">{suggestedReason}</span>
+            )}
+          </span>
+          {onApplySuggestion && (
             <Button
               size="sm"
-              variant="outlined"
-              color="primary"
-              className="mt-2"
+              variant="soft"
+              color="success"
               onClick={() => {
-                onChange([smartSuggestion.userId]);
-                lastAppliedSuggestionRef.current = smartSuggestion.userId;
-                if (onApplySuggestion) onApplySuggestion();
+                onChange([suggestedUserId!]);
+                lastAppliedSuggestionRef.current = suggestedUserId!;
+                onApplySuggestion();
               }}
-              startIcon={<Icon icon={PiLightning} size={16} />}
+              startIcon={<Icon icon={PiArrowsClockwise} size={16} />}
             >
-              Use Smart Suggestion
+              Apply
             </Button>
-          </div>
-        </Alert>
-      )}
-
-      {/* Regular Suggestion */}
-      {shouldShowRegularSuggestion() && suggestedUser && (
-        <div className="mb-3 p-3 bg-green-500/10 rounded-lg">
-          <div>
-            <div className="flex items-center gap-2 justify-between">
-              <span className="text-sm text-primary-200">
-                Suggested: <strong>{suggestedUser.name}</strong>
-              </span>
-
-              {onApplySuggestion && (
-                <Button
-                  size="sm"
-                  variant="soft"
-                  color="success"
-                  onClick={() => {
-                    onChange([suggestedUser.id]);
-                    lastAppliedSuggestionRef.current = suggestedUser.id;
-                    if (onApplySuggestion) onApplySuggestion();
-                  }}
-                  startIcon={
-                    <Icon
-                      icon={PiArrowsClockwise}
-                      size={16}
-                    />
-                  }
-                >
-                  Apply
-                </Button>
-              )}
-            </div>
-          </div>
+          )}
         </div>
       )}
 
-      {/* Vacation Warnings */}
       {vacationWarnings.length > 0 && (
         <div className="mb-3 space-y-2">
           {vacationWarnings.map((warning, index) => (
-            <Alert
-              key={index}
-              tone="warning"
-              variant="soft"
-              icon={PiCalendarBlank}
-            >
+            <Alert key={index} tone="warning" variant="soft" icon={PiCalendarBlank}>
               <div className="text-xs">{warning}</div>
             </Alert>
           ))}
@@ -365,11 +214,22 @@ export const UserAssignmentSelect: React.FC<UserAssignmentSelectProps> = ({
         value={values}
         options={options}
         onChange={(val) => onChange(val)}
-        placeholder={getPlaceholder()}
+        placeholder={fetchingSuggestion ? "Searching for suggestion..." : "Assign Designer(s)"}
         disabled={isLoading || !info?.tierId || !info?.brandId}
         error={touched && error ? error : undefined}
         noResultsLabel="No compatible designers found"
       />
+
+      {/* "Por qué" del sugerido cuando es la selección activa (genera confianza). */}
+      {!fetchingSuggestion &&
+        suggestedReason &&
+        suggestedUserId &&
+        values.includes(suggestedUserId) && (
+          <p className="mt-1.5 flex items-center gap-1.5 text-xs text-(--color-text-muted)">
+            <Icon icon={PiSparkle} size={12} className="shrink-0 text-success-600" />
+            {suggestedReason}
+          </p>
+        )}
     </div>
   );
 };

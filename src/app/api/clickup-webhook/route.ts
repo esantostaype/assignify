@@ -5,6 +5,7 @@
 import { NextResponse } from 'next/server'
 import crypto from 'crypto'
 import { publishTaskUpdate } from '@/lib/pusher'
+import { invalidateActiveClickUpTasksCache } from '@/services/clickup-tasks.service'
 
 // Recibe webhooks y usa request.url (challenge): nunca pre-renderizar/cachear en build.
 export const dynamic = 'force-dynamic'
@@ -80,6 +81,9 @@ export async function POST(req: Request) {
     // Notificar a los clientes en tiempo real (Pusher). La DB ya no se toca:
     // el tablero y el motor de asignación leen las tareas en vivo de ClickUp.
     if (event === 'taskDeleted' || MUTATING_EVENTS.includes(event)) {
+      // Una tarea cambió en ClickUp: invalida la caché del crawl para que el
+      // kanban, el panel de carga y el motor lean el estado fresco.
+      invalidateActiveClickUpTasksCache()
       // El cambio de estado viene en history_items (before/after); lo pasamos para
       // que la notificación diga "To Do → In Progress" en vez de solo "updated".
       const statusItem = Array.isArray(body.history_items)
