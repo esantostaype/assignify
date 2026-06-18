@@ -3,7 +3,7 @@ import { Skeleton } from '@/components/ui'
 
 // Refleja la forma de TaskCard: título (2 líneas), lista, asignados, fecha, prioridad.
 export const TaskCardSkeleton = () => (
-  <div className="p-4 rounded-lg bg-primary-500/10 border-2 border-transparent flex flex-col">
+  <div className="p-4 rounded-lg bg-(--color-surface-card) border border-(--color-border-default) flex flex-col">
     {/* Título */}
     <Skeleton variant="text" height={16} width="80%" />
     <Skeleton variant="text" height={16} width="55%" className="mt-1.5" />
