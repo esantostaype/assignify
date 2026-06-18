@@ -20,6 +20,7 @@ import { IconButton } from "@/components/ui";
 import type { UserWorkload, WorkloadStatus } from "@/hooks/queries/useWorkload";
 import { levelLabel, primaryRole, typeToJobTitle } from "./designerUtils";
 import { DesignerCardSkeleton } from "./DesignerCardSkeleton";
+import { avatarColor } from "@/lib/avatarColor";
 
 // Estado de carga: labels y colores (compartidos con la vista de "team workload").
 const STATUS: Record<
@@ -102,7 +103,7 @@ export const SyncedDesignerCard: React.FC<SyncedDesignerCardProps> = ({
         <Avatar
           src={user.profilePicture}
           className="!h-11 !w-11"
-          style={user.color ? { backgroundColor: user.color } : undefined}
+          style={{ backgroundColor: avatarColor(user.color, user.clickupId), color: "#fff" }}
         >
           {user.initials}
         </Avatar>

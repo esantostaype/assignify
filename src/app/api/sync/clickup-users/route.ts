@@ -154,7 +154,10 @@ export async function GET() {
           profilePicture: clickupUser.profilePicture || '',
           initials: clickupUser.initials || clickupUser.username?.substring(0, 2).toUpperCase() || 'UK',
           timezone: '', // ✅ CORRECCIÓN: timezone no está disponible en esta API
-          color: clickupUser.color || '#6366f1',
+          // Sin default: si el usuario no tiene color en ClickUp, se deja vacío y
+          // la UI genera uno determinista por id (consistente con el kanban). Un
+          // default fijo aquí hacía que todos los sin-color salieran iguales.
+          color: clickupUser.color || '',
           // ✅ NUEVA INFO: Agregar información adicional de ClickUp
           role: clickupUser.role_key || 'member',
           lastActive: clickupUser.last_active || '',

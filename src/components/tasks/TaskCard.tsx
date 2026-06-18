@@ -6,6 +6,7 @@ import {
   PiTarget,
 } from "@/lib/icons";
 import { Avatar } from "@/components/ui";
+import { avatarColor } from "@/lib/avatarColor";
 
 interface TaskCardProps {
   task: {
@@ -120,7 +121,8 @@ export const TaskCard: React.FC<TaskCardProps> = ({ task }) => {
                 src={assignee.profilePicture || undefined}
                 title={`${assignee.name} (${assignee.email})`}
                 style={{
-                  backgroundColor: assignee.color,
+                  backgroundColor: avatarColor(assignee.color, assignee.id),
+                  color: "#fff",
                   fontSize: "0.7rem",
                   zIndex: task.assignees.length - index,
                 }}

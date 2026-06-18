@@ -1,6 +1,7 @@
 import React from "react";
 import { Icon, PiUserCheck } from "@/lib/icons";
 import { Avatar, Checkbox } from "@/components/ui";
+import { avatarColor } from "@/lib/avatarColor";
 
 interface UserCardProps {
   user: {
@@ -49,7 +50,7 @@ export const UserCard: React.FC<UserCardProps> = ({
       <Avatar
         src={user.profilePicture}
         className="!h-11 !w-11"
-        style={user.color ? { backgroundColor: user.color } : undefined}
+        style={{ backgroundColor: avatarColor(user.color, user.clickupId), color: "#fff" }}
       >
         {user.initials}
       </Avatar>
