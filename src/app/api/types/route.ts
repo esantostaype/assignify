@@ -1,14 +1,18 @@
 import { NextResponse } from 'next/server'
 import { db } from '@/db'
 import { taskType } from '@/db/schema'
-import { eq } from 'drizzle-orm'
+import { and, eq } from 'drizzle-orm'
+import { getCurrentWorkspaceId } from '@/lib/workspace'
 
 // Lee datos en vivo de la DB: nunca pre-renderizar/cachear en build.
 export const dynamic = 'force-dynamic'
 
 export async function GET() {
   try {
-    const types = await db.query.taskType.findMany()
+    const wsId = await getCurrentWorkspaceId()
+    const types = await db.query.taskType.findMany({
+      where: eq(taskType.workspaceId, wsId ?? '__none__'),
+    })
 
     return NextResponse.json(types)
   } catch (error) {
@@ -33,10 +37,11 @@ export async function POST(request: Request) {
       )
     }
 
-    // Crear el nuevo task type
+    // Crear el nuevo task type EN el workspace activo.
+    const wsId = await getCurrentWorkspaceId()
     const [newTaskType] = await db
       .insert(taskType)
-      .values({ name: name.trim() })
+      .values({ name: name.trim(), workspaceId: wsId })
       .returning()
 
     return NextResponse.json(newTaskType, { status: 201 })
@@ -81,9 +86,10 @@ export async function PATCH(request: Request) {
       )
     }
 
-    // Verificar que el task type existe
+    // Verificar que el task type existe EN el workspace activo.
+    const wsId = await getCurrentWorkspaceId()
     const existingTaskType = await db.query.taskType.findFirst({
-      where: eq(taskType.id, Number(id))
+      where: and(eq(taskType.id, Number(id)), eq(taskType.workspaceId, wsId ?? '__none__'))
     })
 
     if (!existingTaskType) {
@@ -93,11 +99,11 @@ export async function PATCH(request: Request) {
       )
     }
 
-    // Actualizar el task type
+    // Actualizar el task type (acotado al workspace).
     const [updatedTaskType] = await db
       .update(taskType)
       .set({ name: name.trim() })
-      .where(eq(taskType.id, Number(id)))
+      .where(and(eq(taskType.id, Number(id)), eq(taskType.workspaceId, wsId ?? '__none__')))
       .returning()
 
     return NextResponse.json(updatedTaskType)
@@ -131,9 +137,10 @@ export async function DELETE(request: Request) {
       )
     }
 
-    // Verificar que el task type existe
+    // Verificar que el task type existe EN el workspace activo.
+    const wsId = await getCurrentWorkspaceId()
     const existingTaskType = await db.query.taskType.findFirst({
-      where: eq(taskType.id, Number(id))
+      where: and(eq(taskType.id, Number(id)), eq(taskType.workspaceId, wsId ?? '__none__'))
     })
 
     if (!existingTaskType) {
@@ -143,8 +150,8 @@ export async function DELETE(request: Request) {
       )
     }
 
-    // Eliminar el task type
-    await db.delete(taskType).where(eq(taskType.id, Number(id)))
+    // Eliminar el task type (acotado al workspace).
+    await db.delete(taskType).where(and(eq(taskType.id, Number(id)), eq(taskType.workspaceId, wsId ?? '__none__')))
 
     return NextResponse.json({ message: 'Task type deleted successfully' })
   } catch (error) {

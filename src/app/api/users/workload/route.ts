@@ -6,9 +6,10 @@
 import { NextResponse } from 'next/server'
 import { db } from '@/db'
 import { user, userRole, userVacation, taskType } from '@/db/schema'
-import { eq, asc, gte } from 'drizzle-orm'
+import { eq, and, asc, gte } from 'drizzle-orm'
 import { fetchActiveClickUpTasks, type ActiveClickUpTask } from '@/services/clickup-tasks.service'
 import { mapClickUpPriority } from '@/utils/clickup-status-mapping-utils'
+import { getCurrentWorkspaceId } from '@/lib/workspace'
 
 // Lee ClickUp en vivo: nunca pre-renderizar/cachear en build.
 export const dynamic = 'force-dynamic'
@@ -26,12 +27,16 @@ export async function GET() {
   try {
     const now = new Date()
     const overloadThreshold = new Date(now.getTime() + OVERLOAD_HORIZON_DAYS * DAY_MS)
+    const wsId = await getCurrentWorkspaceId()
 
     // IMPORTANTE: consultas DIRECTAS (sin la query relacional `with` de Drizzle).
     // En el dev server (cliente libSQL reusado) la versión relacional devolvía
     // roles/vacaciones/nivel OBSOLETOS; las directas siempre son frescas.
     const [activeUsers, allRoles, allTypes, futureVacations, tasks] = await Promise.all([
-      db.query.user.findMany({ where: eq(user.active, true), orderBy: asc(user.name) }),
+      db.query.user.findMany({
+        where: and(eq(user.active, true), eq(user.workspaceId, wsId ?? '__none__')),
+        orderBy: asc(user.name),
+      }),
       db.query.userRole.findMany(),
       db.query.taskType.findMany(),
       db.query.userVacation.findMany({

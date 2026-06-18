@@ -80,10 +80,24 @@ tareas, y todo queda **aislado por inquilino** (un usuario nunca ve datos de otr
     email/password → `DEFAULT_WORKSPACE_ID`).
   - `scripts/backfill-workspace.js` aplicado; data actual etiquetada al workspace
     de Inszone **90170099166** (= `brand.team_id`).
-  - **PENDIENTE (el grueso): el SWEEP** — filtrar por `workspaceId` en CADA query de
-    config y enhebrarlo por los servicios (motor `task-assignment`, `getAppSettings`,
-    rutas `/api/users|types|tiers|brands|users/workload|tasks/parallel|suggestion`).
-    Es donde un olvido = fuga entre inquilinos → hacerlo archivo por archivo.
+  - **SWEEP de scoping — HECHO en las superficies principales:**
+    - Listas: `/api/users`, `/api/types` (+POST/PATCH/DELETE), `/api/tiers`,
+      `/api/brands`, `/api/users/workload` → filtran por `workspaceId`.
+    - Motor: `getVacationAwareUserSlots`/`getRankedCandidates`/`getBestUserWithCache`
+      reciben `workspaceId` y filtran el pool de `user`; cache key incluye workspace.
+    - `/api/tasks/suggestion/simple` y `/api/tasks/parallel` resuelven el workspace
+      y lo pasan al motor; parallel valida tier/type/brand/user acotados y guarda
+      `task_meta.workspaceId`.
+    - `/api/sync/clickup-users` etiqueta a los miembros creados con el workspace.
+  - **Hardening pendiente (no bloquea, anotar):**
+    - `getAppSettings` (horario/umbrales) sigue COMPARTIDO — settings por workspace es
+      refinamiento posterior (evita enhebrar workspaceId por las utils de fechas).
+    - Sub-rutas `/api/users/[userId]`(roles/vacations), creación de brands/tiers y
+      `/api/settings` aún no acotan por workspace (riesgo bajo; cerrar luego).
+    - `user.id` PK = id de ClickUp → un mismo usuario en 2 workspaces colisiona;
+      el PK debería ser (workspaceId, id). Migración posterior.
+    - Unicidad real por (workspaceId, …) en task_type/tier_list/system_settings.
+  - Requiere `DEFAULT_WORKSPACE_ID=90170099166` en `.env`/Vercel.
   - **OJO discrepancia de ids**: el token global ve "Inszoneins"=9017044866 y
     "OAuth"=90171327636, pero los brands traen team_id 90170099166. Para Fase 2
     basta la CONSISTENCIA interna (todo etiquetado 90170099166 + `DEFAULT_WORKSPACE_ID`

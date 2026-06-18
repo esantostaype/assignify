@@ -2,14 +2,17 @@
 import { NextResponse } from 'next/server';
 import { db } from '@/db';
 import { brand } from '@/db/schema';
-import { asc } from 'drizzle-orm';
+import { asc, eq } from 'drizzle-orm';
+import { getCurrentWorkspaceId } from '@/lib/workspace';
 
 // Lee datos en vivo de la DB: nunca pre-renderizar/cachear en build.
 export const dynamic = 'force-dynamic';
 
 export async function GET() {
   try {
+    const wsId = await getCurrentWorkspaceId();
     const brands = await db.query.brand.findMany({
+      where: eq(brand.workspaceId, wsId ?? '__none__'),
       columns: {
         id: true,
         name: true,

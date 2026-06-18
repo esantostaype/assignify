@@ -7,7 +7,8 @@ import { getRankedCandidates } from '@/services/task-assignment.service';
 import { RankedCandidate } from '@/interfaces';
 import { db } from '@/db';
 import { brand as brandTable } from '@/db/schema';
-import { eq } from 'drizzle-orm';
+import { and, eq } from 'drizzle-orm';
+import { getCurrentWorkspaceId } from '@/lib/workspace';
 
 // Lee DB y ClickUp en vivo, usa request.url: nunca pre-renderizar/cachear en build.
 export const dynamic = 'force-dynamic';
@@ -44,24 +45,27 @@ export async function GET(req: Request) {
       }, { status: 400 });
     }
 
+    // [SaaS] Workspace activo: acota candidatos y brands a este inquilino.
+    const wsId = await getCurrentWorkspaceId();
+
     // Usar brandId si está disponible; si no, buscar en todos los brands activos.
     let suggestedUserId: string | null = null;
     let candidates: RankedCandidate[] = [];
     let resolvedBrandId = brandId;
 
     if (brandId) {
-      const result = await getRankedCandidates(typeId, brandId, priority, durationDays, level);
+      const result = await getRankedCandidates(typeId, brandId, priority, durationDays, level, wsId);
       suggestedUserId = result.suggestedUserId;
       candidates = result.candidates;
     } else {
-      // FALLBACK: probar cada brand activo hasta encontrar candidatos.
+      // FALLBACK: probar cada brand activo (del workspace) hasta encontrar candidatos.
       const activeBrands = await db.query.brand.findMany({
-        where: eq(brandTable.isActive, true),
+        where: and(eq(brandTable.isActive, true), eq(brandTable.workspaceId, wsId ?? '__none__')),
         columns: { id: true, name: true }
       });
 
       for (const brand of activeBrands) {
-        const result = await getRankedCandidates(typeId, brand.id, priority, durationDays, level);
+        const result = await getRankedCandidates(typeId, brand.id, priority, durationDays, level, wsId);
         if (result.candidates.length > 0) {
           suggestedUserId = result.suggestedUserId;
           candidates = result.candidates;

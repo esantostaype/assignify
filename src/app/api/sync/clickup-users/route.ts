@@ -4,8 +4,9 @@ import { NextResponse } from 'next/server';
 import axios from 'axios';
 import { db } from '@/db';
 import { user } from '@/db/schema';
-import { inArray } from 'drizzle-orm';
+import { and, eq, inArray } from 'drizzle-orm';
 import { API_CONFIG } from '@/config';
+import { getCurrentWorkspaceId } from '@/lib/workspace';
 
 // Lee/escribe DB y consulta ClickUp en vivo: nunca pre-renderizar/cachear en build.
 export const dynamic = 'force-dynamic';
@@ -120,8 +121,10 @@ export async function GET() {
     const uniqueUsers = Array.from(allUsers.values());
     console.log(`👥 Usuarios únicos encontrados en ClickUp: ${uniqueUsers.length}`);
 
-    // Obtener usuarios existentes en la DB local
+    // Obtener usuarios existentes en la DB local (del workspace activo).
+    const wsId = await getCurrentWorkspaceId();
     const localUsers = await db.query.user.findMany({
+      where: eq(user.workspaceId, wsId ?? '__none__'),
       columns: { id: true, name: true, email: true, active: true }
     });
 
@@ -287,9 +290,10 @@ export async function POST(req: Request) {
 
     console.log(`✅ Datos obtenidos para ${usersData.length} usuarios (${notFoundUsers.length} no encontrados)`);
 
-    // Verificar que los usuarios no existan ya en la DB local
+    // Verificar que los usuarios no existan ya en la DB local (del workspace activo).
+    const wsId = await getCurrentWorkspaceId();
     const existingUsers = await db.query.user.findMany({
-      where: inArray(user.id, userIds),
+      where: and(inArray(user.id, userIds), eq(user.workspaceId, wsId ?? '__none__')),
       columns: { id: true, name: true }
     });
 
@@ -336,6 +340,7 @@ export async function POST(req: Request) {
             name: userName,
             email: userEmail,
             active: true,
+            workspaceId: wsId,
             // Los roles se asignarán posteriormente desde la interfaz de administración
           })
           .returning();
