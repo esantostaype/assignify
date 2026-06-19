@@ -7,7 +7,7 @@ import { NextResponse } from 'next/server'
 import axios from 'axios'
 import { db } from '@/db'
 import { brand } from '@/db/schema'
-import { and, eq } from 'drizzle-orm'
+import { and, eq, inArray } from 'drizzle-orm'
 import { API_CONFIG } from '@/config'
 import { getCurrentClickUpContext } from '@/lib/workspace'
 
@@ -53,13 +53,14 @@ export async function GET() {
 
   try {
     const discovered = await discoverLists(token, teamId)
+    // "Asignable" = brand guardado Y ACTIVO (los desactivados ya no cuentan).
     const existing = await db.query.brand.findMany({
-      where: eq(brand.workspaceId, teamId ?? '__none__'),
+      where: and(eq(brand.workspaceId, teamId ?? '__none__'), eq(brand.isActive, true)),
       columns: { id: true },
     })
-    const existingIds = new Set(existing.map((b) => b.id))
+    const assignableIds = new Set(existing.map((b) => b.id))
     return NextResponse.json({
-      lists: discovered.map((l) => ({ ...l, isAssignable: existingIds.has(l.id) })),
+      lists: discovered.map((l) => ({ ...l, isAssignable: assignableIds.has(l.id) })),
     })
   } catch (error: any) {
     return NextResponse.json(
@@ -76,15 +77,17 @@ export async function POST(req: Request) {
 
   try {
     const { listIds }: { listIds: string[] } = await req.json()
-    if (!Array.isArray(listIds) || listIds.length === 0) {
-      return NextResponse.json({ error: 'listIds is required' }, { status: 400 })
+    if (!Array.isArray(listIds)) {
+      return NextResponse.json({ error: 'listIds must be an array' }, { status: 400 })
     }
 
     const discovered = await discoverLists(token, teamId)
     const byId = new Map(discovered.map((l) => [l.id, l]))
+    const selected = new Set(listIds)
 
     const created: string[] = []
     const errors: string[] = []
+    // 1) Activar (insert/upsert) las listas SELECCIONADAS.
     for (const id of listIds) {
       const l = byId.get(id)
       if (!l) { errors.push(`Lista ${id} no encontrada en el workspace`); continue }
@@ -106,13 +109,29 @@ export async function POST(req: Request) {
           })
         created.push(l.id)
       } catch (e) {
-        // brand.name es único GLOBAL todavía: si choca con el nombre de una lista de
-        // otro workspace, lo reportamos (hardening pendiente: unique por workspace).
         errors.push(`No se pudo guardar "${l.name}": ${e instanceof Error ? e.message : 'error'}`)
       }
     }
 
-    return NextResponse.json({ created, errors: errors.length ? errors : undefined })
+    // 2) Desactivar las que YA NO están seleccionadas (sincroniza la selección del modal).
+    //    No se borran: preserva roles/tareas que las referencian; solo dejan de ser asignables.
+    const activos = await db.query.brand.findMany({
+      where: and(eq(brand.workspaceId, teamId ?? '__none__'), eq(brand.isActive, true)),
+      columns: { id: true },
+    })
+    const toDeactivate = activos.map((b) => b.id).filter((id) => !selected.has(id))
+    if (toDeactivate.length > 0) {
+      await db
+        .update(brand)
+        .set({ isActive: false, updatedAt: new Date() })
+        .where(and(eq(brand.workspaceId, teamId ?? '__none__'), inArray(brand.id, toDeactivate)))
+    }
+
+    return NextResponse.json({
+      created,
+      deactivated: toDeactivate.length,
+      errors: errors.length ? errors : undefined,
+    })
   } catch (error: any) {
     return NextResponse.json(
       { error: 'Failed to save lists', details: error?.message },

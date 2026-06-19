@@ -1,9 +1,10 @@
 import { NextResponse } from 'next/server';
 import { db } from '@/db';
 import { systemSettings } from '@/db/schema';
-import { asc } from 'drizzle-orm';
+import { asc, eq } from 'drizzle-orm';
 import { DEFAULT_SETTINGS } from '@/config/settings-catalog';
 import { invalidateAppSettingsCache } from '@/services/app-settings.service';
+import { getCurrentWorkspaceId } from '@/lib/workspace';
 
 // Escribe datos en vivo de la DB: nunca pre-renderizar/cachear en build.
 export const dynamic = 'force-dynamic';
@@ -11,18 +12,21 @@ export const dynamic = 'force-dynamic';
 // POST /api/settings/reset
 export async function POST() {
   try {
-    // Eliminar todos los settings actuales
-    await db.delete(systemSettings);
+    const wsId = await getCurrentWorkspaceId();
 
-    // Recrear con valores por defecto
+    // Eliminar SOLO los settings de ESTE workspace (no los de otros inquilinos).
+    await db.delete(systemSettings).where(eq(systemSettings.workspaceId, wsId ?? '__none__'));
+
+    // Recrear con valores por defecto (con su workspaceId).
     for (const defaultSetting of DEFAULT_SETTINGS) {
-      await db.insert(systemSettings).values(defaultSetting);
+      await db.insert(systemSettings).values({ ...defaultSetting, workspaceId: wsId });
     }
 
-    // Invalidar la caché en memoria del motor.
-    invalidateAppSettingsCache();
+    // Invalidar la caché en memoria del motor (de este workspace).
+    invalidateAppSettingsCache(wsId);
 
     const settings = await db.query.systemSettings.findMany({
+      where: eq(systemSettings.workspaceId, wsId ?? '__none__'),
       orderBy: [asc(systemSettings.group), asc(systemSettings.order)]
     });
 

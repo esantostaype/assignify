@@ -90,9 +90,10 @@ function estimateTaskDurationDays(task: ActiveClickUpTask): number {
 async function getNextAvailableStartAfterVacations(
   baseDate: Date,
   vacations: UserVacation[],
-  taskDurationDays: number = 0
+  taskDurationDays: number = 0,
+  workspaceId?: string | null
 ): Promise<Date> {
-  let availableDate = await getNextAvailableStart(baseDate);
+  let availableDate = await getNextAvailableStart(baseDate, workspaceId);
 
   const sortedVacations = vacations.sort((a, b) =>
     new Date(a.startDate).getTime() - new Date(b.startDate).getTime()
@@ -108,7 +109,7 @@ async function getNextAvailableStartAfterVacations(
 
     const taskHours = taskDurationDays * 8;
     const potentialTaskEnd = taskDurationDays > 0
-      ? await calculateWorkingDeadline(availableDate, taskHours)
+      ? await calculateWorkingDeadline(availableDate, taskHours, workspaceId)
       : availableDate;
 
     for (const vacation of sortedVacations) {
@@ -120,7 +121,7 @@ async function getNextAvailableStartAfterVacations(
       if (hasConflict) {
         const dayAfterVacation = new Date(vacEnd);
         dayAfterVacation.setUTCDate(dayAfterVacation.getUTCDate() + 1);
-        const newAvailableDate = await getNextAvailableStart(dayAfterVacation);
+        const newAvailableDate = await getNextAvailableStart(dayAfterVacation, workspaceId);
 
         availableDate = newAvailableDate;
         adjusted = true;
@@ -225,9 +226,9 @@ async function getVacationAwareUserSlots(
     if (laneTasks.length > 0) {
       // Se libera tras la última entrega del CARRIL (la deadline más lejana en él).
       lastDeadline = new Date(Math.max(...laneTasks.map((t) => new Date(t.dueDate).getTime())));
-      baseAvailableDate = await getNextAvailableStart(lastDeadline);
+      baseAvailableDate = await getNextAvailableStart(lastDeadline, workspaceId);
     } else {
-      baseAvailableDate = await getNextAvailableStart(new Date());
+      baseAvailableDate = await getNextAvailableStart(new Date(), workspaceId);
     }
 
     // Carga total = suma de duraciones de TODAS sus tareas pendientes: la REAL de
@@ -245,11 +246,11 @@ async function getVacationAwareUserSlots(
     // Si la tarea —empezando cuando el usuario se libera de su cola— choca con una vacación,
     // se mueve el inicio a después de la vacación. Si para entonces ya volvió, se asigna normal.
     const availableDate = upcomingVacations.length > 0
-      ? await getNextAvailableStartAfterVacations(baseAvailableDate, upcomingVacations, taskDurationDays)
+      ? await getNextAvailableStartAfterVacations(baseAvailableDate, upcomingVacations, taskDurationDays, workspaceId)
       : baseAvailableDate;
 
     const taskHours = taskDurationDays * 8;
-    const potentialTaskEnd = await calculateWorkingDeadline(availableDate, taskHours);
+    const potentialTaskEnd = await calculateWorkingDeadline(availableDate, taskHours, workspaceId);
 
     const workingDaysUntilAvailable = calculateWorkingDaysBetween(
       new Date(),
@@ -312,11 +313,12 @@ async function getVacationAwareUserSlots(
  */
 async function selectBestUserWithVacationLogic(
   userSlots: VacationAwareUserSlot[],
-  reqLevel: Level
+  reqLevel: Level,
+  workspaceId?: string | null
 ): Promise<VacationAwareUserSlot | null> {
   if (userSlots.length === 0) return null;
 
-  const settings = await getAppSettings();
+  const settings = await getAppSettings(workspaceId);
   return pickBestAcrossAffinity(
     userSlots,
     reqLevel,
@@ -342,7 +344,7 @@ export async function getBestUserWithCache(
   }
 
   const vacationAwareSlots = await getVacationAwareUserSlots(typeId, brandId, durationDays || 0, priority, workspaceId, clickupToken);
-  const bestVacationSlot = await selectBestUserWithVacationLogic(vacationAwareSlots, reqLevel);
+  const bestVacationSlot = await selectBestUserWithVacationLogic(vacationAwareSlots, reqLevel, workspaceId);
 
   if (!bestVacationSlot) {
     setInCache(cacheKey, null);
@@ -428,7 +430,7 @@ export async function getRankedCandidates(
   if (cached !== undefined) return cached;
 
   const slots = await getVacationAwareUserSlots(typeId, brandId, durationDays || 0, priority, workspaceId, clickupToken);
-  const best = await selectBestUserWithVacationLogic(slots, reqLevel);
+  const best = await selectBestUserWithVacationLogic(slots, reqLevel, workspaceId);
   const suggestedUserId = best?.userId ?? null;
 
   const candidates: RankedCandidate[] = slots

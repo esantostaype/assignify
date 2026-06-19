@@ -17,9 +17,10 @@
 //     LUNCH_END   = (14 + 1) - (-5) = 20
 //     END         = 19 - (-5) = 24
 //   (Coincide con los valores UTC hardcodeados que usaba el motor.)
+import { eq } from 'drizzle-orm';
 import { db } from '@/db';
 import { systemSettings } from '@/db/schema';
-import { getFromCache, setInCache, deleteFromCache } from '@/utils/cache';
+import { getFromCache, setInCache, deleteFromCache, invalidateCacheByPrefix } from '@/utils/cache';
 import { WORK_HOURS, TASK_ASSIGNMENT_THRESHOLDS } from '@/config';
 
 export interface AppWorkHours {
@@ -95,12 +96,16 @@ function readNumber(
  * entrega ya tipada y con el horario convertido a UTC. Ante cualquier fallo
  * (DB caída, tabla vacía, valores ausentes) usa los defaults de @/config.
  */
-export async function getAppSettings(): Promise<AppSettings> {
-  const cached = getFromCache<AppSettings>(CACHE_KEY);
+export async function getAppSettings(workspaceId?: string | null): Promise<AppSettings> {
+  const cacheKey = `${CACHE_KEY}:${workspaceId ?? 'global'}`;
+  const cached = getFromCache<AppSettings>(cacheKey);
   if (cached !== undefined) return cached;
 
   try {
-    const rows = (await db.query.systemSettings.findMany()) as SettingRow[];
+    // Acotado al workspace cuando se pasa; si no, comportamiento legacy (todas las filas).
+    const rows = (workspaceId
+      ? await db.query.systemSettings.findMany({ where: eq(systemSettings.workspaceId, workspaceId) })
+      : await db.query.systemSettings.findMany()) as SettingRow[];
 
     // Si la tabla está vacía, devolvemos fallback (el endpoint /api/settings la
     // seedea en su primer GET). No cacheamos el fallback para reintentar pronto.
@@ -152,7 +157,7 @@ export async function getAppSettings(): Promise<AppSettings> {
     );
 
     const settings: AppSettings = { workHours, thresholds, levelEscalationDays };
-    setInCache(CACHE_KEY, settings, CACHE_TTL_SECONDS);
+    setInCache(cacheKey, settings, CACHE_TTL_SECONDS);
     return settings;
   } catch (error) {
     console.error('getAppSettings: failed to read system_settings, using @/config fallback:', error);
@@ -160,7 +165,11 @@ export async function getAppSettings(): Promise<AppSettings> {
   }
 }
 
-/** Invalida la caché en memoria de la configuración del motor. */
-export function invalidateAppSettingsCache(): void {
-  deleteFromCache(CACHE_KEY);
+/** Invalida la caché en memoria de la config del motor (de un workspace, o todas). */
+export function invalidateAppSettingsCache(workspaceId?: string | null): void {
+  if (workspaceId !== undefined) {
+    deleteFromCache(`${CACHE_KEY}:${workspaceId ?? 'global'}`);
+  } else {
+    invalidateCacheByPrefix(`${CACHE_KEY}:`);
+  }
 }

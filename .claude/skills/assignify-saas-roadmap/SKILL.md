@@ -172,11 +172,27 @@ tareas, y todo queda **aislado por inquilino** (un usuario nunca ve datos de otr
   webhook debe ser una URL pública estable; en preview/local no entran eventos). Requiere
   `WEBHOOK_PUBLIC_URL=https://assignify.vercel.app` en Vercel (Production) + desplegar el
   handler a prod ANTES de que se registren los webhooks que apuntan a él.
+- ✅ **Hardening de aislamiento (cierre)**: (a) `DEFAULT_WORKSPACE_ID` correcto = **9017044866**
+  (verificado en DB: ahí viven brands/tiers/settings/users reales; corregido en `.env` y
+  `.env-production`; el `90170099166` era stale). (b) Limpiados 2 `task_type` huérfanos bajo el
+  id stale (`scripts/cleanup-stale-task-types.js`). (c) **Unicidad por `(workspaceId, name)`** en
+  `brand`/`task_type` (por `name`) y `system_settings` (por `category,key`) — antes unique GLOBAL,
+  chocaban entre inquilinos: se reemplazó el índice (DROP del global + CREATE UNIQUE INDEX compuesto
+  con `workspace_id`), **sin recrear tablas** (índices nombrados, origin=c) vía
+  `scripts/fix-name-uniques.js` (generalizado); schema con `unique(...).on(workspaceId, …)`.
+- ✅ **Settings por workspace**: `getAppSettings(workspaceId?)` filtra `system_settings` por
+  workspace + cache key por workspace (fallback a `@/config` si el workspace no tiene filas → un
+  inquilino nuevo usa defaults, no los de Inszone). Se enhebró `workspaceId` por las utils de fechas
+  (`getNextAvailableStart`/`calculateWorkingDeadline`) y se propagó por el motor
+  (`getVacationAwareUserSlots`→`selectBestUserWithVacationLogic`) y por `parallel-priority-insertion`
+  (vía `clickupOpts.teamId`). `/api/settings` (GET siembra con `workspaceId`, PATCH filtra) y
+  `/api/settings/reset` SCOPEADOS por workspace (el reset borraba TODOS los workspaces → fuga grave,
+  corregida). `workspaceId` opcional (compat) en toda la cadena. El núcleo puro `assignment-ranking`
+  no se tocó (20 tests siguen verdes).
 
-**Pendiente:**
-- **brand.name es único GLOBAL** → dos workspaces con una lista del mismo nombre
-  chocan (el POST lo cachea y reporta). Hardening: unique por (workspaceId, name).
-- `getAppSettings` por workspace, scopear `/api/settings` y creación de tiers.
+**Pendiente (operativo, al desplegar a prod):**
+- En Vercel (Production): `WEBHOOK_PUBLIC_URL`, `CRON_SECRET` y `AUTH_URL=https://assignify.vercel.app`
+  (este último para que el redirect del OAuth sea estable; ver `.env-production`).
 
 ### (Referencia) Plan original de Fase 4
 1. **Sync de listas/brands por workspace** (lo más importante): página estilo

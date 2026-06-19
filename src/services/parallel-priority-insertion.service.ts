@@ -52,9 +52,10 @@ interface TaskRow {
 async function getNextAvailableStartAfterVacations(
   baseDate: Date,
   vacations: UserVacation[],
-  taskDurationDays: number = 0
+  taskDurationDays: number = 0,
+  workspaceId?: string | null
 ): Promise<Date> {
-  let availableDate = await getNextAvailableStart(baseDate);
+  let availableDate = await getNextAvailableStart(baseDate, workspaceId);
 
   const sortedVacations = [...vacations].sort(
     (a, b) => new Date(a.startDate).getTime() - new Date(b.startDate).getTime()
@@ -68,7 +69,7 @@ async function getNextAvailableStartAfterVacations(
 
     const taskHours = taskDurationDays * 8;
     const potentialTaskEnd =
-      taskDurationDays > 0 ? await calculateWorkingDeadline(availableDate, taskHours) : availableDate;
+      taskDurationDays > 0 ? await calculateWorkingDeadline(availableDate, taskHours, workspaceId) : availableDate;
 
     for (const vacation of sortedVacations) {
       const vacStart = new Date(vacation.startDate);
@@ -76,7 +77,7 @@ async function getNextAvailableStartAfterVacations(
       if (availableDate <= vacEnd && potentialTaskEnd >= vacStart) {
         const dayAfter = new Date(vacEnd);
         dayAfter.setUTCDate(dayAfter.getUTCDate() + 1);
-        availableDate = await getNextAvailableStart(dayAfter);
+        availableDate = await getNextAvailableStart(dayAfter, workspaceId);
         adjusted = true;
         break;
       }
@@ -90,7 +91,8 @@ async function getNextAvailableStartAfterVacations(
 async function applyVacationLogic(
   userId: string,
   result: ParallelInsertionResult,
-  taskDurationDays: number
+  taskDurationDays: number,
+  workspaceId?: string | null
 ): Promise<ParallelInsertionResult> {
   const userWithVacations = await db.query.user.findFirst({
     where: eq(userTable.id, userId),
@@ -120,9 +122,10 @@ async function applyVacationLogic(
   const adjustedStartDate = await getNextAvailableStartAfterVacations(
     result.startDate,
     upcomingVacations,
-    taskDurationDays
+    taskDurationDays,
+    workspaceId
   );
-  const adjustedDeadline = await calculateWorkingDeadline(adjustedStartDate, taskDurationDays * 8);
+  const adjustedDeadline = await calculateWorkingDeadline(adjustedStartDate, taskDurationDays * 8, workspaceId);
 
   return {
     ...result,
@@ -147,6 +150,8 @@ export async function calculateParallelPriorityInsertion(
   durationDays: number,
   clickupOpts: ClickUpFetchOptions = {}
 ): Promise<ParallelInsertionResult> {
+  // El workspace activo llega vía clickupOpts.teamId → settings del motor por inquilino.
+  const workspaceId = clickupOpts.teamId ?? null;
   const now = new Date();
   const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
 
@@ -177,7 +182,7 @@ export async function calculateParallelPriorityInsertion(
     const last = queueAhead.reduce((a, b) =>
       new Date(a.deadline).getTime() >= new Date(b.deadline).getTime() ? a : b
     );
-    startDate = await getNextAvailableStart(new Date(last.deadline));
+    startDate = await getNextAvailableStart(new Date(last.deadline), workspaceId);
     insertionReason = `${priority}: en cola tras "${last.name}" (última de prioridad ≥ ${priority})`;
     parallelWith = {
       taskId: last.id,
@@ -187,11 +192,11 @@ export async function calculateParallelPriorityInsertion(
   } else {
     // No hay nada de prioridad igual o mayor: empieza lo antes posible (en paralelo
     // con las de menor prioridad, sin empujarlas).
-    startDate = await getNextAvailableStart(now);
+    startDate = await getNextAvailableStart(now, workspaceId);
     insertionReason = `${priority}: empieza de inmediato (sin tareas de prioridad ≥ ${priority})`;
   }
 
-  const deadline = await calculateWorkingDeadline(startDate, durationDays * 8);
+  const deadline = await calculateWorkingDeadline(startDate, durationDays * 8, workspaceId);
 
   const result: ParallelInsertionResult = {
     startDate,
@@ -201,5 +206,5 @@ export async function calculateParallelPriorityInsertion(
     noTasksAffected: true,
   };
 
-  return applyVacationLogic(userId, result, durationDays);
+  return applyVacationLogic(userId, result, durationDays, workspaceId);
 }

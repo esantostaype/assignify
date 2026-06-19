@@ -51,9 +51,9 @@ export function roundUpToNextHalfHour(date: Date): Date {
 /**
  * ✅ CONSERVADOR: Calcula la próxima fecha y hora de inicio disponible
  */
-export async function getNextAvailableStart(date: Date): Promise<Date> {
+export async function getNextAvailableStart(date: Date, workspaceId?: string | null): Promise<Date> {
   const result = new Date(date);
-  const WH = (await getAppSettings()).workHours; // Horario laboral en UTC
+  const WH = (await getAppSettings(workspaceId)).workHours; // Horario laboral en UTC
 
   while (true) {
     const hour = result.getUTCHours(); // Hora UTC
@@ -83,11 +83,11 @@ export async function getNextAvailableStart(date: Date): Promise<Date> {
 /**
  * ✅ CONSERVADOR: Calcula la fecha límite considerando horas laborales
  */
-export async function calculateWorkingDeadline(start: Date, hoursNeeded: number): Promise<Date> {
+export async function calculateWorkingDeadline(start: Date, hoursNeeded: number, workspaceId?: string | null): Promise<Date> {
   let remaining = hoursNeeded;
   let current = new Date(start);
 
-  const WH = (await getAppSettings()).workHours; // Horario laboral en UTC
+  const WH = (await getAppSettings(workspaceId)).workHours; // Horario laboral en UTC
 
   const workBlocks = [
     { from: WH.START, to: WH.LUNCH_START },

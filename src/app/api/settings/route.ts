@@ -4,6 +4,7 @@ import { systemSettings } from '@/db/schema';
 import { and, asc, eq } from 'drizzle-orm';
 import { DEFAULT_SETTINGS } from '@/config/settings-catalog';
 import { invalidateAppSettingsCache } from '@/services/app-settings.service';
+import { getCurrentWorkspaceId } from '@/lib/workspace';
 
 // Lee/escribe datos en vivo de la DB: nunca pre-renderizar/cachear en build.
 export const dynamic = 'force-dynamic';
@@ -11,18 +12,21 @@ export const dynamic = 'force-dynamic';
 // GET /api/settings
 export async function GET() {
   try {
-    // Obtener settings de la base de datos
+    const wsId = await getCurrentWorkspaceId();
+    // Settings del workspace ACTIVO (cada inquilino tiene su horario/umbrales).
     let settings = await db.query.systemSettings.findMany({
+      where: eq(systemSettings.workspaceId, wsId ?? '__none__'),
       orderBy: [asc(systemSettings.group), asc(systemSettings.order)]
     });
 
-    // Si no hay settings, crear los por defecto
+    // Si este workspace aún no tiene settings, sembrar los por defecto (con su workspaceId).
     if (settings.length === 0) {
       for (const defaultSetting of DEFAULT_SETTINGS) {
-        await db.insert(systemSettings).values(defaultSetting);
+        await db.insert(systemSettings).values({ ...defaultSetting, workspaceId: wsId });
       }
 
       settings = await db.query.systemSettings.findMany({
+        where: eq(systemSettings.workspaceId, wsId ?? '__none__'),
         orderBy: [asc(systemSettings.group), asc(systemSettings.order)]
       });
     }
@@ -44,6 +48,7 @@ export async function GET() {
 // PATCH /api/settings
 export async function PATCH(req: Request) {
   try {
+    const wsId = await getCurrentWorkspaceId();
     const { updates } = await req.json();
 
     if (!Array.isArray(updates) || updates.length === 0) {
@@ -64,7 +69,11 @@ export async function PATCH(req: Request) {
       const updated = await db
         .update(systemSettings)
         .set({ value })
-        .where(and(eq(systemSettings.category, category), eq(systemSettings.key, key)))
+        .where(and(
+          eq(systemSettings.category, category),
+          eq(systemSettings.key, key),
+          eq(systemSettings.workspaceId, wsId ?? '__none__')
+        ))
         .returning({ id: systemSettings.id });
 
       results.push({
@@ -74,8 +83,8 @@ export async function PATCH(req: Request) {
       });
     }
 
-    // Invalidar la caché en memoria para que el motor lea los nuevos valores ya.
-    invalidateAppSettingsCache();
+    // Invalidar la caché en memoria (de ESTE workspace) para que el motor lea ya los nuevos valores.
+    invalidateAppSettingsCache(wsId);
 
     return NextResponse.json({
       success: true,
