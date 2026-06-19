@@ -25,12 +25,23 @@ export interface TaskUpdatePayload {
 }
 
 /**
- * Publica un evento de actualización de tareas. No lanza si Pusher falla:
- * el realtime es una mejora, nunca debe tumbar el webhook.
+ * Canal de tareas POR workspace (aísla el realtime entre inquilinos). Sin workspace
+ * → canal global (compat). El cliente arma el MISMO nombre en usePusherTaskSync.
  */
-export async function publishTaskUpdate(payload: TaskUpdatePayload): Promise<void> {
+export function taskChannelForWorkspace(workspaceId?: string | null): string {
+  return workspaceId ? `${TASKS_CHANNEL}-${workspaceId}` : TASKS_CHANNEL
+}
+
+/**
+ * Publica un evento de actualización de tareas en el canal del workspace. No lanza si
+ * Pusher falla: el realtime es una mejora, nunca debe tumbar el webhook.
+ */
+export async function publishTaskUpdate(
+  payload: TaskUpdatePayload,
+  workspaceId?: string | null
+): Promise<void> {
   try {
-    await pusherServer.trigger(TASKS_CHANNEL, TASK_UPDATED_EVENT, payload)
+    await pusherServer.trigger(taskChannelForWorkspace(workspaceId), TASK_UPDATED_EVENT, payload)
   } catch (err) {
     console.error('[pusher] Failed to emit task-updated:', err instanceof Error ? err.message : err)
   }

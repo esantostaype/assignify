@@ -11,6 +11,7 @@ import { authConfig } from './auth.config'
 import { db } from '@/db'
 import { authUser, clickupConnection } from '@/db/schema'
 import { encryptSecret } from '@/lib/crypto'
+import { ensureWorkspaceWebhook } from '@/lib/workspace-webhook'
 
 // Perfil que devuelve GET https://api.clickup.com/api/v2/user → { user: {...} }.
 interface ClickUpProfile {
@@ -135,6 +136,11 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
             updatedAt: now,
           },
         })
+
+      // Registrar (idempotente, best-effort) el webhook de cada workspace autorizado
+      // para que ClickUp notifique sus cambios. Solo actúa si hay WEBHOOK_PUBLIC_URL
+      // (prod); si falla, no bloquea el login.
+      await Promise.allSettled(workspaces.map((w) => ensureWorkspaceWebhook(w.id, token)))
     },
   },
 })

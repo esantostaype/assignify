@@ -4,8 +4,15 @@
 // La DB ya no se sincroniza: el tablero y el motor leen las tareas en vivo de ClickUp.
 import { NextResponse } from 'next/server'
 import crypto from 'crypto'
+import { eq } from 'drizzle-orm'
 import { publishTaskUpdate } from '@/lib/pusher'
-import { invalidateActiveClickUpTasksCache } from '@/services/clickup-tasks.service'
+import {
+  invalidateActiveClickUpTasksCache,
+  invalidateActiveClickUpTasksCacheForTeam,
+} from '@/services/clickup-tasks.service'
+import { db } from '@/db'
+import { workspaceWebhook } from '@/db/schema'
+import { decryptSecret } from '@/lib/crypto'
 
 // Recibe webhooks y usa request.url (challenge): nunca pre-renderizar/cachear en build.
 export const dynamic = 'force-dynamic'
@@ -47,20 +54,42 @@ export async function GET(req: Request) {
 
 export async function POST(req: Request) {
   try {
+    // ?ws={workspaceId}: identifica el webhook por workspace. Sin él = webhook global
+    // de Inszone (compat single-tenant).
+    const ws = new URL(req.url).searchParams.get('ws')
+
     const rawBody = await req.text()
     if (!rawBody.trim()) {
       return NextResponse.json({ success: true, message: 'empty body (test ping)' })
     }
 
-    // Verificación de firma HMAC de ClickUp sobre el cuerpo crudo.
+    // Resolver el SECRET con el que validar la firma y el TEAM al que pertenece:
+    //   con ?ws  → secret guardado para ese workspace (workspace_webhook).
+    //   sin ?ws  → secret global (CLICKUP_WEBHOOK_SECRET) + DEFAULT_WORKSPACE_ID.
+    let secret: string | undefined
+    let teamId: string | null
+    if (ws) {
+      teamId = ws
+      const row = await db.query.workspaceWebhook.findFirst({
+        where: eq(workspaceWebhook.workspaceId, ws),
+      })
+      if (row?.secretEnc) {
+        try { secret = decryptSecret(row.secretEnc) } catch { /* secret corrupto */ }
+      }
+    } else {
+      teamId = process.env.DEFAULT_WORKSPACE_ID ?? null
+      secret = WEBHOOK_SECRET
+    }
+
+    // Verificación de firma HMAC de ClickUp sobre el cuerpo crudo, con el secret resuelto.
     const signature = req.headers.get('x-signature') || ''
-    if (WEBHOOK_SECRET) {
-      const expected = crypto.createHmac('sha256', WEBHOOK_SECRET).update(rawBody).digest('hex')
+    if (secret) {
+      const expected = crypto.createHmac('sha256', secret).update(rawBody).digest('hex')
       const matches =
         signature.length === expected.length &&
         crypto.timingSafeEqual(Buffer.from(signature), Buffer.from(expected))
       if (!matches) {
-        console.error(`Invalid webhook signature (verify=${VERIFY_SIGNATURE})`)
+        console.error(`Invalid webhook signature (verify=${VERIFY_SIGNATURE}, ws=${ws ?? 'global'})`)
         if (VERIFY_SIGNATURE) {
           return NextResponse.json({ error: 'Invalid signature' }, { status: 401 })
         }
@@ -72,7 +101,7 @@ export async function POST(req: Request) {
     const body = JSON.parse(rawBody)
     const event: string | undefined = body.event
     const taskId: string | undefined = body.task_id
-    dlog(`🎯 Evento ${event} para tarea ${taskId}`)
+    dlog(`🎯 Evento ${event} para tarea ${taskId} (ws=${teamId ?? 'global'})`)
 
     if (!event || !taskId) {
       return NextResponse.json({ success: true, message: 'sin event/task_id (probable test de ClickUp)' })
@@ -81,22 +110,27 @@ export async function POST(req: Request) {
     // Notificar a los clientes en tiempo real (Pusher). La DB ya no se toca:
     // el tablero y el motor de asignación leen las tareas en vivo de ClickUp.
     if (event === 'taskDeleted' || MUTATING_EVENTS.includes(event)) {
-      // Una tarea cambió en ClickUp: invalida la caché del crawl para que el
-      // kanban, el panel de carga y el motor lean el estado fresco.
-      invalidateActiveClickUpTasksCache()
+      // Una tarea cambió en ClickUp: invalida la caché del crawl de SU workspace para
+      // que el kanban, el panel de carga y el motor lean el estado fresco.
+      if (teamId) invalidateActiveClickUpTasksCacheForTeam(teamId)
+      else invalidateActiveClickUpTasksCache()
       // El cambio de estado viene en history_items (before/after); lo pasamos para
       // que la notificación diga "To Do → In Progress" en vez de solo "updated".
       const statusItem = Array.isArray(body.history_items)
         ? body.history_items.find((h: any) => h?.field === 'status')
         : null
-      await publishTaskUpdate({
-        taskId,
-        name: body.task?.name,
-        status: body.task?.status?.status,
-        event,
-        fromStatus: statusItem?.before?.status,
-        toStatus: statusItem?.after?.status,
-      })
+      // Publica SOLO en el canal del workspace → cada inquilino recibe solo lo suyo.
+      await publishTaskUpdate(
+        {
+          taskId,
+          name: body.task?.name,
+          status: body.task?.status?.status,
+          event,
+          fromStatus: statusItem?.before?.status,
+          toStatus: statusItem?.after?.status,
+        },
+        teamId ?? undefined
+      )
     }
 
     return NextResponse.json({ success: true, event })

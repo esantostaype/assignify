@@ -161,12 +161,22 @@ tareas, y todo queda **aislado por inquilino** (un usuario nunca ve datos de otr
   **NO** `drizzle-kit push`). **OJO**: las conexiones previas necesitan **RE-LOGIN** con
   ClickUp para poblar `workspaces` (antes solo se guardaba `teams[0]`); hasta entonces el
   GET devuelve solo el activo y el selector queda oculto.
+- ✅ **Webhooks / realtime por workspace**: tabla `workspace_webhook` (webhookId +
+  secret CIFRADO por workspace). `ensureWorkspaceWebhook` (`src/lib/workspace-webhook.ts`)
+  registra el webhook de cada workspace en `events.signIn` (idempotente, best-effort, solo
+  si hay `WEBHOOK_PUBLIC_URL`). El handler `/api/clickup-webhook` valida la firma y enruta
+  por `?ws={workspaceId}` (sin `ws` = webhook global de Inszone, compat). Pusher pasa a
+  canal `tasks-{workspaceId}` (`taskChannelForWorkspace`) y el cliente (`usePusherTaskSync`)
+  escucha SOLO el de su workspace activo → sin fuga de realtime entre inquilinos. Migración
+  `scripts/add-workspace-webhook-table.js`. **OJO**: solo se valida en PROD (el endpoint del
+  webhook debe ser una URL pública estable; en preview/local no entran eventos). Requiere
+  `WEBHOOK_PUBLIC_URL=https://assignify.vercel.app` en Vercel (Production) + desplegar el
+  handler a prod ANTES de que se registren los webhooks que apuntan a él.
 
 **Pendiente:**
 - **brand.name es único GLOBAL** → dos workspaces con una lista del mismo nombre
   chocan (el POST lo cachea y reporta). Hardening: unique por (workspaceId, name).
-- **Webhooks por workspace**, `getAppSettings` por workspace, scopear `/api/settings`
-  y creación de tiers.
+- `getAppSettings` por workspace, scopear `/api/settings` y creación de tiers.
 
 ### (Referencia) Plan original de Fase 4
 1. **Sync de listas/brands por workspace** (lo más importante): página estilo

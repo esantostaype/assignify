@@ -39,6 +39,11 @@ export function invalidateActiveClickUpTasksCache(): void {
   invalidateCacheByPrefix(ACTIVE_TASKS_CACHE_PREFIX)
 }
 
+/** Invalida SOLO la caché del crawl de un workspace (su key es PREFIX+teamId). */
+export function invalidateActiveClickUpTasksCacheForTeam(teamId: string): void {
+  invalidateCacheByPrefix(`${ACTIVE_TASKS_CACHE_PREFIX}${teamId}`)
+}
+
 export interface ClickUpAssignee {
   id: string
   name: string

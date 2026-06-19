@@ -174,6 +174,20 @@ export const clickupConnection = sqliteTable('clickup_connection', {
   updatedAt: updatedAt(),
 })
 
+// [SaaS fase 4] Webhook de ClickUp registrado POR WORKSPACE (no por usuario). Al
+// conectar un workspace registramos su webhook vía la API de ClickUp y guardamos su
+// `secret` (CIFRADO) para validar la firma de SUS eventos. El handler resuelve el
+// secret por `?ws={workspaceId}`. Reemplaza el único webhook global single-tenant.
+export const workspaceWebhook = sqliteTable('workspace_webhook', {
+  workspaceId: text('workspace_id').primaryKey(),
+  webhookId: text('webhook_id').notNull(),
+  // Secret del webhook cifrado (AES-256-GCM); ver src/lib/crypto.ts.
+  secretEnc: text('secret_enc').notNull(),
+  endpoint: text('endpoint').notNull(),
+  createdAt: createdAt(),
+  updatedAt: updatedAt(),
+})
+
 export const syncLog = sqliteTable('sync_log', {
   id: integer('id').primaryKey({ autoIncrement: true }),
   entityType: text('entity_type').notNull(),
