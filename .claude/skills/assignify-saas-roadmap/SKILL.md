@@ -13,10 +13,31 @@ description: >-
 
 # Assignify → SaaS multi-inquilino (roadmap v2)
 
-> Estado: **PLANEADO, no implementado.** La app en producción es single-tenant
-> (un workspace de ClickUp, `CLICKUP_API_TOKEN` global). Este documento captura el
-> diseño acordado para transformarla en un SaaS donde cada persona conecta su
-> propio ClickUp. Trabajar esto en una **rama aparte**; no romper el single-tenant.
+> Estado: **EN CURSO en la rama `feat/saas-multi-tenant`.** Fases 1–3 implementadas;
+> Fase 4 avanzada (PK compuesto, tipos dinámicos, sync de listas). `main`/producción
+> sigue single-tenant e INTACTO (esta rama NO se ha mergeado). Trabajar siempre aquí.
+
+## ⚡ CÓMO RETOMAR (otra PC / sesión nueva) — LEER PRIMERO
+
+1. **Rama**: `git fetch origin && git checkout feat/saas-multi-tenant && git pull && npm install`.
+   Verifica el último commit con `git log --oneline -1`.
+2. **`.env`** (NO viaja por git, recréalo en cada PC). Necesitas:
+   `TURSO_DATABASE_URL`, `TURSO_AUTH_TOKEN`, `CLICKUP_API_TOKEN`, `CLICKUP_WEBHOOK_SECRET`,
+   `PUSHER_*`/`NEXT_PUBLIC_PUSHER_*`, `AUTH_SECRET`, `AUTH_CLICKUP_ID`, `AUTH_CLICKUP_SECRET`,
+   `ENCRYPTION_KEY` (opcional), y **`DEFAULT_WORKSPACE_ID=9017044866`** (Inszone real).
+   - El **redirect URI** de la OAuth app de ClickUp debe incluir el puerto local de ESA PC
+     (`http://localhost:<puerto>/api/auth/callback/clickup`).
+3. **DB**: la Turso es compartida en la nube → el schema (PK compuesto, columnas
+   workspace_id, clickup_connection, task_meta, auth_user) y los backfills YA están.
+   **NO correr `npx drizzle-kit push`** (la última migración se atascó en un índice
+   cosmético de user_role; las tablas/datos están bien, pero re-pushear podría recrear
+   tablas). Si hay que cambiar schema, hacerlo con una migración SQL manual y cuidado.
+4. **Ids**: Inszone real = **9017044866**; workspace de pruebas "Inszone Insurance" =
+   **90171327636** (tiene tareas/diseñadores de prueba; sus "On Approval" son custom).
+5. **GOTCHA dev server**: NO correr `npm run build` mientras `npm run dev` está arriba
+   (ambos escriben `.next` → estado corrupto → errores raros como `ConnectTimeoutError`
+   en el login de ClickUp). Si pasa: `Ctrl+C`, `Remove-Item -Recurse -Force .next`, `npm run dev`.
+6. Verificación: `npx tsc --noEmit` · `npm run build` (con dev apagado) · `npm test` (20 tests).
 
 ## Objetivo
 
@@ -56,6 +77,136 @@ tareas, y todo queda **aislado por inquilino** (un usuario nunca ve datos de otr
    enrutar/validar por workspace.
 5. **Onboarding:** primer login → conectar ClickUp → sincronizar miembros/listas →
    definir task types / tiers → empezar a asignar.
+
+## Progreso
+
+- **Rama:** `feat/saas-multi-tenant`.
+- **Fase 1 — EN CURSO (scaffolding hecho, falta probar con creds reales):**
+  - Provider `clickup` (OAuth) en `src/auth.ts` (+ botón "Continue with ClickUp" en login).
+  - Tabla `clickup_connection` (token cifrado por usuario) en `src/db/schema.ts`.
+  - `src/lib/crypto.ts` (AES-256-GCM, clave de `ENCRYPTION_KEY`/`AUTH_SECRET`).
+  - `events.signIn` guarda el token cifrado al loguear con ClickUp.
+  - **PENDIENTE para activarlo:** crear la OAuth app en ClickUp y definir
+    `AUTH_CLICKUP_ID` / `AUTH_CLICKUP_SECRET` (+ `ENCRYPTION_KEY` recomendado);
+    correr `npx drizzle-kit push` para crear `clickup_connection` en Turso;
+    probar el flujo (el provider es custom y puede necesitar ajuste fino).
+  - El login email/password sigue intacto (no se rompió el single-tenant).
+
+- **Fase 2 — base hecha; falta el SWEEP de scoping:**
+  - Workspace activo se resuelve y guarda al loguear (`clickup_connection.workspaceId`).
+  - Mapeo de estados robusto por `type` de ClickUp (3 buckets) + tests.
+  - Columnas `workspace_id` (nullable) en `user`, `task_type`, `tier_list`, `brand`,
+    `system_settings`, `task_meta` (solo ALTER ADD; uniques intactos).
+  - `getCurrentWorkspaceId()` en `src/lib/workspace.ts` (ClickUp → su workspace;
+    email/password → `DEFAULT_WORKSPACE_ID`).
+  - `scripts/backfill-workspace.js` aplicado; data actual etiquetada al workspace
+    de Inszone **90170099166** (= `brand.team_id`).
+  - **SWEEP de scoping — HECHO en las superficies principales:**
+    - Listas: `/api/users`, `/api/types` (+POST/PATCH/DELETE), `/api/tiers`,
+      `/api/brands`, `/api/users/workload` → filtran por `workspaceId`.
+    - Motor: `getVacationAwareUserSlots`/`getRankedCandidates`/`getBestUserWithCache`
+      reciben `workspaceId` y filtran el pool de `user`; cache key incluye workspace.
+    - `/api/tasks/suggestion/simple` y `/api/tasks/parallel` resuelven el workspace
+      y lo pasan al motor; parallel valida tier/type/brand/user acotados y guarda
+      `task_meta.workspaceId`.
+    - `/api/sync/clickup-users` etiqueta a los miembros creados con el workspace.
+  - **Hardening pendiente (no bloquea, anotar):**
+    - `getAppSettings` (horario/umbrales) sigue COMPARTIDO — settings por workspace es
+      refinamiento posterior (evita enhebrar workspaceId por las utils de fechas).
+    - Sub-rutas `/api/users/[userId]`(roles/vacations), creación de brands/tiers y
+      `/api/settings` aún no acotan por workspace (riesgo bajo; cerrar luego).
+    - `user.id` PK = id de ClickUp → un mismo usuario en 2 workspaces colisiona;
+      el PK debería ser (workspaceId, id). Migración posterior.
+    - Unicidad real por (workspaceId, …) en task_type/tier_list/system_settings.
+  - Requiere `DEFAULT_WORKSPACE_ID=90170099166` en `.env`/Vercel.
+- **Fase 3 — CERRADA (implementada; pendiente solo validación en vivo del usuario):**
+  - `getCurrentClickUpContext()` → `{ token, teamId }` (token de ClickUp del usuario,
+    descifrado; fallback global+DEFAULT_WORKSPACE_ID para el admin email/password).
+  - Enhebrado `{token, teamId}` por TODA la capa: `clickup-tasks.service`
+    (`fetchActiveClickUpTasks`/`getActiveClickUpTasksByUser` con token + crawl acotado
+    al teamId + **caché por workspace**), `clickup.service` (`createTaskInClickUp` con
+    el token del usuario), `parallel-priority-insertion`, el motor
+    (`getVacationAwareUserSlots`/`getRankedCandidates`/`getBestUserWithCache`), y las
+    rutas suggestion/parallel/workload/kanban-sync/sync-users.
+  - **Alineación de ids RESUELTA**: el `brand.team_id` 90170099166 era STALE.
+    Verificado que los brand-lists viven bajo **"Inszoneins" = 9017044866** (ese es el
+    team real). Re-backfill aplicado a 9017044866. → `DEFAULT_WORKSPACE_ID=9017044866`.
+    El workspace de pruebas "Inszone Insurance" (ex-"OAuth") = 90171327636.
+  - **Fix de cierre**: "On Approval" con `type=closed/done` ya NO se excluye (Inszone
+    lo tiene como `closed`); la palabra clave de aprobación gana al `type`. +test.
+  - **Validación en vivo (la confirma el usuario, no bloquea el código):**
+    - Admin email/password → kanban SOLO de Inszone (las 3 tareas del workspace de
+      pruebas ya no se cuelan).
+    - Login ClickUp → solo el workspace que resolvió ese login.
+
+### Fase 4 — EN CURSO.
+**Hecho ya:**
+- ✅ **PK compuesto `user(id, workspaceId)`** → la misma persona en varios workspaces
+  (commit del usuario); user_role/user_vacation con `workspace_id` + relaciones
+  compuestas. *(OJO: el `drizzle-kit push` se atascó en un índice cosmético de
+  user_role; las tablas/datos quedaron correctos pero NO volver a pushear sin revisar.)*
+- ✅ **Fix skeleton**: `useSyncUsers` invalida `workload`.
+- ✅ **Tipo de tarea dinámico** en el form: `TaskTypeSelect` con los task types del
+  workspace (se eliminó el switch UX/UI|Graphic y `getTypeKind`/`TaskKindSwitch`).
+- ✅ **Sync de listas/brands**: `/api/sync/clickup-lists` (GET descubre, POST guarda) +
+  `ListsSyncForm` + entrada "Lists" en el header. BrandSelect ahora dice "List".
+- ✅ **Selector multi-workspace**: columna `clickup_connection.workspaces` (JSON con
+  TODOS los teams autorizados; el activo sigue en `workspaceId`, que es lo que leen
+  `getCurrentWorkspaceId`/`getCurrentClickUpContext`). `events.signIn` ya guarda todos
+  los teams y **preserva el activo elegido** si sigue disponible. `GET/PATCH
+  /api/workspaces` (el PATCH valida que el workspace sea uno autorizado). Hook
+  `useWorkspaces`/`useSetActiveWorkspace` + `WorkspaceSwitcher` en el Header (solo si
+  hay >1; al cambiar → `window.location.reload` para releer todo con el nuevo activo).
+  Migración manual `scripts/add-workspaces-column.js` (ADD COLUMN nullable, idempotente;
+  **NO** `drizzle-kit push`). **OJO**: las conexiones previas necesitan **RE-LOGIN** con
+  ClickUp para poblar `workspaces` (antes solo se guardaba `teams[0]`); hasta entonces el
+  GET devuelve solo el activo y el selector queda oculto.
+- ✅ **Webhooks / realtime por workspace**: tabla `workspace_webhook` (webhookId +
+  secret CIFRADO por workspace). `ensureWorkspaceWebhook` (`src/lib/workspace-webhook.ts`)
+  registra el webhook de cada workspace en `events.signIn` (idempotente, best-effort, solo
+  si hay `WEBHOOK_PUBLIC_URL`). El handler `/api/clickup-webhook` valida la firma y enruta
+  por `?ws={workspaceId}` (sin `ws` = webhook global de Inszone, compat). Pusher pasa a
+  canal `tasks-{workspaceId}` (`taskChannelForWorkspace`) y el cliente (`usePusherTaskSync`)
+  escucha SOLO el de su workspace activo → sin fuga de realtime entre inquilinos. Migración
+  `scripts/add-workspace-webhook-table.js`. **OJO**: solo se valida en PROD (el endpoint del
+  webhook debe ser una URL pública estable; en preview/local no entran eventos). Requiere
+  `WEBHOOK_PUBLIC_URL=https://assignify.vercel.app` en Vercel (Production) + desplegar el
+  handler a prod ANTES de que se registren los webhooks que apuntan a él.
+
+**Pendiente:**
+- **brand.name es único GLOBAL** → dos workspaces con una lista del mismo nombre
+  chocan (el POST lo cachea y reporta). Hardening: unique por (workspaceId, name).
+- `getAppSettings` por workspace, scopear `/api/settings` y creación de tiers.
+
+### (Referencia) Plan original de Fase 4
+1. **Sync de listas/brands por workspace** (lo más importante): página estilo
+   `/designers` que DESCUBRE las listas del workspace (crawl space→folder→list con el
+   token del usuario — reusar la lógica de `clickup-tasks.service`) y deja ELEGIR
+   cuáles son asignables; se guardan como `brand` con su `workspaceId`/`teamId`.
+   Endpoint nuevo `/api/sync/clickup-lists` (GET descubre, POST guarda). Hoy los brands
+   se configuran a mano → un workspace nuevo no puede poblarlos. Estructura ClickUp =
+   Team > Folder > List; un brand = una List (puede colgar de un space o de una
+   carpeta). Naming: "Brand" es de Inszone; genérico = "List/Project" (decidir si
+   renombrar o usar etiqueta configurable por workspace).
+2. **Selector multi-workspace**: guardar TODOS los teams autorizados y permitir
+   elegir/cambiar el activo (hoy se toma `teams[0]` en `events.signIn`). Persistir el
+   elegido; `getCurrentClickUpContext` usa ese.
+3. **Webhooks por workspace**: registrar un webhook por workspace al conectar (la OAuth
+   app de ClickUp lo permite vía API); enrutar/validar por workspace (hoy hay 1 global).
+4. **Cerrar hardening de Fase 2**: `getAppSettings` por workspace; scopear sub-rutas
+   `/api/users/[userId]`(roles/vacations), creación de brands/tiers y `/api/settings`;
+   PK de `user` → (workspaceId, clickupUserId); uniques por (workspaceId, …).
+5. **Onboarding**: primer login ClickUp → elegir workspace → sync listas + miembros →
+   definir tipos/tiers.
+
+### Cómo arrancar mañana (checklist)
+- Rama **`feat/saas-multi-tenant`** (NO mergear a `main` hasta validar). Seguir ahí.
+- `.env`: `AUTH_SECRET`, `AUTH_CLICKUP_ID`/`AUTH_CLICKUP_SECRET`, `ENCRYPTION_KEY` (opc.),
+  y **`DEFAULT_WORKSPACE_ID=9017044866`** (Inszone real). Luego `npm run dev`.
+- Ids útiles: **Inszone real = 9017044866**; workspace de pruebas
+  "Inszone Insurance" = **90171327636** (tiene 3 tareas de prueba en distintos status).
+- Validar Fase 3 (admin Inszone vs login ClickUp) ANTES de empezar Fase 4.
+- Verificación: `npx tsc --noEmit` · `npm run build` · `npm test` (20 tests).
 
 ## Plan por fases (sugerido)
 

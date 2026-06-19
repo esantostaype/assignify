@@ -7,23 +7,36 @@ export type LocalTaskStatus = 'TO_DO' | 'IN_PROGRESS' | 'ON_APPROVAL' | 'COMPLET
  * @param clickupStatus - The status string from ClickUp
  * @returns Local status or null if task should be excluded (completed)
  */
-export function mapClickUpStatusToLocal(clickupStatus: string): LocalTaskStatus | null {
+export function mapClickUpStatusToLocal(
+  clickupStatus: string,
+  clickupType?: string
+): LocalTaskStatus | null {
   const statusLower = clickupStatus.toLowerCase().trim();
+  const type = (clickupType || '').toLowerCase().trim();
 
-  // ✅ ON APPROVAL - Estados de revisión/aprobación (PRIMERO para evitar conflictos)
-  if (statusLower === 'on approval' || 
+  // ✅ ON APPROVAL — revisión/aprobación. Va PRIMERO, incluso por encima del `type`:
+  // muchos workspaces (p. ej. Inszone) configuran "On Approval" con type=closed/done
+  // (lo ven casi-cerrado), pero para Assignify es trabajo ENTREGADO que SÍ se muestra
+  // (no cuenta como carga). Si excluyéramos por type, desaparecerían esas tareas.
+  if (statusLower === 'on approval' ||
       statusLower === 'approval' ||
       statusLower === 'pending approval' ||
       statusLower.includes('on approval') ||
       statusLower.includes('approval') ||
       statusLower.includes('review') ||
       statusLower.includes('pending review') ||
-      statusLower.includes('qa') || 
+      statusLower.includes('qa') ||
       statusLower.includes('testing') ||
       statusLower.includes('check') ||
       statusLower.includes('waiting for approval') ||
       statusLower.includes('ready for review')) {
     return 'ON_APPROVAL';
+  }
+
+  // ✅ MULTI-TENANT: el `type` de ClickUp (open|custom|done|closed) es la señal más
+  // fiable para EXCLUIR lo terminado, sin depender del nombre (que varía por workspace).
+  if (type === 'done' || type === 'closed') {
+    return null; // tarea terminada → excluida
   }
 
   // IN PROGRESS - Estados de trabajo activo
@@ -50,8 +63,9 @@ export function mapClickUpStatusToLocal(clickupStatus: string): LocalTaskStatus 
     return null; // Exclude completed tasks
   }
 
-  // Por defecto, estados desconocidos van a TO DO
-  return 'TO_DO';
+  // Sin coincidencia de nombre: decidir por el `type` de ClickUp.
+  // 'custom' suele ser un estado intermedio del flujo → IN_PROGRESS; el resto → TO_DO.
+  return type === 'custom' ? 'IN_PROGRESS' : 'TO_DO';
 }
 
 /**
@@ -90,8 +104,8 @@ export function mapLocalStatusToColumn(localStatus: LocalTaskStatus): string | n
  * @param clickupStatus - The status string from ClickUp
  * @returns true if task is active, false if completed
  */
-export function isActiveTaskStatus(clickupStatus: string): boolean {
-  const mapped = mapClickUpStatusToLocal(clickupStatus);
+export function isActiveTaskStatus(clickupStatus: string, clickupType?: string): boolean {
+  const mapped = mapClickUpStatusToLocal(clickupStatus, clickupType);
   return mapped !== null; // null means completed/excluded
 }
 

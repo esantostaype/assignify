@@ -1,7 +1,8 @@
 import { NextResponse } from 'next/server';
 import { db } from '@/db';
 import { tierList } from '@/db/schema';
-import { asc } from 'drizzle-orm';
+import { asc, eq } from 'drizzle-orm';
+import { getCurrentWorkspaceId } from '@/lib/workspace';
 
 // Lee datos en vivo de la DB: nunca pre-renderizar/cachear en build.
 export const dynamic = 'force-dynamic';
@@ -12,7 +13,9 @@ export const dynamic = 'force-dynamic';
  */
 export async function GET() {
   try {
+    const wsId = await getCurrentWorkspaceId();
     const tiers = await db.query.tierList.findMany({
+      where: eq(tierList.workspaceId, wsId ?? '__none__'),
       orderBy: [asc(tierList.name)] // Esto ordenará S, A, B, C, D, E
     });
 

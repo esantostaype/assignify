@@ -15,7 +15,7 @@ import { eq, gte } from 'drizzle-orm';
 import { Priority } from '@/db/enums';
 import { getNextAvailableStart, calculateWorkingDeadline } from '@/utils/task-calculation-utils';
 import { UserVacation } from '@/interfaces';
-import { getActiveClickUpTasksByUser } from '@/services/clickup-tasks.service';
+import { getActiveClickUpTasksByUser, type ClickUpFetchOptions } from '@/services/clickup-tasks.service';
 import { mapClickUpPriority } from '@/utils/clickup-status-mapping-utils';
 
 // Rango de prioridad: mayor número = más prioritaria.
@@ -144,7 +144,8 @@ async function applyVacationLogic(
 export async function calculateParallelPriorityInsertion(
   userId: string,
   priority: Priority,
-  durationDays: number
+  durationDays: number,
+  clickupOpts: ClickUpFetchOptions = {}
 ): Promise<ParallelInsertionResult> {
   const now = new Date();
   const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
@@ -152,7 +153,7 @@ export async function calculateParallelPriorityInsertion(
   // Tareas activas del usuario leídas EN VIVO de ClickUp (no de la DB).
   // fetchActiveClickUpTasks ya excluye completadas; conservamos solo las que aún
   // cuentan (deadline >= hoy) para el cálculo de carriles por prioridad.
-  const clickUpTasks = await getActiveClickUpTasksByUser(userId);
+  const clickUpTasks = await getActiveClickUpTasksByUser(userId, clickupOpts);
   const tasks: TaskRow[] = clickUpTasks
     .map((t) => ({
       id: t.clickupId,

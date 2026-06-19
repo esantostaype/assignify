@@ -9,6 +9,7 @@ import { useQueryClient } from '@tanstack/react-query'
 import { taskKeys } from '@/hooks/queries/useTasks'
 import { workloadKeys } from '@/hooks/queries/useWorkload'
 import { requestNotificationPermission, notifyTaskChange } from '@/utils/notifications'
+import { useWorkspaces } from '@/hooks/queries/useWorkspaces'
 
 interface TaskUpdatePayload {
   taskId?: string
@@ -33,6 +34,9 @@ const lastNotified = { taskId: undefined as string | undefined, at: 0 }
 
 export const usePusherTaskSync = () => {
   const queryClient = useQueryClient()
+  // El cliente solo escucha el canal de SU workspace activo (aislamiento por inquilino).
+  const { data: wsData } = useWorkspaces()
+  const activeId = wsData?.activeId
 
   useEffect(() => {
     // Pedir permiso de notificaciones del navegador (si aún no se decidió).
@@ -40,10 +44,12 @@ export const usePusherTaskSync = () => {
 
     const key = process.env.NEXT_PUBLIC_PUSHER_KEY
     const cluster = process.env.NEXT_PUBLIC_PUSHER_CLUSTER
-    if (!key || !cluster) return
+    if (!key || !cluster || !activeId) return
 
     const client = getPusher(key, cluster)
-    const channel = client.subscribe(taskKeys.all[0]) // 'tasks'
+    // Canal por workspace: mismo patrón que taskChannelForWorkspace() en src/lib/pusher.ts.
+    const channelName = `tasks-${activeId}`
+    const channel = client.subscribe(channelName)
 
     const handler = (payload: TaskUpdatePayload) => {
       // ClickUp no envía el nombre en el webhook; intentamos sacarlo de la caché.
@@ -96,8 +102,11 @@ export const usePusherTaskSync = () => {
     channel.bind('task-updated', handler)
 
     return () => {
-      // Solo quitamos NUESTRO handler; la conexión singleton se reutiliza.
+      // Quitamos NUESTRO handler y nos desuscribimos del canal del workspace; la
+      // conexión singleton se reutiliza. Al cambiar de workspace activo, el effect
+      // se re-ejecuta y deja el canal previo antes de suscribir el nuevo.
       channel.unbind('task-updated', handler)
+      client.unsubscribe(channelName)
     }
-  }, [queryClient])
+  }, [queryClient, activeId])
 }

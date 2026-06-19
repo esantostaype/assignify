@@ -92,6 +92,24 @@ export default function LoginPage() {
               {loading ? "Signing in..." : "Sign In"}
             </Button>
           </form>
+
+          {/* [SaaS v2] Login con ClickUp OAuth. Requiere AUTH_CLICKUP_ID/SECRET y la
+              OAuth app creada en ClickUp; si no, ClickUp responderá con error. */}
+          <div className="my-4 flex items-center gap-3 text-xs text-(--color-text-muted)">
+            <span className="h-px flex-1 bg-(--color-border-default)" />
+            or
+            <span className="h-px flex-1 bg-(--color-border-default)" />
+          </div>
+          <Button
+            type="button"
+            variant="outlined"
+            color="neutral"
+            fullWidth
+            disabled={loading}
+            onClick={() => signIn("clickup", { callbackUrl: "/tasks" })}
+          >
+            Continue with ClickUp
+          </Button>
         </div>
       </div>
   );

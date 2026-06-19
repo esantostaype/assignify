@@ -18,7 +18,7 @@ import { hotToast as toast } from "@/lib/hotToast";
 import { useQueryClient } from "@tanstack/react-query";
 
 import {
-  TaskKindSwitch,
+  TaskTypeSelect,
   TaskNameField,
   BrandSelect,
   TierSelect,
@@ -31,12 +31,8 @@ import {
 
 import { useTaskData, useTaskSuggestion } from "@/hooks";
 import { taskKeys } from "@/hooks/queries/useTasks";
-// Importa directo del módulo (no del barrel @/utils): el barrel arrastra
-// utilidades que tocan la DB (@/db) y contaminaría este bundle de cliente,
-// rompiendo el prerender (Element type is invalid).
-import { getTypeKind } from "@/utils/taskUtils";
 import { validationSchema } from "@/validation/taskValidation";
-import { FormValues, User, TaskType, RankedCandidate } from "@/interfaces";
+import { FormValues, User, RankedCandidate } from "@/interfaces";
 
 interface FormikSuggestionLogicProps {
   setSuggestedAssignment: Dispatch<
@@ -152,7 +148,8 @@ export const CreateTaskForm: FC = () => {
 
   const { types, brands, users, tiers, loading: dataLoading } = useTaskData();
   const [loading, setLoading] = useState(false);
-  const [selectedKind, setSelectedKind] = useState<"UX/UI" | "Graphic">("UX/UI");
+  // [SaaS] Tipo de tarea elegido (id), de los tipos PROPIOS del workspace.
+  const [selectedTypeId, setSelectedTypeId] = useState<string | null>(null);
   const [triggerSuggestion, setTriggerSuggestion] = useState(0);
 
   const [suggestedAssignment, setSuggestedAssignment] = useState<{
@@ -167,18 +164,15 @@ export const CreateTaskForm: FC = () => {
   // tanto tras crear con éxito como en la auto-limpieza por inactividad.
   // (Los valores de Formik —name, tierId, level, etc.— los reinicia resetForm.)
   const resetLocalState = useCallback(() => {
-    setSelectedKind("UX/UI");
+    setSelectedTypeId(null);
     setTriggerSuggestion(0);
     setSuggestedAssignment(null);
     setCandidates([]);
     setUserHasManuallyChanged(false);
   }, []);
 
-  // El tipo se determina por el kind seleccionado (UX/UI o Graphic).
-  const filteredTypes = (types as TaskType[]).filter(
-    (type) => getTypeKind(type.name) === selectedKind
-  );
-  const currentTypeId = filteredTypes.length > 0 ? filteredTypes[0].id : undefined;
+  // El tipo lo elige el usuario directamente entre los tipos del workspace.
+  const currentTypeId = selectedTypeId ? parseInt(selectedTypeId) : undefined;
 
   // Formulario SIEMPRE vacío al abrir/limpiar: el usuario elige cada campo.
   const initialValues: FormValues = {
@@ -195,7 +189,7 @@ export const CreateTaskForm: FC = () => {
   const handleSubmit = async (values: FormValues, { resetForm }: any) => {
     try {
       if (!currentTypeId) {
-        toast.error({ title: "No type found for the selected kind", description: "Pick a different kind." });
+        toast.error({ title: "Select a task type", description: "Pick one of your workspace's task types." });
         return;
       }
 
@@ -339,16 +333,19 @@ export const CreateTaskForm: FC = () => {
                 onInactivityReset={handleInactivityReset}
               />
 
-              <TaskKindSwitch
-                selectedKind={selectedKind}
-                onKindChange={(kind) => {
-                  setSelectedKind(kind);
+              <TaskTypeSelect
+                types={types}
+                value={selectedTypeId}
+                onChange={(typeId) => {
+                  setSelectedTypeId(typeId);
                   setTimeout(() => {
                     setFieldValue("tierId", "");
                     setFieldValue("durationDays", "");
                     resetDependentFields();
+                    setTriggerSuggestion((prev) => prev + 1);
                   }, 0);
                 }}
+                loading={dataLoading}
               />
 
               <TaskNameField touched={touched.name} error={errors.name} />

@@ -7,7 +7,8 @@
 import { NextResponse } from 'next/server'
 import { db } from '@/db'
 import { tierList, taskType as taskTypeTable, brand as brandTable, user as userTable, userRole, taskMeta } from '@/db/schema'
-import { eq, inArray, or, isNull } from 'drizzle-orm'
+import { eq, and, inArray, or, isNull } from 'drizzle-orm'
+import { getCurrentClickUpContext } from '@/lib/workspace'
 import { Level } from '@/db/enums'
 import { getBestUserWithCache } from '@/services/task-assignment.service'
 import { createTaskInClickUp } from '@/services/clickup.service'
@@ -55,11 +56,14 @@ export async function POST(req: Request) {
       ? levelParam
       : 'MID') as Level
 
-    // Config desde la DB (Drizzle/Turso).
+    // [SaaS] Contexto del inquilino: token de ClickUp + su workspace (== teamId).
+    const { token: clickupToken, teamId: wsId } = await getCurrentClickUpContext()
+
+    // Config desde la DB (Drizzle/Turso), acotada al workspace.
     const [tier, type, brand] = await Promise.all([
-      db.query.tierList.findFirst({ where: eq(tierList.id, tierId) }),
-      db.query.taskType.findFirst({ where: eq(taskTypeTable.id, typeId) }),
-      db.query.brand.findFirst({ where: eq(brandTable.id, brandId) }),
+      db.query.tierList.findFirst({ where: and(eq(tierList.id, tierId), eq(tierList.workspaceId, wsId ?? '__none__')) }),
+      db.query.taskType.findFirst({ where: and(eq(taskTypeTable.id, typeId), eq(taskTypeTable.workspaceId, wsId ?? '__none__')) }),
+      db.query.brand.findFirst({ where: and(eq(brandTable.id, brandId), eq(brandTable.workspaceId, wsId ?? '__none__')) }),
     ])
 
     if (!tier) return NextResponse.json({ error: 'Tier not found' }, { status: 404 })
@@ -76,7 +80,7 @@ export async function POST(req: Request) {
       const specificUsersResults = await Promise.all(
         assignedUserIds.map(userId =>
           db.query.user.findFirst({
-            where: eq(userTable.id, userId),
+            where: and(eq(userTable.id, userId), eq(userTable.workspaceId, wsId ?? '__none__')),
             with: {
               roles: { where: or(eq(userRole.brandId, brandId), isNull(userRole.brandId)) },
             },
@@ -100,7 +104,7 @@ export async function POST(req: Request) {
 
       usersToAssign = validUsers.map(user => user.id)
     } else {
-      const bestUser = await getBestUserWithCache(typeId, brandId, priority, durationDays, reqLevel)
+      const bestUser = await getBestUserWithCache(typeId, brandId, priority, durationDays, reqLevel, wsId, clickupToken)
 
       if (!bestUser) {
         return NextResponse.json({
@@ -118,7 +122,7 @@ export async function POST(req: Request) {
 
     const insertionResults = await Promise.all(
       usersToAssign.map(async (userId) => {
-        const result = await calculateParallelPriorityInsertion(userId, priority, userDuration)
+        const result = await calculateParallelPriorityInsertion(userId, priority, userDuration, { token: clickupToken, teamId: wsId })
         return { userId, ...result }
       })
     )
@@ -145,7 +149,7 @@ export async function POST(req: Request) {
       tier,
       brand: brandForClickUp,
       customDurationDays: isCustomDuration ? durationDays : undefined,
-    })
+    }, clickupToken)
 
     // Persistir la metadata SIDECAR (write-once): lo inmutable de creación que
     // ClickUp no puede representar (tier/duración real, nivel) + el rastro de la
@@ -163,6 +167,7 @@ export async function POST(req: Request) {
         suggestedUserId: suggestedUserId ?? null,
         assignedUserIds: usersToAssign,
         wasOverride: suggestedUserId ? !usersToAssign.includes(suggestedUserId) : false,
+        workspaceId: wsId,
       })
     } catch (metaError) {
       console.error('No se pudo guardar task_meta (la tarea sí se creó en ClickUp):', metaError)

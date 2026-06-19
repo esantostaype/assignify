@@ -21,6 +21,12 @@ viven las tareas) y se despliega en **Vercel**.
 > Comunícate SIEMPRE en español. Los commits van en español y terminan con
 > `Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>`.
 
+> **Hay una transformación a SaaS multi-inquilino EN CURSO en la rama
+> `feat/saas-multi-tenant`** (login con ClickUp OAuth + datos aislados por workspace).
+> Si trabajas en esa rama o en lo multi-tenant, consulta la skill
+> **`assignify-saas-roadmap`** (tiene el estado, los gotchas y cómo retomar). `main`
+> sigue single-tenant.
+
 ## Stack
 
 - **Next.js 14 (App Router) + TypeScript**, React Query, Zustand, Formik + Yup.
