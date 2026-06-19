@@ -98,7 +98,7 @@ tareas, y todo queda **aislado por inquilino** (un usuario nunca ve datos de otr
       el PK debería ser (workspaceId, id). Migración posterior.
     - Unicidad real por (workspaceId, …) en task_type/tier_list/system_settings.
   - Requiere `DEFAULT_WORKSPACE_ID=90170099166` en `.env`/Vercel.
-- **Fase 3 — HECHA (threading completo); falta validar en vivo + hardening):**
+- **Fase 3 — CERRADA (implementada; pendiente solo validación en vivo del usuario):**
   - `getCurrentClickUpContext()` → `{ token, teamId }` (token de ClickUp del usuario,
     descifrado; fallback global+DEFAULT_WORKSPACE_ID para el admin email/password).
   - Enhebrado `{token, teamId}` por TODA la capa: `clickup-tasks.service`
@@ -111,17 +111,42 @@ tareas, y todo queda **aislado por inquilino** (un usuario nunca ve datos de otr
     Verificado que los brand-lists viven bajo **"Inszoneins" = 9017044866** (ese es el
     team real). Re-backfill aplicado a 9017044866. → `DEFAULT_WORKSPACE_ID=9017044866`.
     El workspace de pruebas "Inszone Insurance" (ex-"OAuth") = 90171327636.
-  - **Pendiente**: validar en vivo (admin Inszone vs login ClickUp del workspace de
-    pruebas); hardening de Fase 2 (settings por workspace, sub-rutas, PK de user,
-    uniques); selector multi-workspace; webhooks por workspace (Fase 4).
-  - **OJO discrepancia de ids**: el token global ve "Inszoneins"=9017044866 y
-    "OAuth"=90171327636, pero los brands traen team_id 90170099166. Para Fase 2
-    basta la CONSISTENCIA interna (todo etiquetado 90170099166 + `DEFAULT_WORKSPACE_ID`
-    = 90170099166 → el admin ve su data). Resolver cuál es el id "real" de ClickUp
-    es asunto de Fase 3 (lectura de tareas por token/workspace).
-  - **Para activar/probar Fase 2**: poner `DEFAULT_WORKSPACE_ID=90170099166` en `.env`
-    (y Vercel). El usuario que entra por ClickUp cae en su workspace propio (vacío);
-    para ver la data de Inszone, entrar con email/password (→ DEFAULT).
+  - **Fix de cierre**: "On Approval" con `type=closed/done` ya NO se excluye (Inszone
+    lo tiene como `closed`); la palabra clave de aprobación gana al `type`. +test.
+  - **Validación en vivo (la confirma el usuario, no bloquea el código):**
+    - Admin email/password → kanban SOLO de Inszone (las 3 tareas del workspace de
+      pruebas ya no se cuelan).
+    - Login ClickUp → solo el workspace que resolvió ese login.
+
+### Fase 4 — PRÓXIMA SESIÓN. Pieza central: SYNC DE LISTAS/BRANDS POR WORKSPACE.
+1. **Sync de listas/brands por workspace** (lo más importante): página estilo
+   `/designers` que DESCUBRE las listas del workspace (crawl space→folder→list con el
+   token del usuario — reusar la lógica de `clickup-tasks.service`) y deja ELEGIR
+   cuáles son asignables; se guardan como `brand` con su `workspaceId`/`teamId`.
+   Endpoint nuevo `/api/sync/clickup-lists` (GET descubre, POST guarda). Hoy los brands
+   se configuran a mano → un workspace nuevo no puede poblarlos. Estructura ClickUp =
+   Team > Folder > List; un brand = una List (puede colgar de un space o de una
+   carpeta). Naming: "Brand" es de Inszone; genérico = "List/Project" (decidir si
+   renombrar o usar etiqueta configurable por workspace).
+2. **Selector multi-workspace**: guardar TODOS los teams autorizados y permitir
+   elegir/cambiar el activo (hoy se toma `teams[0]` en `events.signIn`). Persistir el
+   elegido; `getCurrentClickUpContext` usa ese.
+3. **Webhooks por workspace**: registrar un webhook por workspace al conectar (la OAuth
+   app de ClickUp lo permite vía API); enrutar/validar por workspace (hoy hay 1 global).
+4. **Cerrar hardening de Fase 2**: `getAppSettings` por workspace; scopear sub-rutas
+   `/api/users/[userId]`(roles/vacations), creación de brands/tiers y `/api/settings`;
+   PK de `user` → (workspaceId, clickupUserId); uniques por (workspaceId, …).
+5. **Onboarding**: primer login ClickUp → elegir workspace → sync listas + miembros →
+   definir tipos/tiers.
+
+### Cómo arrancar mañana (checklist)
+- Rama **`feat/saas-multi-tenant`** (NO mergear a `main` hasta validar). Seguir ahí.
+- `.env`: `AUTH_SECRET`, `AUTH_CLICKUP_ID`/`AUTH_CLICKUP_SECRET`, `ENCRYPTION_KEY` (opc.),
+  y **`DEFAULT_WORKSPACE_ID=9017044866`** (Inszone real). Luego `npm run dev`.
+- Ids útiles: **Inszone real = 9017044866**; workspace de pruebas
+  "Inszone Insurance" = **90171327636** (tiene 3 tareas de prueba en distintos status).
+- Validar Fase 3 (admin Inszone vs login ClickUp) ANTES de empezar Fase 4.
+- Verificación: `npx tsc --noEmit` · `npm run build` · `npm test` (20 tests).
 
 ## Plan por fases (sugerido)
 
