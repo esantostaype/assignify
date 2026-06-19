@@ -24,12 +24,12 @@ export const BrandSelect: React.FC<BrandSelectProps> = ({
   <div>
     <Typography variant="label" className="flex items-center gap-1.5 mb-1.5">
       <Icon icon={PiTag} size={18} />
-      Brand
+      List
     </Typography>
     <Select
       value={value}
       onChange={(val) => onChange(val)}
-      placeholder={loading ? "Loading brands..." : "Select a brand"}
+      placeholder={loading ? "Loading lists..." : "Select a list"}
       disabled={loading}
       error={touched && error ? error : undefined}
       options={brands.map((brand) => ({ value: brand.id, label: brand.name }))}

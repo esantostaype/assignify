@@ -1,7 +1,8 @@
 'use client'
 import { useState } from 'react'
-import { Queue01Icon, Settings01Icon, SwatchIcon, UserGroup03Icon } from '@hugeicons/core-free-icons'
+import { Queue01Icon, Settings01Icon, SwatchIcon, UserGroup03Icon, Folder01Icon } from '@hugeicons/core-free-icons'
 import { NavItem, SettingsForm, TaskTypesForm } from '@/components'
+import { ListsSyncForm } from '@/components/ListsSyncForm'
 import { Button, Modal, AlertDialog } from '@/components/ui'
 import { Icon, PiUser, PiSignOut } from '@/lib/icons'
 import { useAuth } from '@/contexts/AuthContext'
@@ -15,6 +16,7 @@ export const Header = () => {
   // reference project: no global modal store holding a JSX snapshot — the
   // content stays part of the live React tree and reflects updates).
   const [typesOpen, setTypesOpen] = useState(false)
+  const [listsOpen, setListsOpen] = useState(false)
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [logoutOpen, setLogoutOpen] = useState(false)
 
@@ -30,6 +32,7 @@ export const Header = () => {
     { href: '/tasks', label: 'Tasks', icon: Queue01Icon },
     { href: '/designers', label: 'Designers', icon: UserGroup03Icon },
     { onClick: () => setTypesOpen(true), label: 'Types', icon: SwatchIcon },
+    { onClick: () => setListsOpen(true), label: 'Lists', icon: Folder01Icon },
     { onClick: () => setSettingsOpen(true), label: 'Settings', icon: Settings01Icon }
   ]
 
@@ -78,6 +81,17 @@ export const Header = () => {
         size="md"
       >
         <TaskTypesForm />
+      </Modal>
+
+      {/* Lists — elegir qué listas de ClickUp del workspace son asignables (brands). */}
+      <Modal
+        open={listsOpen}
+        onClose={() => setListsOpen(false)}
+        title="Assignable Lists"
+        description="Choose which ClickUp lists of your workspace can receive tasks"
+        size="md"
+      >
+        <ListsSyncForm />
       </Modal>
 
       {/* Settings — larger configuration modal */}
