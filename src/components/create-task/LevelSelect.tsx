@@ -32,7 +32,7 @@ export const LevelSelect: React.FC<LevelSelectProps> = ({
     <Select
       value={value}
       onChange={(val) => onChange(val)}
-      placeholder="Mid"
+      placeholder="Select level"
       options={LEVEL_OPTIONS}
       error={touched && error ? error : undefined}
     />
