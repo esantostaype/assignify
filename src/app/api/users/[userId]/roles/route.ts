@@ -3,6 +3,7 @@ import { NextResponse } from 'next/server';
 import { db } from '@/db';
 import { user, taskType, brand, userRole } from '@/db/schema';
 import { eq, and, isNull } from 'drizzle-orm';
+import { getCurrentWorkspaceId } from '@/lib/workspace';
 
 // Lee/escribe datos en vivo de la DB: nunca pre-renderizar/cachear en build.
 export const dynamic = 'force-dynamic';
@@ -40,9 +41,12 @@ export async function POST(req: Request, { params }: RouteParams) {
 
     console.log(`🔄 Adding role to user ${userId}: typeId=${typeId}, brandId=${brandId || 'null'}, isPrimary=${isPrimary ? 'true' : 'false'}`);
 
-    // Verificar que el usuario existe
+    // [SaaS] Workspace activo: el rol pertenece a este inquilino.
+    const wsId = await getCurrentWorkspaceId();
+
+    // Verificar que el usuario existe EN el workspace activo.
     const existingUser = await db.query.user.findFirst({
-      where: eq(user.id, userId)
+      where: and(eq(user.id, userId), eq(user.workspaceId, wsId ?? '__none__'))
     });
 
     if (!existingUser) {
@@ -78,6 +82,7 @@ export async function POST(req: Request, { params }: RouteParams) {
     // Verificar que el rol no existe ya
     const existingRole = await db.query.userRole.findFirst({
       where: and(
+        eq(userRole.workspaceId, wsId ?? '__none__'),
         eq(userRole.userId, userId),
         eq(userRole.typeId, typeId),
         brandId ? eq(userRole.brandId, brandId) : isNull(userRole.brandId)
@@ -104,7 +109,8 @@ export async function POST(req: Request, { params }: RouteParams) {
         userId: userId,
         typeId: typeId,
         brandId: normalizedBrandId,
-        isPrimary: isPrimary ?? false
+        isPrimary: isPrimary ?? false,
+        workspaceId: wsId
       })
       .returning();
 

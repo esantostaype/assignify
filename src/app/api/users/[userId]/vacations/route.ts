@@ -3,6 +3,7 @@ import { NextResponse } from 'next/server';
 import { db } from '@/db';
 import { user, userVacation } from '@/db/schema';
 import { eq, and, or, lte, gte } from 'drizzle-orm';
+import { getCurrentWorkspaceId } from '@/lib/workspace';
 
 // Lee/escribe datos en vivo de la DB: nunca pre-renderizar/cachear en build.
 export const dynamic = 'force-dynamic';
@@ -65,9 +66,12 @@ export async function POST(req: Request, { params }: RouteParams) {
       }, { status: 400 });
     }
 
-    // Verificar que el usuario existe
+    // [SaaS] Workspace activo: la vacación pertenece a este inquilino.
+    const wsId = await getCurrentWorkspaceId();
+
+    // Verificar que el usuario existe EN el workspace activo.
     const existingUser = await db.query.user.findFirst({
-      where: eq(user.id, userId),
+      where: and(eq(user.id, userId), eq(user.workspaceId, wsId ?? '__none__')),
       columns: { id: true, name: true }
     });
 
@@ -80,6 +84,7 @@ export async function POST(req: Request, { params }: RouteParams) {
     // Verificar conflictos con vacaciones existentes
     const conflictingVacations = await db.query.userVacation.findMany({
       where: and(
+        eq(userVacation.workspaceId, wsId ?? '__none__'),
         eq(userVacation.userId, userId),
         or(
           and(
@@ -115,7 +120,8 @@ export async function POST(req: Request, { params }: RouteParams) {
       .values({
         userId: userId,
         startDate: startDateObj,
-        endDate: endDateObj
+        endDate: endDateObj,
+        workspaceId: wsId
       })
       .returning();
 

@@ -77,7 +77,7 @@ export async function DELETE(req: Request, { params }: RouteParams) {
     // Eliminar el rol
     await db.delete(userRole).where(eq(userRole.id, roleIdInt));
 
-    console.log(`✅ Role deleted successfully: ${existingRole.type.name} ${existingRole.brand ? `for ${existingRole.brand.name}` : '(Global)'} from user ${existingRole.user.name}`);
+    console.log(`✅ Role deleted successfully: ${existingRole.type.name} ${existingRole.brand ? `for ${existingRole.brand.name}` : '(Global)'} from user ${existingRole.user?.name ?? 'unknown'}`);
 
     return NextResponse.json({
       message: 'Role deleted successfully',
@@ -85,7 +85,7 @@ export async function DELETE(req: Request, { params }: RouteParams) {
         id: existingRole.id,
         typeName: existingRole.type.name,
         brandName: existingRole.brand?.name || 'Global',
-        userName: existingRole.user.name
+        userName: existingRole.user?.name ?? null
       }
     });
 

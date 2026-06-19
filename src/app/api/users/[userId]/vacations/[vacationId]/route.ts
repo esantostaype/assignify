@@ -62,7 +62,7 @@ export async function DELETE(req: Request, { params }: RouteParams) {
     const isOngoing = existingVacation.startDate <= now && existingVacation.endDate >= now;
 
     if (isOngoing) {
-      console.log(`⚠️ Warning: Deleting ongoing vacation for user ${existingVacation.user.name}`);
+      console.log(`⚠️ Warning: Deleting ongoing vacation for user ${existingVacation.user?.name ?? 'unknown'}`);
     }
 
     // Eliminar la vacación
@@ -72,13 +72,13 @@ export async function DELETE(req: Request, { params }: RouteParams) {
       (existingVacation.endDate.getTime() - existingVacation.startDate.getTime()) / (1000 * 60 * 60 * 24)
     );
 
-    console.log(`✅ Vacation deleted successfully: ${durationDays} days vacation for user ${existingVacation.user.name}`);
+    console.log(`✅ Vacation deleted successfully: ${durationDays} days vacation for user ${existingVacation.user?.name ?? 'unknown'}`);
 
     return NextResponse.json({
       message: 'Vacation deleted successfully',
       deletedVacation: {
         id: existingVacation.id,
-        userName: existingVacation.user.name,
+        userName: existingVacation.user?.name ?? null,
         startDate: existingVacation.startDate.toISOString().split('T')[0],
         endDate: existingVacation.endDate.toISOString().split('T')[0],
         durationDays,

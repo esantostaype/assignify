@@ -5,7 +5,7 @@
 //   - DateTime → integer timestamp en ms (mode: 'timestamp_ms')
 //   - Boolean → integer (mode: 'boolean')
 //   - Json → text (mode: 'json')
-import { sqliteTable, text, integer, real, unique, index } from 'drizzle-orm/sqlite-core'
+import { sqliteTable, text, integer, real, unique, index, primaryKey } from 'drizzle-orm/sqlite-core'
 import { relations } from 'drizzle-orm'
 
 export const TIER_NAMES = ['S', 'A', 'B', 'C', 'D', 'E'] as const
@@ -33,33 +33,41 @@ export const tierList = sqliteTable('tier_list', {
   updatedAt: updatedAt(),
 })
 
-export const user = sqliteTable('user', {
-  id: text('id').primaryKey(),
-  name: text('name').notNull(),
-  email: text('email').notNull().unique(),
-  active: integer('active', { mode: 'boolean' }).notNull().default(false),
-  // Nivel del diseñador (Junior/Mid/Senior). Decide el escalado de asignación.
-  // Los users existentes toman 'MID' por defecto.
-  level: text('level', { enum: LEVEL_NAMES }).notNull().default('MID'),
-  // [SaaS] Workspace al que pertenece el miembro (nullable; backfill).
-  workspaceId: text('workspace_id'),
-  createdAt: createdAt(),
-  updatedAt: updatedAt(),
-})
+// [SaaS] PK COMPUESTO (id de ClickUp + workspaceId): la MISMA persona puede ser
+// miembro de varios workspaces. `email` deja de ser único global (mismo correo en
+// distintos workspaces). workspaceId se deja nullable a propósito para no romper los
+// inserts del código single-tenant viejo que comparte esta Turso (SQLite admite NULL
+// en columnas de PK compuesto).
+export const user = sqliteTable(
+  'user',
+  {
+    id: text('id').notNull(),
+    name: text('name').notNull(),
+    email: text('email').notNull(),
+    active: integer('active', { mode: 'boolean' }).notNull().default(false),
+    // Nivel del diseñador (Junior/Mid/Senior). Decide el escalado de asignación.
+    level: text('level', { enum: LEVEL_NAMES }).notNull().default('MID'),
+    workspaceId: text('workspace_id'),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (t) => ({ pk: primaryKey({ columns: [t.id, t.workspaceId] }) })
+)
 
 export const userVacation = sqliteTable(
   'user_vacation',
   {
     id: integer('id').primaryKey({ autoIncrement: true }),
-    userId: text('user_id')
-      .notNull()
-      .references(() => user.id, { onDelete: 'cascade' }),
+    // Sin FK a user.id: el PK de user ahora es compuesto (id, workspaceId).
+    userId: text('user_id').notNull(),
     startDate: integer('start_date', { mode: 'timestamp_ms' }).notNull(),
     endDate: integer('end_date', { mode: 'timestamp_ms' }).notNull(),
+    // [SaaS] Workspace dueño de la vacación (acota la relación con user).
+    workspaceId: text('workspace_id'),
     createdAt: createdAt(),
     updatedAt: updatedAt(),
   },
-  (t) => ({ uniq: unique().on(t.userId, t.startDate, t.endDate) })
+  (t) => ({ uniq: unique().on(t.workspaceId, t.userId, t.startDate, t.endDate) })
 )
 
 export const taskType = sqliteTable('task_type', {
@@ -88,19 +96,18 @@ export const userRole = sqliteTable(
   'user_role',
   {
     id: integer('id').primaryKey({ autoIncrement: true }),
-    userId: text('user_id')
-      .notNull()
-      .references(() => user.id),
+    // Sin FK a user.id: el PK de user ahora es compuesto (id, workspaceId).
+    userId: text('user_id').notNull(),
     typeId: integer('type_id')
       .notNull()
       .references(() => taskType.id),
     brandId: text('brand_id').references(() => brand.id),
     // Cargo PRIMARIO (true) vs SECUNDARIO (false) para este tipo de tarea.
-    // Los roles existentes quedan en false (secundario); los primarios se marcan desde la UI.
-    // El motor de asignación prefiere primarios y escala a secundarios / otros cargos si están saturados.
     isPrimary: integer('is_primary', { mode: 'boolean' }).notNull().default(false),
+    // [SaaS] Workspace dueño del rol (acota la relación con user).
+    workspaceId: text('workspace_id'),
   },
-  (t) => ({ uniq: unique().on(t.userId, t.typeId, t.brandId) })
+  (t) => ({ uniq: unique().on(t.workspaceId, t.userId, t.typeId, t.brandId) })
 )
 
 // Metadata SIDECAR de cada tarea creada por Assignify, keyed por el id de ClickUp.
@@ -210,7 +217,11 @@ export const userRelations = relations(user, ({ many }) => ({
 }))
 
 export const userVacationRelations = relations(userVacation, ({ one }) => ({
-  user: one(user, { fields: [userVacation.userId], references: [user.id] }),
+  // Relación COMPUESTA (userId + workspaceId) → user(id, workspaceId).
+  user: one(user, {
+    fields: [userVacation.userId, userVacation.workspaceId],
+    references: [user.id, user.workspaceId],
+  }),
 }))
 
 export const brandRelations = relations(brand, ({ many }) => ({
@@ -222,7 +233,11 @@ export const taskTypeRelations = relations(taskType, ({ many }) => ({
 }))
 
 export const userRoleRelations = relations(userRole, ({ one }) => ({
-  user: one(user, { fields: [userRole.userId], references: [user.id] }),
+  // Relación COMPUESTA (userId + workspaceId) → user(id, workspaceId).
+  user: one(user, {
+    fields: [userRole.userId, userRole.workspaceId],
+    references: [user.id, user.workspaceId],
+  }),
   type: one(taskType, { fields: [userRole.typeId], references: [taskType.id] }),
   brand: one(brand, { fields: [userRole.brandId], references: [brand.id] }),
 }))
