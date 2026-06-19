@@ -150,12 +150,23 @@ tareas, y todo queda **aislado por inquilino** (un usuario nunca ve datos de otr
   workspace (se eliminó el switch UX/UI|Graphic y `getTypeKind`/`TaskKindSwitch`).
 - ✅ **Sync de listas/brands**: `/api/sync/clickup-lists` (GET descubre, POST guarda) +
   `ListsSyncForm` + entrada "Lists" en el header. BrandSelect ahora dice "List".
+- ✅ **Selector multi-workspace**: columna `clickup_connection.workspaces` (JSON con
+  TODOS los teams autorizados; el activo sigue en `workspaceId`, que es lo que leen
+  `getCurrentWorkspaceId`/`getCurrentClickUpContext`). `events.signIn` ya guarda todos
+  los teams y **preserva el activo elegido** si sigue disponible. `GET/PATCH
+  /api/workspaces` (el PATCH valida que el workspace sea uno autorizado). Hook
+  `useWorkspaces`/`useSetActiveWorkspace` + `WorkspaceSwitcher` en el Header (solo si
+  hay >1; al cambiar → `window.location.reload` para releer todo con el nuevo activo).
+  Migración manual `scripts/add-workspaces-column.js` (ADD COLUMN nullable, idempotente;
+  **NO** `drizzle-kit push`). **OJO**: las conexiones previas necesitan **RE-LOGIN** con
+  ClickUp para poblar `workspaces` (antes solo se guardaba `teams[0]`); hasta entonces el
+  GET devuelve solo el activo y el selector queda oculto.
 
 **Pendiente:**
 - **brand.name es único GLOBAL** → dos workspaces con una lista del mismo nombre
   chocan (el POST lo cachea y reporta). Hardening: unique por (workspaceId, name).
-- **Selector multi-workspace** (hoy `teams[0]`), **webhooks por workspace**,
-  `getAppSettings` por workspace, scopear `/api/settings` y creación de tiers.
+- **Webhooks por workspace**, `getAppSettings` por workspace, scopear `/api/settings`
+  y creación de tiers.
 
 ### (Referencia) Plan original de Fase 4
 1. **Sync de listas/brands por workspace** (lo más importante): página estilo

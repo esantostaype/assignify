@@ -84,26 +84,32 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       const enc = encryptSecret(token)
       const now = new Date()
 
-      // Workspace activo: consultamos los workspaces autorizados del usuario y
-      // guardamos el primero (un picker para multi-workspace es fase posterior).
-      // Si falla, NO bloqueamos el login; el workspace se completará luego.
-      let workspaceId: string | null = null
-      let workspaceName: string | null = null
+      // Workspaces autorizados: traemos TODOS los teams del usuario (el selector
+      // multi-workspace los lista). Si el fetch falla, NO bloqueamos el login: la
+      // lista se completará en el próximo acceso.
+      let workspaces: { id: string; name: string | null }[] = []
       try {
         const res = await fetch('https://api.clickup.com/api/v2/team', {
           headers: { Authorization: `Bearer ${token}` },
         })
         if (res.ok) {
           const data = (await res.json()) as { teams?: { id: string | number; name?: string }[] }
-          const team = data.teams?.[0]
-          if (team) {
-            workspaceId = String(team.id)
-            workspaceName = team.name ?? null
-          }
+          workspaces = (data.teams ?? []).map((t) => ({ id: String(t.id), name: t.name ?? null }))
         }
       } catch {
         /* sin bloquear el login */
       }
+
+      // Activo: si ya había uno elegido y sigue entre los autorizados, lo
+      // respetamos (no pisamos la elección del usuario); si no, el primero.
+      const existing = await db.query.clickupConnection.findFirst({
+        where: eq(clickupConnection.clickupUserId, user.id),
+      })
+      const prevActive = existing?.workspaceId ?? null
+      const active =
+        (prevActive ? workspaces.find((w) => w.id === prevActive) : undefined) ?? workspaces[0]
+      const workspaceId = active?.id ?? prevActive
+      const workspaceName = active?.name ?? existing?.workspaceName ?? null
 
       await db
         .insert(clickupConnection)
@@ -114,6 +120,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
           accessTokenEnc: enc,
           workspaceId,
           workspaceName,
+          workspaces: workspaces.length ? workspaces : null,
         })
         .onConflictDoUpdate({
           target: clickupConnection.clickupUserId,
@@ -121,8 +128,10 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
             accessTokenEnc: enc,
             email: cu?.email ?? user.email ?? null,
             username: cu?.username ?? user.name ?? null,
-            // Solo sobreescribe el workspace si lo pudimos resolver ahora.
+            // Activo resuelto (preserva el previo si sigue disponible).
             ...(workspaceId ? { workspaceId, workspaceName } : {}),
+            // Lista completa: solo si la trajimos ahora (no la borramos si falló el fetch).
+            ...(workspaces.length ? { workspaces } : {}),
             updatedAt: now,
           },
         })

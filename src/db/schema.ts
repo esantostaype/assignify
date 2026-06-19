@@ -163,9 +163,13 @@ export const clickupConnection = sqliteTable('clickup_connection', {
   username: text('username'),
   // Token de acceso de ClickUp cifrado (AES-256-GCM); ver src/lib/crypto.ts.
   accessTokenEnc: text('access_token_enc').notNull(),
-  // Workspace activo del usuario (se completa en fase 2; por ahora opcional).
+  // Workspace ACTIVO del usuario (el que aísla su data). Se elige entre `workspaces`
+  // desde el WorkspaceSwitcher; lo leen getCurrentWorkspaceId/getCurrentClickUpContext.
   workspaceId: text('workspace_id'),
   workspaceName: text('workspace_name'),
+  // TODOS los workspaces que el usuario autorizó en el OAuth. El activo es `workspaceId`.
+  // Se rellena/actualiza en cada login con ClickUp (events.signIn).
+  workspaces: text('workspaces', { mode: 'json' }).$type<{ id: string; name: string | null }[]>(),
   createdAt: createdAt(),
   updatedAt: updatedAt(),
 })

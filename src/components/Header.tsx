@@ -3,6 +3,7 @@ import { useState } from 'react'
 import { Queue01Icon, Settings01Icon, SwatchIcon, UserGroup03Icon, Folder01Icon } from '@hugeicons/core-free-icons'
 import { NavItem, SettingsForm, TaskTypesForm } from '@/components'
 import { ListsSyncForm } from '@/components/ListsSyncForm'
+import { WorkspaceSwitcher } from '@/components/WorkspaceSwitcher'
 import { Button, Modal, AlertDialog } from '@/components/ui'
 import { Icon, PiUser, PiSignOut } from '@/lib/icons'
 import { useAuth } from '@/contexts/AuthContext'
@@ -49,6 +50,7 @@ export const Header = () => {
         </div>
 
         <div className="flex items-center gap-3">
+          <WorkspaceSwitcher />
           <ThemeToggle />
 
           {/* User info - opcional */}
