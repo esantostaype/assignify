@@ -146,6 +146,9 @@ export const useSyncUsers = (options?: {
     onSuccess: (data) => {
       // Invalidate and refetch users data
       queryClient.invalidateQueries({ queryKey: userKeys.clickup() })
+      // …y la CARGA: sin esto las tarjetas recién sincronizadas se quedan en
+      // skeleton (no llega su workload) hasta recargar la página a mano.
+      queryClient.invalidateQueries({ queryKey: workloadKeys.all })
       options?.onSuccess?.(data)
     },
     onError: options?.onError,
