@@ -189,6 +189,25 @@ tareas, y todo queda **aislado por inquilino** (un usuario nunca ve datos de otr
   `/api/settings/reset` SCOPEADOS por workspace (el reset borraba TODOS los workspaces → fuga grave,
   corregida). `workspaceId` opcional (compat) en toda la cadena. El núcleo puro `assignment-ranking`
   no se tocó (20 tests siguen verdes).
+- ✅ **Tiers con unidad de tiempo (days/hours/minutes) por workspace**: la duración sigue en
+  "días base" (motor/`task_meta`/endpoints de tareas INTACTOS; 1 día = 8h = 480min); la unidad es
+  solo edición/display. `duration-utils` (`unitToDays`/`daysToUnit`/`formatDuration`); `/api/tiers`
+  GET→`{tiers, durationUnit}` + PATCH guarda la unidad (fila `system_settings` category `tier`);
+  el selector vive en `SettingsForm` (sección Tier Durations); `TierSelect`/`DurationField`/
+  `CreateTaskForm` muestran/editan en la unidad y convierten a días base al enviar. *(OJO:
+  `TierListForm` es código MUERTO —no se monta—; el real es `SettingsForm`. Pendiente: borrarlo.)*
+- ✅ **Fix aislamiento de ROLES por workspace** (el mismo userId puede tener roles en varios
+  workspaces): `GET/PATCH /api/users/[userId]` acotan el usuario al workspace; `/api/users/workload`
+  filtra `userRole`/`taskType`/`userVacation` por workspace (las cards mostraban roles ajenos);
+  `POST /api/users/[userId]/roles` valida el tipo dentro del workspace.
+
+### Fase 5 — onboarding (EN CURSO)
+- ✅ **Onboarding wizard**: `OnboardingWizard` (Modal + Stepper) montado en `providers.tsx` (no en
+  login). Aparece solo si el workspace **no fue onboarded Y le falta config** (sin miembros/listas/
+  tipos, vía `useTaskData`), así no molesta a workspaces ya configurados. 3 pasos reutilizando
+  componentes: `StepSyncMembers` (sobre `useClickUpUsers`/`useSyncUsers`) → `ListsSyncForm` →
+  `TaskTypesForm`. Skip/Finish → `PATCH /api/onboarding {completed:true}` (flag en `system_settings`).
+- **Pendiente Fase 5**: renombrar **"Designers" → "Team/Members"** (la app deja de ser solo de diseño).
 
 **Pendiente (operativo, al desplegar a prod):**
 - En Vercel (Production): `WEBHOOK_PUBLIC_URL`, `CRON_SECRET` y `AUTH_URL=https://assignify.vercel.app`
