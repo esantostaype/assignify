@@ -15,6 +15,12 @@ describe('mapClickUpStatusToLocal (multi-tenant: usa el type de ClickUp)', () =>
     expect(mapClickUpStatusToLocal('QA Testing', 'custom')).toBe('ON_APPROVAL')
   })
 
+  it('On Approval con type closed/done NO se excluye (regresión Inszone)', () => {
+    // Inszone configura "On Approval" como closed; debe seguir siendo ON_APPROVAL.
+    expect(mapClickUpStatusToLocal('On Approval', 'closed')).toBe('ON_APPROVAL')
+    expect(mapClickUpStatusToLocal('On Approval', 'done')).toBe('ON_APPROVAL')
+  })
+
   it('detecta trabajo activo por palabra clave', () => {
     expect(mapClickUpStatusToLocal('In Progress', 'custom')).toBe('IN_PROGRESS')
     expect(mapClickUpStatusToLocal('Doing', 'custom')).toBe('IN_PROGRESS')

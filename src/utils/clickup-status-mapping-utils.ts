@@ -12,30 +12,31 @@ export function mapClickUpStatusToLocal(
   clickupType?: string
 ): LocalTaskStatus | null {
   const statusLower = clickupStatus.toLowerCase().trim();
-
-  // ✅ MULTI-TENANT: ClickUp marca cada estado con un `type`
-  // (open | custom | done | closed). Es la señal MÁS fiable y NO depende del
-  // nombre (que varía por workspace). Si está cerrado/terminado → se excluye,
-  // sin importar cómo lo llamen.
   const type = (clickupType || '').toLowerCase().trim();
-  if (type === 'done' || type === 'closed') {
-    return null; // tarea terminada → excluida
-  }
 
-  // ✅ ON APPROVAL - Estados de revisión/aprobación (PRIMERO para evitar conflictos)
-  if (statusLower === 'on approval' || 
+  // ✅ ON APPROVAL — revisión/aprobación. Va PRIMERO, incluso por encima del `type`:
+  // muchos workspaces (p. ej. Inszone) configuran "On Approval" con type=closed/done
+  // (lo ven casi-cerrado), pero para Assignify es trabajo ENTREGADO que SÍ se muestra
+  // (no cuenta como carga). Si excluyéramos por type, desaparecerían esas tareas.
+  if (statusLower === 'on approval' ||
       statusLower === 'approval' ||
       statusLower === 'pending approval' ||
       statusLower.includes('on approval') ||
       statusLower.includes('approval') ||
       statusLower.includes('review') ||
       statusLower.includes('pending review') ||
-      statusLower.includes('qa') || 
+      statusLower.includes('qa') ||
       statusLower.includes('testing') ||
       statusLower.includes('check') ||
       statusLower.includes('waiting for approval') ||
       statusLower.includes('ready for review')) {
     return 'ON_APPROVAL';
+  }
+
+  // ✅ MULTI-TENANT: el `type` de ClickUp (open|custom|done|closed) es la señal más
+  // fiable para EXCLUIR lo terminado, sin depender del nombre (que varía por workspace).
+  if (type === 'done' || type === 'closed') {
+    return null; // tarea terminada → excluida
   }
 
   // IN PROGRESS - Estados de trabajo activo
