@@ -355,3 +355,69 @@ export const useUpdateUserLevel = (userId: string, options?: {
     onError: options?.onError,
   })
 }
+
+// Activa/desactiva al miembro. `active=false` lo deja en el equipo (conserva
+// roles y vacaciones) pero el motor lo excluye de la asignación automática;
+// es reversible. Afecta la disponibilidad → invalida los caches del motor.
+export const useSetUserActive = (userId: string, options?: {
+  onSuccess?: () => void
+  onError?: (error: unknown) => void
+}) => {
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: async (active: boolean) => {
+      const { data } = await axios.patch(`/api/users/${userId}`, { active })
+      return data
+    },
+    onSuccess: (_, active) => {
+      // Optimista: el badge y el botón del modal leen `user.active` del detalle.
+      queryClient.setQueryData<DetailedUser>(userKeys.details(userId), (old) =>
+        old ? { ...old, active } : old
+      )
+      queryClient.invalidateQueries({ queryKey: userKeys.details(userId) })
+      queryClient.invalidateQueries({ queryKey: workloadKeys.all })
+      queryClient.invalidateQueries({ queryKey: userKeys.clickup() })
+
+      queryClient.invalidateQueries({ queryKey: ['task-suggestion'] })
+      queryClient.invalidateQueries({ queryKey: ['compatible-users'] })
+      queryClient.invalidateQueries({ queryKey: ['user-slots'] })
+      queryClient.invalidateQueries({ queryKey: ['best-user-selection'] })
+      queryClient.invalidateQueries({ queryKey: ['task-data'] })
+
+      options?.onSuccess?.()
+    },
+    onError: options?.onError,
+  })
+}
+
+// Desincroniza (quita) al miembro del workspace activo: borra el usuario y sus
+// roles/vacaciones. No toca ClickUp (la fuente); se puede volver a sincronizar.
+export const useRemoveUser = (userId: string, options?: {
+  onSuccess?: () => void
+  onError?: (error: unknown) => void
+}) => {
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: async () => {
+      const { data } = await axios.delete(`/api/users/${userId}`)
+      return data
+    },
+    onSuccess: () => {
+      // El miembro desaparece de la lista/carga; su detalle ya no existe.
+      queryClient.removeQueries({ queryKey: userKeys.details(userId) })
+      queryClient.invalidateQueries({ queryKey: workloadKeys.all })
+      queryClient.invalidateQueries({ queryKey: userKeys.clickup() })
+
+      queryClient.invalidateQueries({ queryKey: ['task-suggestion'] })
+      queryClient.invalidateQueries({ queryKey: ['compatible-users'] })
+      queryClient.invalidateQueries({ queryKey: ['user-slots'] })
+      queryClient.invalidateQueries({ queryKey: ['best-user-selection'] })
+      queryClient.invalidateQueries({ queryKey: ['task-data'] })
+
+      options?.onSuccess?.()
+    },
+    onError: options?.onError,
+  })
+}

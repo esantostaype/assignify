@@ -6,9 +6,9 @@ import { UserRoleRow } from './UserRoleRow'
 import { UserVacationRow } from './UserVacationRow'
 import { AddRoleForm } from './AddRoleForm'
 import { AddVacationForm } from './AddVacationForm'
-import { Icon, PiUser, PiCalendarBlank, PiMedal } from '@/lib/icons'
-import { useUserDetails, useTaskTypes, useBrands, useUpdateUserLevel, useAddUserRole, useToggleUserRolePrimary } from '@/hooks/queries/useUsers'
-import { Alert, Select, type SelectOption } from '@/components/ui'
+import { Icon, PiUser, PiCalendarBlank, PiMedal, PiUserCheck, PiTrash } from '@/lib/icons'
+import { useUserDetails, useTaskTypes, useBrands, useUpdateUserLevel, useAddUserRole, useToggleUserRolePrimary, useSetUserActive, useRemoveUser } from '@/hooks/queries/useUsers'
+import { Alert, Select, Button, DeleteConfirmDialog, type SelectOption } from '@/components/ui'
 
 type UserLevel = 'JUNIOR' | 'MID' | 'SENIOR'
 
@@ -43,6 +43,8 @@ interface UserEditModalProps {
   onDeleteRole: (roleId: number) => void
   onAddVacation: (startDate: string, endDate: string) => void
   onDeleteVacation: (vacationId: number) => void
+  /** Cierra el modal tras desincronizar al miembro (ya no existe que editar). */
+  onRemoved?: () => void
   loadingStates?: {
     addingRole?: boolean
     deletingRole?: number
@@ -56,6 +58,7 @@ export const UserEditModal: React.FC<UserEditModalProps> = ({
   onDeleteRole,
   onAddVacation,
   onDeleteVacation,
+  onRemoved,
   loadingStates = {}
 }) => {
   const {
@@ -95,6 +98,24 @@ export const UserEditModal: React.FC<UserEditModalProps> = ({
       onSuccess: () => toast.success({ title: 'Primary role updated', description: 'Engine preference updated.' }),
       onError: () => toast.error({ title: 'Error updating primary role', description: 'The change was not saved.' }),
     })
+
+  // Activar/desactivar al miembro (sigue en el equipo; el motor lo ignora si está inactivo).
+  const { mutate: setActive, isPending: settingActive } = useSetUserActive(userId, {
+    onSuccess: () => toast.success({ title: 'Member updated', description: 'Availability recalculated.' }),
+    onError: () => toast.error({ title: 'Error updating member', description: 'The change was not saved.' }),
+  })
+
+  // Desincronizar (quitar) al miembro del workspace.
+  const { mutate: removeUser, isPending: removing } = useRemoveUser(userId, {
+    onSuccess: () => {
+      toast.success({ title: 'Member removed', description: 'Desynced from this workspace.' })
+      onRemoved?.()
+    },
+    onError: () => toast.error({ title: "Couldn't remove member", description: 'They are still on the team.' }),
+  })
+
+  // Confirmación inline para el borrado (evita un modal anidado dentro del modal de edición).
+  const [confirmingRemove, setConfirmingRemove] = React.useState(false)
 
   if (userError || typesError || brandsError) {
     return (
@@ -254,6 +275,83 @@ export const UserEditModal: React.FC<UserEditModalProps> = ({
           userId={userId}
         />
       </div>
+
+      {/* Divider */}
+      <div className="border-t border-(--color-border-default)" />
+
+      {/* Membership Section: activar/desactivar + desincronizar del equipo */}
+      <div>
+        <h3 className="text-lg font-medium text-(--color-text-strong) mb-2 flex items-center gap-2">
+          <Icon icon={PiUserCheck} size={20} />
+          Membership
+        </h3>
+
+        {/* Estado + activar/desactivar */}
+        <div className="flex items-center justify-between gap-4 py-2">
+          <div>
+            <div className="flex items-center gap-2">
+              <span
+                className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-medium ${
+                  user?.active
+                    ? 'bg-(--color-success-soft) text-(--color-success-strong)'
+                    : 'bg-(--color-surface-hover) text-(--color-text-subtle)'
+                }`}
+              >
+                <span className={`h-1.5 w-1.5 rounded-full ${user?.active ? 'bg-(--color-success-solid)' : 'bg-(--color-text-subtle)'}`} />
+                {user?.active ? 'Active' : 'Inactive'}
+              </span>
+            </div>
+            <p className="mt-1.5 text-sm text-(--color-text-subtle)">
+              Inactive members stay on the team but are skipped by auto-assignment.
+            </p>
+          </div>
+          <Button
+            variant="outlined"
+            color={user?.active ? 'warning' : 'success'}
+            size="sm"
+            onClick={() => setActive(!user?.active)}
+            disabled={loadingUser || settingActive}
+            loading={settingActive}
+          >
+            {user?.active ? 'Deactivate' : 'Activate'}
+          </Button>
+        </div>
+
+        {/* Desincronizar del equipo */}
+        <div className="mt-3 flex items-center justify-between gap-4 rounded-lg border border-(--color-error-border) bg-(--color-error-soft) px-3 py-2.5">
+          <div>
+            <p className="text-sm font-medium text-(--color-text-strong)">Remove from team</p>
+            <p className="mt-0.5 text-sm text-(--color-text-subtle)">
+              Desyncs from this workspace (roles & vacations included). Re-sync from ClickUp anytime.
+            </p>
+          </div>
+          <Button
+            variant="soft"
+            color="error"
+            size="sm"
+            startIcon={<Icon icon={PiTrash} size={16} />}
+            onClick={() => setConfirmingRemove(true)}
+            disabled={loadingUser || removing}
+            loading={removing}
+          >
+            Remove
+          </Button>
+        </div>
+      </div>
+
+      <DeleteConfirmDialog
+        open={confirmingRemove}
+        onClose={() => setConfirmingRemove(false)}
+        onConfirm={() => {
+          setConfirmingRemove(false)
+          removeUser()
+        }}
+        itemName={user?.name}
+        itemKind="member"
+        title="Remove this member?"
+        description={`${user?.name ?? 'This member'} and their roles & vacations will be removed from this workspace. You can re-sync them from ClickUp later.`}
+        confirmLabel="Remove"
+      />
     </div>
   )
 }

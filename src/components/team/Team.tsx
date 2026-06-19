@@ -201,6 +201,7 @@ export const ClickUpUsersSync: React.FC = () => {
             onAddVacation={(startDate, endDate) =>
               addVacation({ userId: editingUserId, startDate, endDate })
             }
+            onRemoved={() => setEditingUserId(null)}
             loadingStates={{ addingRole, addingVacation }}
           />
         )}
@@ -214,6 +215,7 @@ interface UserEditModalWrapperProps {
   userId: string
   onAddRole: (typeId: number, brandId?: string) => void
   onAddVacation: (startDate: string, endDate: string) => void
+  onRemoved?: () => void
   loadingStates: {
     addingRole?: boolean
     addingVacation?: boolean
@@ -224,6 +226,7 @@ const UserEditModalWrapper: React.FC<UserEditModalWrapperProps> = ({
   userId,
   onAddRole,
   onAddVacation,
+  onRemoved,
   loadingStates
 }) => {
   // ✅ Create deletion mutations with proper userId context
@@ -252,6 +255,7 @@ const UserEditModalWrapper: React.FC<UserEditModalWrapperProps> = ({
       onDeleteRole={(roleId) => deleteRole(roleId)}
       onAddVacation={onAddVacation}
       onDeleteVacation={(vacationId) => deleteVacation(vacationId)}
+      onRemoved={onRemoved}
       loadingStates={loadingStates}
     />
   )
