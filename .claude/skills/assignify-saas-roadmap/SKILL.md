@@ -13,10 +13,31 @@ description: >-
 
 # Assignify → SaaS multi-inquilino (roadmap v2)
 
-> Estado: **PLANEADO, no implementado.** La app en producción es single-tenant
-> (un workspace de ClickUp, `CLICKUP_API_TOKEN` global). Este documento captura el
-> diseño acordado para transformarla en un SaaS donde cada persona conecta su
-> propio ClickUp. Trabajar esto en una **rama aparte**; no romper el single-tenant.
+> Estado: **EN CURSO en la rama `feat/saas-multi-tenant`.** Fases 1–3 implementadas;
+> Fase 4 avanzada (PK compuesto, tipos dinámicos, sync de listas). `main`/producción
+> sigue single-tenant e INTACTO (esta rama NO se ha mergeado). Trabajar siempre aquí.
+
+## ⚡ CÓMO RETOMAR (otra PC / sesión nueva) — LEER PRIMERO
+
+1. **Rama**: `git fetch origin && git checkout feat/saas-multi-tenant && git pull && npm install`.
+   Verifica el último commit con `git log --oneline -1`.
+2. **`.env`** (NO viaja por git, recréalo en cada PC). Necesitas:
+   `TURSO_DATABASE_URL`, `TURSO_AUTH_TOKEN`, `CLICKUP_API_TOKEN`, `CLICKUP_WEBHOOK_SECRET`,
+   `PUSHER_*`/`NEXT_PUBLIC_PUSHER_*`, `AUTH_SECRET`, `AUTH_CLICKUP_ID`, `AUTH_CLICKUP_SECRET`,
+   `ENCRYPTION_KEY` (opcional), y **`DEFAULT_WORKSPACE_ID=9017044866`** (Inszone real).
+   - El **redirect URI** de la OAuth app de ClickUp debe incluir el puerto local de ESA PC
+     (`http://localhost:<puerto>/api/auth/callback/clickup`).
+3. **DB**: la Turso es compartida en la nube → el schema (PK compuesto, columnas
+   workspace_id, clickup_connection, task_meta, auth_user) y los backfills YA están.
+   **NO correr `npx drizzle-kit push`** (la última migración se atascó en un índice
+   cosmético de user_role; las tablas/datos están bien, pero re-pushear podría recrear
+   tablas). Si hay que cambiar schema, hacerlo con una migración SQL manual y cuidado.
+4. **Ids**: Inszone real = **9017044866**; workspace de pruebas "Inszone Insurance" =
+   **90171327636** (tiene tareas/diseñadores de prueba; sus "On Approval" son custom).
+5. **GOTCHA dev server**: NO correr `npm run build` mientras `npm run dev` está arriba
+   (ambos escriben `.next` → estado corrupto → errores raros como `ConnectTimeoutError`
+   en el login de ClickUp). Si pasa: `Ctrl+C`, `Remove-Item -Recurse -Force .next`, `npm run dev`.
+6. Verificación: `npx tsc --noEmit` · `npm run build` (con dev apagado) · `npm test` (20 tests).
 
 ## Objetivo
 
