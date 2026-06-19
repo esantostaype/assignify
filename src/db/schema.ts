@@ -20,18 +20,20 @@ const updatedAt = () =>
     .$defaultFn(() => new Date())
     .$onUpdate(() => new Date())
 
-export const tierList = sqliteTable('tier_list', {
-  id: integer('id').primaryKey({ autoIncrement: true }),
-  name: text('name', { enum: TIER_NAMES }).notNull().unique(),
-  duration: real('duration').notNull(),
-  // [SaaS] Workspace dueño de esta config (nullable; backfill rellena los datos
-  // actuales con el workspace de Inszone). Solo se AGREGA la columna (ALTER seguro);
-  // los `unique` actuales se mantienen — la unicidad por (workspaceId, name) es una
-  // migración posterior (recrear tabla) que NO hacemos ahora sobre la DB de prod.
-  workspaceId: text('workspace_id'),
-  createdAt: createdAt(),
-  updatedAt: updatedAt(),
-})
+export const tierList = sqliteTable(
+  'tier_list',
+  {
+    id: integer('id').primaryKey({ autoIncrement: true }),
+    name: text('name', { enum: TIER_NAMES }).notNull(),
+    duration: real('duration').notNull(),
+    // [SaaS] Workspace dueño de esta config (nullable; backfill con el de Inszone).
+    workspaceId: text('workspace_id'),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  // Único por (workspaceId, name): cada workspace tiene sus propios tiers S/A/B/C/D/E.
+  (t) => ({ workspaceNameUnique: unique('tier_list_workspace_name_unique').on(t.workspaceId, t.name) })
+)
 
 // [SaaS] PK COMPUESTO (id de ClickUp + workspaceId): la MISMA persona puede ser
 // miembro de varios workspaces. `email` deja de ser único global (mismo correo en
@@ -70,27 +72,37 @@ export const userVacation = sqliteTable(
   (t) => ({ uniq: unique().on(t.workspaceId, t.userId, t.startDate, t.endDate) })
 )
 
-export const taskType = sqliteTable('task_type', {
-  id: integer('id').primaryKey({ autoIncrement: true }),
-  name: text('name').notNull().unique(),
-  // [SaaS] Workspace dueño del tipo (nullable; backfill).
-  workspaceId: text('workspace_id'),
-})
+export const taskType = sqliteTable(
+  'task_type',
+  {
+    id: integer('id').primaryKey({ autoIncrement: true }),
+    // [SaaS] Único por (workspaceId, name): cada workspace puede tener su propio "UX/UI".
+    name: text('name').notNull(),
+    // [SaaS] Workspace dueño del tipo (nullable; backfill).
+    workspaceId: text('workspace_id'),
+  },
+  (t) => ({ workspaceNameUnique: unique('task_type_workspace_name_unique').on(t.workspaceId, t.name) })
+)
 
-export const brand = sqliteTable('brand', {
-  id: text('id').primaryKey(),
-  name: text('name').notNull().unique(),
-  spaceId: text('space_id'),
-  folderId: text('folder_id'),
-  teamId: text('team_id'),
-  isActive: integer('is_active', { mode: 'boolean' }).notNull().default(true),
-  description: text('description'),
-  defaultStatus: text('default_status', { enum: STATUS_NAMES }).notNull().default('TO_DO'),
-  // [SaaS] Workspace dueño del brand/lista (nullable; backfill).
-  workspaceId: text('workspace_id'),
-  createdAt: createdAt(),
-  updatedAt: updatedAt(),
-})
+export const brand = sqliteTable(
+  'brand',
+  {
+    id: text('id').primaryKey(),
+    // [SaaS] Único por (workspaceId, name): dos workspaces pueden tener una lista del mismo nombre.
+    name: text('name').notNull(),
+    spaceId: text('space_id'),
+    folderId: text('folder_id'),
+    teamId: text('team_id'),
+    isActive: integer('is_active', { mode: 'boolean' }).notNull().default(true),
+    description: text('description'),
+    defaultStatus: text('default_status', { enum: STATUS_NAMES }).notNull().default('TO_DO'),
+    // [SaaS] Workspace dueño del brand/lista (nullable; backfill).
+    workspaceId: text('workspace_id'),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (t) => ({ workspaceNameUnique: unique('brand_workspace_name_unique').on(t.workspaceId, t.name) })
+)
 
 export const userRole = sqliteTable(
   'user_role',
@@ -216,14 +228,14 @@ export const systemSettings = sqliteTable(
     maxValue: real('max_value'),
     options: text('options', { mode: 'json' }),
     required: integer('required', { mode: 'boolean' }).notNull().default(true),
-    // [SaaS] Workspace dueño de la config (nullable; backfill). La unicidad real
-    // pasará a (workspaceId, category, key) en una migración posterior.
+    // [SaaS] Workspace dueño de la config (nullable; backfill).
     workspaceId: text('workspace_id'),
     createdAt: createdAt(),
     updatedAt: updatedAt(),
   },
   (t) => ({
-    uniq: unique().on(t.category, t.key),
+    // Único por (workspaceId, category, key): cada workspace tiene su propia config.
+    uniq: unique('system_settings_ws_category_key_unique').on(t.workspaceId, t.category, t.key),
     groupOrderIdx: index('system_settings_group_order_idx').on(t.group, t.order),
   })
 )
