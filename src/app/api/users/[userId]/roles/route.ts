@@ -55,9 +55,9 @@ export async function POST(req: Request, { params }: RouteParams) {
       }, { status: 404 });
     }
 
-    // Verificar que el tipo existe
+    // Verificar que el tipo existe EN el workspace activo (evita roles con tipos de otro inquilino).
     const existingType = await db.query.taskType.findFirst({
-      where: eq(taskType.id, typeId)
+      where: and(eq(taskType.id, typeId), eq(taskType.workspaceId, wsId ?? '__none__'))
     });
 
     if (!existingType) {

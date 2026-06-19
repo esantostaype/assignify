@@ -37,10 +37,16 @@ export async function GET() {
         where: and(eq(user.active, true), eq(user.workspaceId, wsId ?? '__none__')),
         orderBy: asc(user.name),
       }),
-      db.query.userRole.findMany(),
-      db.query.taskType.findMany(),
+      // [SaaS] Roles, tipos y vacaciones ACOTADOS al workspace activo: el mismo userId
+      // (id de ClickUp) puede tener roles en varios workspaces; sin filtrar, se mezclan.
+      db.query.userRole.findMany({
+        where: eq(userRole.workspaceId, wsId ?? '__none__'),
+      }),
+      db.query.taskType.findMany({
+        where: eq(taskType.workspaceId, wsId ?? '__none__'),
+      }),
       db.query.userVacation.findMany({
-        where: gte(userVacation.endDate, now),
+        where: and(gte(userVacation.endDate, now), eq(userVacation.workspaceId, wsId ?? '__none__')),
         orderBy: asc(userVacation.startDate),
       }),
       fetchActiveClickUpTasks({ token: clickupToken, teamId: wsId }),

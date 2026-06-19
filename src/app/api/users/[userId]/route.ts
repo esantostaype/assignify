@@ -5,9 +5,10 @@
 import { NextResponse } from 'next/server'
 import { db } from '@/db'
 import { user, userVacation } from '@/db/schema'
-import { eq, asc } from 'drizzle-orm'
+import { eq, and, asc } from 'drizzle-orm'
 import { Level } from '@/db/enums'
 import { invalidateAllCache } from '@/utils/cache'
+import { getCurrentWorkspaceId } from '@/lib/workspace'
 
 // Lee/escribe datos en vivo de la DB: nunca pre-renderizar/cachear en build.
 export const dynamic = 'force-dynamic'
@@ -37,8 +38,11 @@ export async function GET(req: Request, { params }: RouteParams) {
       return NextResponse.json({ error: 'User ID is required' }, { status: 400 })
     }
 
+    // [SaaS] El mismo userId (id de ClickUp) puede existir en varios workspaces (PK
+    // compuesto). Acotamos al workspace activo para devolver al usuario correcto y SUS roles.
+    const wsId = await getCurrentWorkspaceId()
     const result = await db.query.user.findFirst({
-      where: eq(user.id, userId),
+      where: and(eq(user.id, userId), eq(user.workspaceId, wsId ?? '__none__')),
       with: {
         roles: {
           with: {
@@ -94,10 +98,12 @@ export async function PATCH(req: Request, { params }: RouteParams) {
 
     const level = levelParam as Level
 
+    // [SaaS] Acotar al workspace activo (el mismo userId puede existir en varios).
+    const wsId = await getCurrentWorkspaceId()
     const [updated] = await db
       .update(user)
       .set({ level })
-      .where(eq(user.id, userId))
+      .where(and(eq(user.id, userId), eq(user.workspaceId, wsId ?? '__none__')))
       .returning()
 
     if (!updated) {
