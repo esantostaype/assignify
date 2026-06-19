@@ -2,6 +2,7 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import axios from 'axios'
 import { TierInfo, TaskType, Brand, User } from '@/interfaces'
+import type { DurationUnit } from '@/utils/duration-utils'
 
 // Query keys para React Query
 export const taskDataKeys = {
@@ -28,9 +29,9 @@ const fetchUsers = async (): Promise<User[]> => {
   return response.data.filter((user: User) => user.active)
 }
 
-const fetchTiers = async (): Promise<TierInfo[]> => {
+const fetchTiers = async (): Promise<{ tiers: TierInfo[]; durationUnit: DurationUnit }> => {
   const response = await axios.get('/api/tiers')
-  return response.data
+  return { tiers: response.data.tiers ?? [], durationUnit: response.data.durationUnit ?? 'days' }
 }
 
 export const useTaskData = () => {
@@ -68,7 +69,7 @@ export const useTaskData = () => {
   })
 
   const {
-    data: tiers = [],
+    data: tiersData = { tiers: [] as TierInfo[], durationUnit: 'days' as DurationUnit },
     isLoading: tiersLoading,
     error: tiersError
   } = useQuery({
@@ -76,6 +77,8 @@ export const useTaskData = () => {
     queryFn: fetchTiers,
     staleTime: 5 * 60 * 1000,
   })
+  const tiers = tiersData.tiers
+  const durationUnit = tiersData.durationUnit
 
   // Loading y error combinados
   const loading = typesLoading || brandsLoading || usersLoading || tiersLoading
@@ -109,6 +112,7 @@ export const useTaskData = () => {
     brands,
     users,
     tiers,
+    durationUnit,
     loading,
     error,
     refreshData,

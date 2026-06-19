@@ -6,15 +6,17 @@ import { Input } from '@/components/ui'
 import { Typography } from '@/components/ui/typography'
 import { Icon, PiClock } from '@/lib/icons'
 import { FormValues } from '@/interfaces'
-import { formatDaysToReadable } from '@/utils/duration-utils'
+import { formatDuration, unitToDays, type DurationUnit } from '@/utils/duration-utils'
 
 interface DurationFieldProps {
   touched?: boolean
   error?: string
   onDurationComplete?: (duration: string) => void
   onDurationChange?: (duration: string) => void
-  // Duración por defecto del tier seleccionado (para indicar la fuente del valor).
+  // Duración por defecto del tier seleccionado (EN LA UNIDAD del workspace).
   tierDuration?: number
+  // Unidad de duración del workspace (días/horas/minutos). El valor del campo está en ESTA unidad.
+  unit?: DurationUnit
 }
 
 export const DurationField: React.FC<DurationFieldProps> = ({
@@ -23,6 +25,7 @@ export const DurationField: React.FC<DurationFieldProps> = ({
   onDurationComplete,
   onDurationChange,
   tierDuration,
+  unit = 'days',
 }) => {
   const { values, setFieldValue } = useFormikContext<FormValues>()
 
@@ -70,13 +73,13 @@ export const DurationField: React.FC<DurationFieldProps> = ({
   if (numberOfAssignees > 1 && originalDuration > 0) {
     durationHelper = (
       <>
-        Effective duration per user: <strong>{formatDaysToReadable(effectiveDuration)}</strong>
+        Effective duration per user: <strong>{formatDuration(unitToDays(effectiveDuration, unit), unit)}</strong>
         <br />
         ({numberOfAssignees} users working in parallel)
       </>
     )
   } else if (numberOfAssignees === 1 && originalDuration > 0) {
-    durationHelper = <>Total duration: {formatDaysToReadable(originalDuration)}</>
+    durationHelper = <>Total duration: {formatDuration(unitToDays(originalDuration, unit), unit)}</>
   }
 
   const handleInputChange = (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -123,7 +126,7 @@ export const DurationField: React.FC<DurationFieldProps> = ({
         value={localInputValue}
         onChange={handleInputChange}
         onBlur={handleBlur}
-        placeholder="Duration in days"
+        placeholder={`Duration in ${unit}`}
         error={touched && error ? error : undefined}
         helper={durationHelper}
         step={0.1}

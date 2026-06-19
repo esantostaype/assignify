@@ -1,24 +1,30 @@
 /* eslint-disable react/no-unescaped-entities */
-/* eslint-disable @typescript-eslint/no-unused-vars */
-/* eslint-disable @typescript-eslint/no-explicit-any */
 "use client";
 import React, { useState, useEffect } from "react";
-import { Button, Input, Alert } from "@/components/ui";
+import { Button, Input, Alert, Select } from "@/components/ui";
 import { Icon, PiDownloadSimple, PiWarning } from "@/lib/icons";
 import { useTaskDataInvalidation } from "@/hooks/useTaskData";
+import { daysToUnit, unitToDays, DURATION_UNITS, type DurationUnit } from "@/utils/duration-utils";
 import axios from "axios";
 import { hotToast as toast } from "@/lib/hotToast";
 
 interface TierData {
   id: number;
   name: string;
+  // Duración en DÍAS BASE (lo que guarda el motor); se muestra/edita en `unit`.
   duration: number;
-  categoryCount: number;
 }
 
-// Agregar este componente dentro del archivo, antes del componente principal:
+const UNIT_OPTIONS: { value: DurationUnit; label: string }[] = [
+  { value: "days", label: "Days" },
+  { value: "hours", label: "Hours" },
+  { value: "minutes", label: "Minutes" },
+];
+
+// Redondea el valor mostrado en la unidad (evita 29.999…).
+const toUnit = (days: number, unit: DurationUnit) => Math.round(daysToUnit(days, unit) * 100) / 100;
+
 const TierSkeleton: React.FC = () => {
-  // Crear 4 columnas de skeleton para simular los tiers
   const skeletonColumns = Array.from({ length: 6 }, (_, index) => (
     <th key={index} className="p-2 first:pl-4 last:pr-4 text-left text-sm font-medium text-gray-300">
       <div className="flex items-center gap-2 justify-center animate-pulse">
@@ -26,7 +32,6 @@ const TierSkeleton: React.FC = () => {
       </div>
     </th>
   ));
-
   const skeletonInputs = Array.from({ length: 6 }, (_, index) => (
     <td key={index} className="p-2 first:pl-4 last:pr-4">
       <div className="pt-2 w-full flex justify-center animate-pulse">
@@ -37,15 +42,10 @@ const TierSkeleton: React.FC = () => {
       </div>
     </td>
   ));
-
   return (
     <>
-      <thead className="bg-(--color-surface-hover)">
-        <tr>{skeletonColumns}</tr>
-      </thead>
-      <tbody>
-        <tr>{skeletonInputs}</tr>
-      </tbody>
+      <thead className="bg-(--color-surface-hover)"><tr>{skeletonColumns}</tr></thead>
+      <tbody><tr>{skeletonInputs}</tr></tbody>
     </>
   );
 };
@@ -54,72 +54,80 @@ export const TierListForm: React.FC = () => {
   const { invalidateTiers } = useTaskDataInvalidation();
 
   const [tiers, setTiers] = useState<TierData[]>([]);
+  const [unit, setUnit] = useState<DurationUnit>("days");
+  // Cambios pendientes, EN LA UNIDAD activa (lo que el usuario teclea).
   const [tierChanges, setTierChanges] = useState<Record<number, number>>({});
   const [loadingTiers, setLoadingTiers] = useState(true);
   const [savingTiers, setSavingTiers] = useState(false);
+  const [savingUnit, setSavingUnit] = useState(false);
 
-  // Cargar tiers
+  const loadTiers = async () => {
+    const { data } = await axios.get("/api/tiers");
+    setTiers(data.tiers ?? []);
+    setUnit((data.durationUnit as DurationUnit) ?? "days");
+  };
+
   useEffect(() => {
-    const fetchTiers = async () => {
+    (async () => {
       try {
         setLoadingTiers(true);
-        const response = await axios.get("/api/tiers");
-        setTiers(response.data);
+        await loadTiers();
       } catch (error) {
         console.error("Error loading tiers:", error);
         toast.error({ title: "Error loading tier settings", description: "Couldn't reach the server." });
       } finally {
         setLoadingTiers(false);
       }
-    };
-    fetchTiers();
+    })();
   }, []);
 
-  // Handle tier duration changes
-  const handleTierDurationChange = (tierId: number, newDuration: number) => {
-    const originalTier = tiers.find((t) => t.id === tierId);
-    if (!originalTier) return;
-
-    if (originalTier.duration === newDuration) {
-      // Si vuelve al valor original, remover del registro de cambios
-      const newTierChanges = { ...tierChanges };
-      delete newTierChanges[tierId];
-      setTierChanges(newTierChanges);
-    } else {
-      // Registrar el cambio
-      setTierChanges((prev) => ({
-        ...prev,
-        [tierId]: newDuration,
-      }));
+  // Cambiar la unidad: persiste de inmediato y re-muestra los valores en ella.
+  // (Descarta ediciones de duración sin guardar: primero se elige la unidad, luego se ajusta.)
+  const handleUnitChange = async (newUnit: DurationUnit) => {
+    if (newUnit === unit) return;
+    try {
+      setSavingUnit(true);
+      await axios.patch("/api/tiers", { durationUnit: newUnit });
+      setTierChanges({});
+      await loadTiers();
+      invalidateTiers(); // el form de crear tarea lee la unidad desde aquí
+    } catch (error) {
+      console.error("Error updating unit:", error);
+      toast.error({ title: "Couldn't change the unit", description: "Please try again." });
+    } finally {
+      setSavingUnit(false);
     }
   };
 
-  // Check if there are changes
+  const handleTierDurationChange = (tierId: number, newValueInUnit: number) => {
+    const tier = tiers.find((t) => t.id === tierId);
+    if (!tier) return;
+    const currentInUnit = toUnit(tier.duration, unit);
+    if (currentInUnit === newValueInUnit) {
+      const next = { ...tierChanges };
+      delete next[tierId];
+      setTierChanges(next);
+    } else {
+      setTierChanges((prev) => ({ ...prev, [tierId]: newValueInUnit }));
+    }
+  };
+
   const hasChanges = Object.keys(tierChanges).length > 0;
 
-  // Handle form submission
   const handleSave = async () => {
+    if (!hasChanges) return;
     try {
-      if (Object.keys(tierChanges).length > 0) {
-        setSavingTiers(true);
-
-        const updatePromises = Object.entries(tierChanges).map(
-          ([tierId, duration]) =>
-            axios.patch(`/api/tiers/${tierId}`, { duration })
-        );
-
-        await Promise.all(updatePromises);
-
-        // Recargar tiers localmente
-        const response = await axios.get("/api/tiers");
-        setTiers(response.data);
-        setTierChanges({});
-
-        // Invalidate task data cache so other components refresh
-        invalidateTiers();
-
-        toast.success({ title: "Tier durations updated successfully", description: "Changes saved." });
-      }
+      setSavingTiers(true);
+      // Convertir cada cambio (en la unidad) a DÍAS BASE antes de guardar.
+      await Promise.all(
+        Object.entries(tierChanges).map(([tierId, valueInUnit]) =>
+          axios.patch(`/api/tiers/${tierId}`, { duration: unitToDays(valueInUnit, unit) })
+        )
+      );
+      await loadTiers();
+      setTierChanges({});
+      invalidateTiers();
+      toast.success({ title: "Tier durations updated", description: "Changes saved." });
     } catch (error) {
       console.error("Error saving:", error);
       toast.error({ title: "Error saving tier durations", description: "Changes were not saved." });
@@ -130,13 +138,26 @@ export const TierListForm: React.FC = () => {
 
   return (
     <>
+      <div className="flex items-center justify-between gap-3 mb-4">
+        <p className="text-sm text-(--color-text-muted)">
+          Set how long each tier takes. Pick the unit your team works in.
+        </p>
+        <div className="w-40 shrink-0">
+          <Select
+            size="sm"
+            value={unit}
+            onChange={(val) => handleUnitChange(val as DurationUnit)}
+            disabled={loadingTiers || savingUnit}
+            options={UNIT_OPTIONS.filter((o) => DURATION_UNITS.includes(o.value))}
+          />
+        </div>
+      </div>
+
       {!loadingTiers && hasChanges && (
         <Alert tone="warning" variant="soft" icon={null} className="mb-4">
           <div className="flex items-center gap-2">
             <Icon icon={PiWarning} size={16} />
-            <span className="text-sm">
-              You have unsaved changes. Don't forget to save your settings.
-            </span>
+            <span className="text-sm">You have unsaved changes. Don't forget to save your settings.</span>
           </div>
         </Alert>
       )}
@@ -144,26 +165,18 @@ export const TierListForm: React.FC = () => {
       <div className="border border-(--color-border-default) rounded-lg overflow-y-hidden overflow-x-auto">
         <table className="w-full">
           {loadingTiers ? (
-            // Skeleton mientras carga
             <TierSkeleton />
           ) : (
-            // Contenido real
             <>
               <thead className="bg-(--color-surface-hover)">
                 <tr>
                   {tiers.map((tier) => {
                     const hasChanged = tierChanges[tier.id] !== undefined;
-
                     return (
                       <th key={tier.id} className="p-2 first:pl-4 last:pr-4 text-left text-sm font-medium text-gray-300">
                         <div className="flex items-center gap-2 justify-center">
                           <span>Tier {tier.name}</span>
-                          {hasChanged && (
-                            <div
-                              className="w-2 h-2 bg-orange-500 rounded-full"
-                              title="Changed"
-                            />
-                          )}
+                          {hasChanged && <div className="w-2 h-2 bg-orange-500 rounded-full" title="Changed" />}
                         </div>
                       </th>
                     );
@@ -174,30 +187,24 @@ export const TierListForm: React.FC = () => {
                 <tr>
                   {tiers.map((tier) => {
                     const hasChanged = tierChanges[tier.id] !== undefined;
-                    const currentDuration =
-                      tierChanges[tier.id] ?? tier.duration;
-
+                    const currentValue = tierChanges[tier.id] ?? toUnit(tier.duration, unit);
                     return (
                       <td key={tier.id} className="p-2 first:pl-4 last:pr-4">
                         <div className="pt-2 w-full flex justify-center">
                           <div className="flex flex-col items-center gap-1">
                             <Input
                               type="number"
-                              value={currentDuration.toString()}
+                              value={currentValue.toString()}
                               onChange={(e) => {
                                 const value = parseFloat(e.target.value);
-                                if (!isNaN(value) && value > 0) {
-                                  handleTierDurationChange(tier.id, value);
-                                }
+                                if (!isNaN(value) && value > 0) handleTierDurationChange(tier.id, value);
                               }}
-                              min={0.1}
-                              step={0.1}
+                              min={unit === "minutes" ? 1 : 0.1}
+                              step={unit === "days" ? 0.1 : 1}
                               size="md"
-                              className={`w-24 [&_input]:text-center${
-                                hasChanged ? " border-warning-500" : ""
-                              }`}
+                              className={`w-24 [&_input]:text-center${hasChanged ? " border-warning-500" : ""}`}
                             />
-                            <span className="text-xs text-(--color-text-muted)">days</span>
+                            <span className="text-xs text-(--color-text-muted)">{unit}</span>
                           </div>
                         </div>
                       </td>
@@ -217,11 +224,7 @@ export const TierListForm: React.FC = () => {
           loading={savingTiers}
           color={hasChanges ? "warning" : "primary"}
         >
-          {loadingTiers
-            ? "Loading..."
-            : hasChanges
-            ? "Save Changes"
-            : "No Changes"}
+          {loadingTiers ? "Loading..." : hasChanges ? "Save Changes" : "No Changes"}
         </Button>
       </div>
     </>

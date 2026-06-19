@@ -3,7 +3,7 @@ import React from "react";
 import { Select } from "@/components/ui";
 import { Typography } from "@/components/ui/typography";
 import { Icon, PiSteps } from "@/lib/icons";
-import { formatDaysToReadable } from "@/utils/duration-utils";
+import { formatDuration, type DurationUnit } from "@/utils/duration-utils";
 import { TierInfo } from "@/interfaces";
 
 interface TierSelectProps {
@@ -13,6 +13,8 @@ interface TierSelectProps {
   touched?: boolean;
   error?: string;
   loading?: boolean;
+  // Unidad de duración del workspace (días/horas/minutos) para mostrar la duración del tier.
+  unit?: DurationUnit;
 }
 
 // Orden visual de los tiers (de mayor a menor esfuerzo).
@@ -25,6 +27,7 @@ export const TierSelect: React.FC<TierSelectProps> = ({
   touched,
   error,
   loading = false,
+  unit = "days",
 }) => {
   const sortedTiers = React.useMemo(
     () =>
@@ -53,7 +56,7 @@ export const TierSelect: React.FC<TierSelectProps> = ({
             <>
               <span style={{ fontWeight: 600, marginRight: 8 }}>{tier.name}</span>
               <span style={{ opacity: 0.6, fontSize: "0.8rem" }}>
-                {formatDaysToReadable(tier.duration)}
+                {formatDuration(tier.duration, unit)}
               </span>
             </>
           ),

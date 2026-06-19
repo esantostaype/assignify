@@ -35,11 +35,11 @@ export const validationSchema = Yup.object({
   durationDays: Yup.string()
     .test(
       'is-valid-duration',
-      'Duration must be a valid number between 0.1 and 30 days',
+      'Duration must be greater than 0',
       (value) => {
         if (!value) return false
         const num = parseFloat(value)
-        return !isNaN(num) && num >= 0.1 && num <= 30
+        return !isNaN(num) && num > 0
       }
     )
     .required('Duration is required'),

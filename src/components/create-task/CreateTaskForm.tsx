@@ -33,6 +33,7 @@ import { useTaskData, useTaskSuggestion } from "@/hooks";
 import { taskKeys } from "@/hooks/queries/useTasks";
 import { validationSchema } from "@/validation/taskValidation";
 import { FormValues, User, RankedCandidate } from "@/interfaces";
+import { unitToDays, daysToUnit, type DurationUnit } from "@/utils/duration-utils";
 
 interface FormikSuggestionLogicProps {
   setSuggestedAssignment: Dispatch<
@@ -45,6 +46,7 @@ interface FormikSuggestionLogicProps {
   triggerSuggestion: number;
   isSubmitting: boolean;
   setFieldValue: (field: string, value: any) => void;
+  durationUnit: DurationUnit;
 }
 
 // Lógica de sugerencia de usuario: depende del tipo (del kind) + duración + brand
@@ -60,12 +62,18 @@ const FormikSuggestionLogic: FC<FormikSuggestionLogicProps> = ({
   triggerSuggestion,
   isSubmitting,
   setFieldValue,
+  durationUnit,
 }) => {
   const { values } = useFormikContext<FormValues>();
 
+  // El form maneja la duración EN LA UNIDAD del workspace; el motor espera días base.
+  const durationDaysBase = values.durationDays
+    ? unitToDays(parseFloat(values.durationDays as string), durationUnit).toString()
+    : "";
+
   const { suggestedAssignment, candidates, fetchingSuggestion } = useTaskSuggestion(
     isSubmitting ? undefined : currentTypeId,
-    isSubmitting ? "" : (values.durationDays as string),
+    isSubmitting ? "" : durationDaysBase,
     isSubmitting ? undefined : values.brandId || undefined,
     isSubmitting ? undefined : values.priority,
     isSubmitting ? 0 : triggerSuggestion,
@@ -146,7 +154,7 @@ const FormikInactivityReset: FC<FormikInactivityResetProps> = ({
 export const CreateTaskForm: FC = () => {
   const queryClient = useQueryClient();
 
-  const { types, brands, users, tiers, loading: dataLoading } = useTaskData();
+  const { types, brands, users, tiers, durationUnit, loading: dataLoading } = useTaskData();
   const [loading, setLoading] = useState(false);
   // [SaaS] Tipo de tarea elegido (id), de los tipos PROPIOS del workspace.
   const [selectedTypeId, setSelectedTypeId] = useState<string | null>(null);
@@ -199,7 +207,8 @@ export const CreateTaskForm: FC = () => {
         return;
       }
 
-      const finalDurationDays = parseFloat(values.durationDays as string);
+      // El form trabaja en la unidad del workspace; el backend espera días base.
+      const finalDurationDays = unitToDays(parseFloat(values.durationDays as string), durationUnit);
       if (finalDurationDays <= 0) {
         toast.error({ title: "Task duration must be greater than zero.", description: "Enter a positive value." });
         return;
@@ -270,8 +279,11 @@ export const CreateTaskForm: FC = () => {
     setUserHasManuallyChanged(false);
   };
 
-  const selectedTierDuration = (tierId: string) =>
-    tiers.find((t) => t.id.toString() === tierId)?.duration;
+  // Duración del tier EN LA UNIDAD del workspace (lo que el form muestra/edita).
+  const selectedTierDuration = (tierId: string) => {
+    const d = tiers.find((t) => t.id.toString() === tierId)?.duration;
+    return d !== undefined ? Math.round(daysToUnit(d, durationUnit) * 100) / 100 : undefined;
+  };
 
   return (
     <aside className="bg-(--color-surface-card) sticky w-[28rem] p-10 h-dvh overflow-y-auto top-0 border-l border-l-(--color-border-default)">
@@ -326,6 +338,7 @@ export const CreateTaskForm: FC = () => {
                 triggerSuggestion={triggerSuggestion}
                 isSubmitting={isSubmitting}
                 setFieldValue={setFieldValue}
+                durationUnit={durationUnit}
               />
 
               <FormikInactivityReset
@@ -377,6 +390,7 @@ export const CreateTaskForm: FC = () => {
                 touched={touched.tierId}
                 error={errors.tierId}
                 loading={dataLoading}
+                unit={durationUnit}
               />
 
               <LevelSelect
@@ -402,6 +416,7 @@ export const CreateTaskForm: FC = () => {
                 error={errors.durationDays}
                 onDurationComplete={() => setTriggerSuggestion((prev) => prev + 1)}
                 tierDuration={values.tierId ? selectedTierDuration(values.tierId) : undefined}
+                unit={durationUnit}
               />
 
               <UserAssignmentSelect

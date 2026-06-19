@@ -14,6 +14,7 @@ import {
   Spinner,
   FormSeparator,
   AlertDialog,
+  Select,
 } from "@/components/ui";
 import {
   Icon,
@@ -29,6 +30,7 @@ import {
   useResetSettings,
 } from "@/hooks/useSettings";
 import { useTaskDataInvalidation } from "@/hooks/useTaskData";
+import { daysToUnit, unitToDays, DURATION_UNITS, type DurationUnit } from "@/utils/duration-utils";
 import axios from "axios";
 import { hotToast as toast } from "@/lib/hotToast";
 
@@ -65,15 +67,25 @@ export const SettingsForm: React.FC = () => {
   const [tierChanges, setTierChanges] = useState<Record<number, number>>({});
   const [loadingTiers, setLoadingTiers] = useState(true);
   const [savingTiers, setSavingTiers] = useState(false);
+  const [unit, setUnit] = useState<DurationUnit>("days");
+  const [savingUnit, setSavingUnit] = useState(false);
   const [showResetDialog, setShowResetDialog] = useState(false);
 
-  // Cargar tiers
+  // Duración (días base) → valor mostrado en la unidad activa (redondeado).
+  const toUnit = (days: number) => Math.round(daysToUnit(days, unit) * 100) / 100;
+
+  // Cargar tiers + la unidad de duración del workspace.
+  const loadTiers = async () => {
+    const response = await axios.get("/api/tiers");
+    setTiers(response.data.tiers ?? []);
+    setUnit((response.data.durationUnit as DurationUnit) ?? "days");
+  };
+
   useEffect(() => {
-    const fetchTiers = async () => {
+    (async () => {
       try {
         setLoadingTiers(true);
-        const response = await axios.get("/api/tiers");
-        setTiers(response.data);
+        await loadTiers();
       } catch (error) {
         console.error("Error loading tiers:", error);
         toast.error({
@@ -83,9 +95,27 @@ export const SettingsForm: React.FC = () => {
       } finally {
         setLoadingTiers(false);
       }
-    };
-    fetchTiers();
+    })();
   }, []);
+
+  // Cambiar la unidad: persiste de inmediato y re-muestra los valores en ella.
+  // (Descarta ediciones de duración sin guardar: primero se elige la unidad.)
+  const handleUnitChange = async (newUnit: DurationUnit) => {
+    if (newUnit === unit) return;
+    try {
+      setSavingUnit(true);
+      await axios.patch("/api/tiers", { durationUnit: newUnit });
+      setTierChanges({});
+      await loadTiers();
+      setHasChanges(Object.values(settingValues).some((s) => s.hasChanged));
+      invalidateTiers();
+    } catch (error) {
+      console.error("Error updating unit:", error);
+      toast.error({ title: "Couldn't change the unit", description: "Please try again." });
+    } finally {
+      setSavingUnit(false);
+    }
+  };
 
   // Initialize setting values when data loads
   useEffect(() => {
@@ -147,23 +177,16 @@ export const SettingsForm: React.FC = () => {
     const originalTier = tiers.find((t) => t.id === tierId);
     if (!originalTier) return;
 
-    if (originalTier.duration === newDuration) {
+    if (toUnit(originalTier.duration) === newDuration) {
       // Si vuelve al valor original, remover del registro de cambios
       const newTierChanges = { ...tierChanges };
       delete newTierChanges[tierId];
       setTierChanges(newTierChanges);
+      updateHasChanges(settingValues, null, false, newTierChanges);
     } else {
-      // Registrar el cambio
-      setTierChanges((prev) => ({
-        ...prev,
-        [tierId]: newDuration,
-      }));
+      setTierChanges((prev) => ({ ...prev, [tierId]: newDuration }));
+      updateHasChanges(settingValues, null, false, { ...tierChanges, [tierId]: newDuration });
     }
-
-    updateHasChanges(settingValues, null, false, {
-      ...tierChanges,
-      [tierId]: newDuration,
-    });
   };
 
   // Check if any setting has changed
@@ -204,15 +227,14 @@ export const SettingsForm: React.FC = () => {
         setSavingTiers(true);
 
         const updatePromises = Object.entries(tierChanges).map(
-          ([tierId, duration]) =>
-            axios.patch(`/api/tiers/${tierId}`, { duration })
+          ([tierId, valueInUnit]) =>
+            axios.patch(`/api/tiers/${tierId}`, { duration: unitToDays(valueInUnit, unit) })
         );
 
         await Promise.all(updatePromises);
 
         // Recargar tiers localmente
-        const response = await axios.get("/api/tiers");
-        setTiers(response.data);
+        await loadTiers();
         setTierChanges({});
 
         // Invalidate task data cache so other components refresh
@@ -436,7 +458,18 @@ export const SettingsForm: React.FC = () => {
 
         {/* Tier Settings */}
         <section className="space-y-4">
-          <FormSeparator>Tier Durations</FormSeparator>
+          <div className="flex items-center justify-between gap-3">
+            <FormSeparator>Tier Durations</FormSeparator>
+            <div className="w-36 shrink-0">
+              <Select
+                size="sm"
+                value={unit}
+                onChange={(val) => handleUnitChange(val as DurationUnit)}
+                disabled={loadingTiers || savingUnit}
+                options={DURATION_UNITS.map((u) => ({ value: u, label: u[0].toUpperCase() + u.slice(1) }))}
+              />
+            </div>
+          </div>
 
           {loadingTiers ? (
             <Progress />
@@ -444,7 +477,7 @@ export const SettingsForm: React.FC = () => {
             <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
               {tiers.map((tier) => {
                 const hasChanged = tierChanges[tier.id] !== undefined;
-                const currentDuration = tierChanges[tier.id] ?? tier.duration;
+                const currentDuration = tierChanges[tier.id] ?? toUnit(tier.duration);
 
                 return (
                   <div key={tier.id} className="flex flex-col gap-1.5 min-w-0">
@@ -456,6 +489,7 @@ export const SettingsForm: React.FC = () => {
                           title="Changed"
                         />
                       )}
+                      <span className="text-xs text-(--color-text-subtle)">({unit})</span>
                     </div>
                     <Input
                       type="number"
@@ -466,8 +500,8 @@ export const SettingsForm: React.FC = () => {
                           handleTierDurationChange(tier.id, value);
                         }
                       }}
-                      min={0.1}
-                      step={0.1}
+                      min={unit === "minutes" ? 1 : 0.1}
+                      step={unit === "days" ? 0.1 : 1}
                       size="sm"
                       className={`w-full${hasChanged ? " border-warning-500" : ""}`}
                     />
