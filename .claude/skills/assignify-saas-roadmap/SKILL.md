@@ -118,7 +118,25 @@ tareas, y todo queda **aislado por inquilino** (un usuario nunca ve datos de otr
       pruebas ya no se cuelan).
     - Login ClickUp → solo el workspace que resolvió ese login.
 
-### Fase 4 — PRÓXIMA SESIÓN. Pieza central: SYNC DE LISTAS/BRANDS POR WORKSPACE.
+### Fase 4 — EN CURSO.
+**Hecho ya:**
+- ✅ **PK compuesto `user(id, workspaceId)`** → la misma persona en varios workspaces
+  (commit del usuario); user_role/user_vacation con `workspace_id` + relaciones
+  compuestas. *(OJO: el `drizzle-kit push` se atascó en un índice cosmético de
+  user_role; las tablas/datos quedaron correctos pero NO volver a pushear sin revisar.)*
+- ✅ **Fix skeleton**: `useSyncUsers` invalida `workload`.
+- ✅ **Tipo de tarea dinámico** en el form: `TaskTypeSelect` con los task types del
+  workspace (se eliminó el switch UX/UI|Graphic y `getTypeKind`/`TaskKindSwitch`).
+- ✅ **Sync de listas/brands**: `/api/sync/clickup-lists` (GET descubre, POST guarda) +
+  `ListsSyncForm` + entrada "Lists" en el header. BrandSelect ahora dice "List".
+
+**Pendiente:**
+- **brand.name es único GLOBAL** → dos workspaces con una lista del mismo nombre
+  chocan (el POST lo cachea y reporta). Hardening: unique por (workspaceId, name).
+- **Selector multi-workspace** (hoy `teams[0]`), **webhooks por workspace**,
+  `getAppSettings` por workspace, scopear `/api/settings` y creación de tiers.
+
+### (Referencia) Plan original de Fase 4
 1. **Sync de listas/brands por workspace** (lo más importante): página estilo
    `/designers` que DESCUBRE las listas del workspace (crawl space→folder→list con el
    token del usuario — reusar la lógica de `clickup-tasks.service`) y deja ELEGIR
