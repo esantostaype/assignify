@@ -4,6 +4,17 @@
 // Vive aparte de task-assignment.service.ts para poder testearlo sin mocks: toda la
 // lógica sutil (carril/congestión, escalado de nivel y de cargo, especialista vs
 // generalista) se ejercita con fixtures sintéticas.
+//
+// Refinamientos sobre el review del motor:
+//   #1 Congestión medida en DÍAS de trabajo del carril (no nº de tareas).
+//   #2 Tope blando de carga (overloadSoftCapDays): empuja la fecha efectiva de
+//      quien arrastra una cola grande de trabajo de menor prioridad, que el
+//      carril por sí solo ignora → menos sobreasignación.
+//   #3 Tres escalados con umbral PROPIO (closeWindow / forceGeneralist /
+//      crossRole) en vez de un único forceGeneralistThreshold compartido.
+//   #4 Equidad: a igualdad de fecha/congestión, decide la MENOR carga acumulada
+//      (reparte hacia el menos cargado) y, en último término, un id estable.
+//   #6 Desempate final DETERMINISTA por id (no el orden de llegada al array).
 import { Level, Priority } from '@/db/enums';
 import { VacationAwareUserSlot } from '@/interfaces';
 
@@ -23,55 +34,96 @@ export const PRIORITY_RANK: Record<Priority, number> = { LOW: 1, NORMAL: 2, HIGH
 export const ROLE_AFFINITY_ASCENDING: Array<1 | 2 | 3> = [1, 2, 3];
 
 /**
+ * Umbrales del núcleo de decisión, ya SEPARADOS. Antes un único
+ * `forceGeneralistThreshold` gobernaba los tres escalados (fechas parejas,
+ * especialista/generalista y cargo); separarlos permite afinar cada uno sin
+ * mover los otros. Poner el mismo valor en los tres reproduce el comportamiento
+ * del umbral único.
+ */
+export interface RankingConfig {
+  /** Ventana (días) para considerar dos fechas de liberación "parejas". */
+  closeWindowDays: number;
+  /** Umbral (días) para preferir generalista sobre especialista dentro de un nivel. */
+  forceGeneralistDays: number;
+  /** Umbral (días) para escalar al NIVEL superior. */
+  levelEscalationDays: number;
+  /** Umbral (días) para escalar a otro CARGO/afinidad. */
+  crossRoleEscalationDays: number;
+  /** Tope blando de carga total (días); 0 = desactivado. */
+  overloadSoftCapDays: number;
+}
+
+/**
+ * Fecha de liberación EFECTIVA para comparar candidatos. Con el tope blando de
+ * carga activo (overloadSoftCapDays > 0), a quien ya supera ese tope de trabajo
+ * total pendiente se le empuja la fecha hacia adelante en proporción al exceso.
+ * Así dejamos de apilar tareas en quien arrastra una cola enorme de trabajo de
+ * MENOR prioridad (que el carril ignora). Con 0, no hay penalización y la fecha
+ * efectiva es la real (comportamiento previo).
+ */
+function effectiveAvailableMs(s: VacationAwareUserSlot, cfg: RankingConfig): number {
+  const base = s.availableDate.getTime();
+  if (cfg.overloadSoftCapDays <= 0) return base;
+  const excess = s.totalAssignedDurationDays - cfg.overloadSoftCapDays;
+  return excess > 0 ? base + excess * MS_PER_DAY : base;
+}
+
+/**
  * Orden de preferencia entre candidatos:
- *   1. Quien se libera ANTES, si la diferencia es mayor que `closeWindowDays`.
- *   2. Si se liberan en fechas PARECIDAS (dentro de la ventana), gana quien tenga
- *      MENOS congestión de prioridad (menos tareas de prioridad ≥ la pedida) —
- *      así no se apilan urgentes en el mismo diseñador aunque sea especialista.
- *   3. Desempates: menos carga total y, por último, la fecha exacta.
- * `closeWindowDays` reutiliza el umbral que ya separa especialista/generalista.
+ *   1. Quien se libera ANTES (fecha EFECTIVA, ya penalizada por sobrecarga), si la
+ *      diferencia supera `closeWindowDays`.
+ *   2. Si se liberan en fechas PARECIDAS, gana quien tenga MENOS congestión de
+ *      prioridad medida en DÍAS de trabajo (no en nº de tareas) — así no se apilan
+ *      urgentes en el mismo diseñador aunque sea especialista.
+ *   3. Desempates (equidad): menor carga total acumulada → fecha real → id estable
+ *      (nunca el orden de llegada al array, que era arbitrario).
  */
 export function compareSlots(
   a: VacationAwareUserSlot,
   b: VacationAwareUserSlot,
-  closeWindowDays: number
+  cfg: RankingConfig
 ): number {
-  const dateDiffMs = a.availableDate.getTime() - b.availableDate.getTime();
-  if (Math.abs(dateDiffMs) / MS_PER_DAY > closeWindowDays) return dateDiffMs;
+  const effDiff = effectiveAvailableMs(a, cfg) - effectiveAvailableMs(b, cfg);
+  if (Math.abs(effDiff) / MS_PER_DAY > cfg.closeWindowDays) return effDiff;
 
   const congestionDiff =
-    (a.samePriorityOrHigherLoad ?? 0) - (b.samePriorityOrHigherLoad ?? 0);
+    (a.samePriorityOrHigherLoadDays ?? 0) - (b.samePriorityOrHigherLoadDays ?? 0);
   if (congestionDiff !== 0) return congestionDiff;
 
   const loadDiff = a.totalAssignedDurationDays - b.totalAssignedDurationDays;
   if (loadDiff !== 0) return loadDiff;
 
-  return dateDiffMs;
+  const realDiff = a.availableDate.getTime() - b.availableDate.getTime();
+  if (realDiff !== 0) return realDiff;
+
+  // Desempate final DETERMINISTA por id (estable y reproducible) en vez de
+  // depender del orden de entrada al array.
+  return a.userId < b.userId ? -1 : a.userId > b.userId ? 1 : 0;
 }
 
 // Disponible antes primero (fecha ya ajustada por cola + vacaciones + festivos);
 // entre quienes se liberan en fechas parecidas, el de menor congestión de prioridad.
 export function sortByAvailability(
   users: VacationAwareUserSlot[],
-  closeWindowDays: number
+  cfg: RankingConfig
 ): VacationAwareUserSlot[] {
-  return [...users].sort((a, b) => compareSlots(a, b, closeWindowDays));
+  return [...users].sort((a, b) => compareSlots(a, b, cfg));
 }
 
 /**
  * Mejor candidato DENTRO de un mismo nivel. La regla de niveles manda; la de
  * especialista/generalista queda como DESEMPATE dentro del nivel: si el mejor
  * especialista se libera mucho más tarde que el mejor generalista
- * (umbral DEADLINE_DIFFERENCE_TO_FORCE_GENERALIST), se prefiere el generalista.
- * En caso normal gana simplemente el de antes-disponible / menos-carga.
+ * (umbral `forceGeneralistDays`), se prefiere el generalista. En caso normal gana
+ * simplemente el de antes-disponible / menos-carga.
  */
 export function pickBestInLevel(
   slots: VacationAwareUserSlot[],
-  forceGeneralistThresholdDays: number
+  cfg: RankingConfig
 ): VacationAwareUserSlot | null {
   if (slots.length === 0) return null;
 
-  const sorted = sortByAvailability(slots, forceGeneralistThresholdDays);
+  const sorted = sortByAvailability(slots, cfg);
   const bestOverall = sorted[0];
 
   const bestSpecialist = sorted.find((s) => s.isSpecialist) ?? null;
@@ -82,7 +134,7 @@ export function pickBestInLevel(
   if (bestSpecialist && bestGeneralist && bestOverall.isSpecialist) {
     const daysLater =
       (bestSpecialist.availableDate.getTime() - bestGeneralist.availableDate.getTime()) / MS_PER_DAY;
-    if (daysLater > forceGeneralistThresholdDays) {
+    if (daysLater > cfg.forceGeneralistDays) {
       return bestGeneralist;
     }
   }
@@ -102,8 +154,7 @@ export function pickBestInLevel(
 export function pickBestByLevelEscalation(
   slots: VacationAwareUserSlot[],
   reqLevel: Level,
-  levelEscalationDays: number,
-  forceGeneralistThreshold: number
+  cfg: RankingConfig
 ): VacationAwareUserSlot | null {
   if (slots.length === 0) return null;
 
@@ -113,7 +164,7 @@ export function pickBestByLevelEscalation(
   const bestByLevel: Partial<Record<Level, VacationAwareUserSlot>> = {};
   for (const lvl of candidateLevels) {
     const slotsOfLevel = slots.filter((s) => s.level === lvl);
-    const best = pickBestInLevel(slotsOfLevel, forceGeneralistThreshold);
+    const best = pickBestInLevel(slotsOfLevel, cfg);
     if (best) bestByLevel[lvl] = best;
   }
 
@@ -126,7 +177,7 @@ export function pickBestByLevelEscalation(
       continue;
     }
     const daysLater = (chosen.availableDate.getTime() - current.availableDate.getTime()) / MS_PER_DAY;
-    if (daysLater > levelEscalationDays) chosen = current;
+    if (daysLater > cfg.levelEscalationDays) chosen = current;
   }
 
   return chosen;
@@ -138,17 +189,16 @@ export function pickBestByLevelEscalation(
  * - Los slots se agrupan por `roleAffinity` (1 primario → 2 secundario → 3 otro cargo).
  *   Dentro de cada grupo se resuelve el nivel con `pickBestByLevelEscalation`.
  * - ESCALADO entre cargos: si el mejor del grupo actual se libera MÁS de
- *   `forceGeneralistThreshold` días DESPUÉS que el del siguiente grupo (affinity
- *   superior), se considera también ese grupo (1→2→3). Mismo umbral que separa
- *   especialista de generalista: "ve a otros cargos cuando los preferidos están saturados".
+ *   `crossRoleEscalationDays` días DESPUÉS que el del siguiente grupo (affinity
+ *   superior), se considera también ese grupo (1→2→3): "ve a otros cargos cuando
+ *   los preferidos están saturados".
  *
  * El override MANUAL (asignar a mano) no pasa por aquí.
  */
 export function pickBestAcrossAffinity(
   userSlots: VacationAwareUserSlot[],
   reqLevel: Level,
-  levelEscalationDays: number,
-  forceGeneralistThreshold: number
+  cfg: RankingConfig
 ): VacationAwareUserSlot | null {
   if (userSlots.length === 0) return null;
 
@@ -158,12 +208,7 @@ export function pickBestAcrossAffinity(
   for (const affinity of ROLE_AFFINITY_ASCENDING) {
     const slotsOfAffinity = userSlots.filter((s) => (s.roleAffinity ?? 3) === affinity);
     if (slotsOfAffinity.length === 0) continue;
-    const best = pickBestByLevelEscalation(
-      slotsOfAffinity,
-      reqLevel,
-      levelEscalationDays,
-      forceGeneralistThreshold
-    );
+    const best = pickBestByLevelEscalation(slotsOfAffinity, reqLevel, cfg);
     if (best) bestByAffinity[affinity] = best;
   }
 
@@ -176,7 +221,7 @@ export function pickBestAcrossAffinity(
       continue;
     }
     const daysLater = (chosen.availableDate.getTime() - current.availableDate.getTime()) / MS_PER_DAY;
-    if (daysLater > forceGeneralistThreshold) chosen = current;
+    if (daysLater > cfg.crossRoleEscalationDays) chosen = current;
   }
 
   return chosen;

@@ -40,12 +40,33 @@ export interface AppThresholds {
   CONSECUTIVE_LOW_TASKS_THRESHOLD: number;
 }
 
+/**
+ * Umbrales del núcleo de decisión "¿QUIÉN?" (assignment-ranking). Antes los tres
+ * escalados compartían DEADLINE_DIFFERENCE_TO_FORCE_GENERALIST; ahora cada uno
+ * tiene su setting para poder afinarlos por separado. Los defaults (10/10/10)
+ * reproducen el comportamiento del umbral único.
+ */
+export interface RankingThresholds {
+  /** Ventana (días) para considerar dos fechas de liberación "parejas". */
+  closeWindowDays: number;
+  /** Umbral (días) para preferir generalista sobre especialista. */
+  forceGeneralistDays: number;
+  /** Umbral (días) para escalar al NIVEL superior. */
+  levelEscalationDays: number;
+  /** Umbral (días) para escalar a otro CARGO/afinidad. */
+  crossRoleEscalationDays: number;
+  /** Tope blando de carga total (días); 0 = desactivado. */
+  overloadSoftCapDays: number;
+}
+
 export interface AppSettings {
   /** Horario laboral YA convertido a UTC. */
   workHours: AppWorkHours;
   thresholds: AppThresholds;
   /** Días para escalar de nivel (umbral nuevo). */
   levelEscalationDays: number;
+  /** Umbrales del núcleo de decisión "¿QUIÉN?" (ya separados). */
+  ranking: RankingThresholds;
 }
 
 // Defaults a partir de las constantes de @/config + el nuevo umbral.
@@ -54,6 +75,13 @@ const FALLBACK_SETTINGS: AppSettings = {
   workHours: { ...WORK_HOURS },
   thresholds: { ...TASK_ASSIGNMENT_THRESHOLDS },
   levelEscalationDays: 3,
+  ranking: {
+    closeWindowDays: TASK_ASSIGNMENT_THRESHOLDS.DEADLINE_DIFFERENCE_TO_FORCE_GENERALIST,
+    forceGeneralistDays: TASK_ASSIGNMENT_THRESHOLDS.DEADLINE_DIFFERENCE_TO_FORCE_GENERALIST,
+    levelEscalationDays: 3,
+    crossRoleEscalationDays: TASK_ASSIGNMENT_THRESHOLDS.DEADLINE_DIFFERENCE_TO_FORCE_GENERALIST,
+    overloadSoftCapDays: 0,
+  },
 };
 
 const CACHE_KEY = 'app-settings:engine';
@@ -156,12 +184,73 @@ export async function getAppSettings(workspaceId?: string | null): Promise<AppSe
       FALLBACK_SETTINGS.levelEscalationDays
     );
 
-    const settings: AppSettings = { workHours, thresholds, levelEscalationDays };
+    // Umbrales del núcleo "¿QUIÉN?", ya separados. Cada uno cae al umbral único
+    // legacy (deadline_difference_to_force_generalist) si su fila aún no existe,
+    // de modo que el comportamiento por defecto no cambia.
+    const forceGeneralistDays = thresholds.DEADLINE_DIFFERENCE_TO_FORCE_GENERALIST;
+    const ranking: RankingThresholds = {
+      closeWindowDays: readNumber(rows, 'task_assignment', 'close_dates_window_days', forceGeneralistDays),
+      forceGeneralistDays,
+      levelEscalationDays,
+      crossRoleEscalationDays: readNumber(rows, 'task_assignment', 'cross_role_escalation_days', forceGeneralistDays),
+      overloadSoftCapDays: readNumber(rows, 'task_assignment', 'overload_soft_cap_days', 0),
+    };
+
+    const settings: AppSettings = { workHours, thresholds, levelEscalationDays, ranking };
     setInCache(cacheKey, settings, CACHE_TTL_SECONDS);
     return settings;
   } catch (error) {
     console.error('getAppSettings: failed to read system_settings, using @/config fallback:', error);
     return FALLBACK_SETTINGS;
+  }
+}
+
+/** Busca un setting booleano; tolera boolean/number/string en el JSON guardado. */
+function readBoolean(
+  rows: SettingRow[],
+  category: string,
+  key: string,
+  fallback: boolean
+): boolean {
+  const row = rows.find((r) => r.category === category && r.key === key);
+  if (!row) return fallback;
+  const v = row.value;
+  if (typeof v === 'boolean') return v;
+  if (typeof v === 'number') return v !== 0;
+  if (typeof v === 'string') return v === 'true' || v === '1';
+  return fallback;
+}
+
+export interface ApprovalSettings {
+  /** Si el cron auto-completa las tareas "On Approval" vencidas. */
+  enabled: boolean;
+  /** Días tras el deadline antes de auto-completar. */
+  days: number;
+}
+
+/** Default seguro si la DB falla o el workspace aún no tiene estas settings. */
+const FALLBACK_APPROVAL_SETTINGS: ApprovalSettings = { enabled: true, days: 14 };
+
+/**
+ * Config de auto-completado de approvals para un workspace (la edita el usuario
+ * en Settings → grupo "Approvals"). La consume el cron complete-stale-approvals.
+ * Lectura directa (sin caché): el cron corre a diario y queremos el valor fresco.
+ */
+export async function getApprovalSettings(workspaceId?: string | null): Promise<ApprovalSettings> {
+  try {
+    const rows = (workspaceId
+      ? await db.query.systemSettings.findMany({ where: eq(systemSettings.workspaceId, workspaceId) })
+      : await db.query.systemSettings.findMany()) as SettingRow[];
+
+    if (rows.length === 0) return FALLBACK_APPROVAL_SETTINGS;
+
+    const enabled = readBoolean(rows, 'approvals', 'auto_complete_enabled', FALLBACK_APPROVAL_SETTINGS.enabled);
+    const days = readNumber(rows, 'approvals', 'auto_complete_days', FALLBACK_APPROVAL_SETTINGS.days);
+    // Blindaje: nunca permitir 0/negativo (completaría tareas al instante).
+    return { enabled, days: days > 0 ? days : FALLBACK_APPROVAL_SETTINGS.days };
+  } catch (error) {
+    console.error('getApprovalSettings: failed to read system_settings, using fallback:', error);
+    return FALLBACK_APPROVAL_SETTINGS;
   }
 }
 

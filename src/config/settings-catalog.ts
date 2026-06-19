@@ -13,7 +13,7 @@
 export interface SettingDefinition {
   category: string;
   key: string;
-  value: number | string;
+  value: number | string | boolean;
   dataType: 'number' | 'string' | 'boolean';
   label: string;
   description: string;
@@ -144,6 +144,76 @@ export const DEFAULT_SETTINGS: SettingDefinition[] = [
     order: 4,
     minValue: 1,
     maxValue: 60,
+    required: true,
+  },
+  {
+    category: 'task_assignment',
+    key: 'close_dates_window_days',
+    value: 10,
+    dataType: 'number',
+    label: 'Close-dates window (days)',
+    description:
+      'Two candidates freeing up within this many days of each other are treated as "tied" on date; the choice then falls to workload and role fit instead of the exact day.',
+    group: 'task_assignment',
+    order: 5,
+    minValue: 1,
+    maxValue: 60,
+    required: true,
+  },
+  {
+    category: 'task_assignment',
+    key: 'cross_role_escalation_days',
+    value: 10,
+    dataType: 'number',
+    label: 'Cross-role escalation (days)',
+    description:
+      'If the best candidate of the preferred role frees up more than this many days later than one of a secondary/other role, the other role is also considered.',
+    group: 'task_assignment',
+    order: 6,
+    minValue: 1,
+    maxValue: 60,
+    required: true,
+  },
+  {
+    category: 'task_assignment',
+    key: 'overload_soft_cap_days',
+    value: 0,
+    dataType: 'number',
+    label: 'Overload soft cap (days, 0 = off)',
+    description:
+      'Soft fairness cap: when a member already has more than this many days of total pending work, their effective availability is pushed back so heavy queues of lower-priority work stop attracting new tasks. 0 disables it.',
+    group: 'task_assignment',
+    order: 7,
+    minValue: 0,
+    maxValue: 365,
+    required: true,
+  },
+
+  // ── Auto-completar approvals (cron diario) ──────────────────────────────────
+  {
+    category: 'approvals',
+    key: 'auto_complete_enabled',
+    value: true,
+    dataType: 'boolean',
+    label: 'Auto-complete stale approvals',
+    description:
+      'When on, the daily job marks "On Approval" tasks as complete in ClickUp once their deadline has passed by the days below. Tasks tagged "keep" are never touched.',
+    group: 'approvals',
+    order: 1,
+    required: true,
+  },
+  {
+    category: 'approvals',
+    key: 'auto_complete_days',
+    value: 14,
+    dataType: 'number',
+    label: 'Days after deadline',
+    description:
+      'How many days past its deadline an "On Approval" task waits before being auto-completed.',
+    group: 'approvals',
+    order: 2,
+    minValue: 1,
+    maxValue: 90,
     required: true,
   },
 ];

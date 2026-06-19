@@ -61,10 +61,15 @@ export interface VacationAwareUserSlot extends UserSlot {
   roleAffinity?: 1 | 2 | 3
   /**
    * Nº de tareas pendientes del diseñador con prioridad IGUAL o MAYOR a la pedida.
-   * Sirve para no apilar urgentes en quien ya carga muchas: a igualdad (o cercanía)
-   * de fecha de liberación, gana quien tenga menos congestión de esta prioridad.
+   * Se conserva solo para el texto explicativo (`reason`) del selector.
    */
   samePriorityOrHigherLoad?: number
+  /**
+   * Congestión del carril medida en DÍAS de trabajo (suma de duraciones de las
+   * tareas de prioridad ≥ la pedida), no en nº de tareas. Es la métrica que usa
+   * el comparador: 3 tareas de 30 min no deben pesar más que una de 5 días.
+   */
+  samePriorityOrHigherLoadDays?: number
   /** Estado para la UI del selector. */
   status?: MemberStatus
 }

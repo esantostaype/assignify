@@ -19,10 +19,17 @@ export async function GET() {
       orderBy: [asc(systemSettings.group), asc(systemSettings.order)]
     });
 
-    // Si este workspace aún no tiene settings, sembrar los por defecto (con su workspaceId).
-    if (settings.length === 0) {
-      for (const defaultSetting of DEFAULT_SETTINGS) {
-        await db.insert(systemSettings).values({ ...defaultSetting, workspaceId: wsId });
+    // Back-fill: insertar los settings del catálogo que ESTE workspace aún no
+    // tenga. Cubre tanto un workspace nuevo (inserta todos) como añadir nuevas
+    // settings al catálogo más adelante (p.ej. 'approvals') sin resetear ni
+    // perder los valores ya editados.
+    const existingKeys = new Set(settings.map((s) => `${s.category}.${s.key}`));
+    const missing = DEFAULT_SETTINGS.filter(
+      (d) => !existingKeys.has(`${d.category}.${d.key}`)
+    );
+    if (missing.length > 0) {
+      for (const def of missing) {
+        await db.insert(systemSettings).values({ ...def, workspaceId: wsId });
       }
 
       settings = await db.query.systemSettings.findMany({

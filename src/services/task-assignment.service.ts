@@ -240,7 +240,14 @@ async function getVacationAwareUserSlots(
     );
     // Congestión del carril: cuántas de prioridad ≥ la pedida ya tiene (para no
     // apilar urgentes en quien ya carga muchas cuando se liberan en fechas parecidas).
+    // `...Load` (conteo) se conserva solo para el texto explicativo del selector;
+    // la DECISIÓN usa `...LoadDays`, la congestión medida en DÍAS de trabajo, para
+    // que 3 tareas de 30 min no pesen más que una de 5 días.
     const samePriorityOrHigherLoad = laneTasks.length;
+    const samePriorityOrHigherLoadDays = laneTasks.reduce(
+      (sum, t) => sum + estimateTaskDurationDays(t),
+      0
+    );
 
     // Ajustar la fecha de inicio para SALTAR las vacaciones (en lugar de excluir al usuario).
     // Si la tarea —empezando cuando el usuario se libera de su cola— choca con una vacación,
@@ -259,7 +266,11 @@ async function getVacationAwareUserSlots(
     );
 
     const matchingRoles = user.roles.filter(role => role.typeId === typeId);
-    const isSpecialist = matchingRoles.length === 1 && user.roles.length === 1;
+    // Especialista del TIPO pedido: tiene cargo para este tipo y NINGÚN cargo de
+    // otro tipo (da igual cuántos brands o cargos del mismo tipo). Antes era
+    // `=== 1 && roles.length === 1`, que dejaba fuera a cualquiera con >1 rol.
+    const isSpecialist =
+      matchingRoles.length > 0 && user.roles.every(role => role.typeId === typeId);
 
     // Estado para los badges del selector (no decide a quién se elige):
     //   on_vacation → ahora mismo de vacaciones, o la tarea se corrió por una vacación.
@@ -298,6 +309,7 @@ async function getVacationAwareUserSlots(
       // Afinidad de cargo (1 primario / 2 secundario / 3 otro): eje superior al de nivel.
       roleAffinity,
       samePriorityOrHigherLoad,
+      samePriorityOrHigherLoadDays,
       status,
     });
   }
@@ -319,12 +331,9 @@ async function selectBestUserWithVacationLogic(
   if (userSlots.length === 0) return null;
 
   const settings = await getAppSettings(workspaceId);
-  return pickBestAcrossAffinity(
-    userSlots,
-    reqLevel,
-    settings.levelEscalationDays,
-    settings.thresholds.DEADLINE_DIFFERENCE_TO_FORCE_GENERALIST
-  );
+  // Todos los umbrales del núcleo, ya separados, viajan en `settings.ranking`
+  // (mismo shape que RankingConfig). El override MANUAL no pasa por aquí.
+  return pickBestAcrossAffinity(userSlots, reqLevel, settings.ranking);
 }
 
 export async function getBestUserWithCache(

@@ -49,7 +49,7 @@ interface TierData {
 }
 
 // Grupos permitidos
-const ALLOWED_GROUPS = ["work_schedule", "task_assignment"];
+const ALLOWED_GROUPS = ["work_schedule", "task_assignment", "approvals"];
 
 export const SettingsForm: React.FC = () => {
   const { data: settingsData, isLoading, error, refetch } = useSettings();
@@ -361,7 +361,8 @@ export const SettingsForm: React.FC = () => {
   const getGroupDisplayName = (groupName: string) => {
     const mapping: Record<string, string> = {
       work_schedule: "Work schedule",
-      task_assignment: "Task assignment"
+      task_assignment: "Task assignment",
+      approvals: "Approvals"
     };
     return mapping[groupName] || groupName;
   };

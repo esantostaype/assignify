@@ -1,7 +1,12 @@
 // src/app/api/cron/complete-stale-approvals/route.ts
 //
 // Cron diario: auto-completa en ClickUp las tareas "On Approval" cuyo deadline
-// (due_date) ya pasó hace MÁS de 2 semanas, SALVO que tengan el tag `keep`.
+// (due_date) ya pasó hace MÁS de N días, SALVO que tengan el tag `keep`.
+//
+// [SaaS] La función es CONFIGURABLE POR WORKSPACE (Settings → "Approvals"):
+//   - `auto_complete_enabled` (on/off): si está off, ese workspace se omite.
+//   - `auto_complete_days`: cuántos días tras el deadline esperar (def. 14).
+//   Se agrupan los brands por workspace y cada uno usa SU config.
 //
 // - Fuente de listas: brands ACTIVOS en Turso (brand.id === list.id de ClickUp).
 // - Lee tareas EN VIVO de ClickUp por lista (axios) y detecta las que mapean a
@@ -19,12 +24,13 @@ import { eq } from 'drizzle-orm'
 import { API_CONFIG } from '@/config'
 import { mapClickUpStatusToLocal } from '@/utils/clickup-status-mapping-utils'
 import { getClickUpStatusName } from '@/utils/clickup-task-mapping-utils'
+import { getApprovalSettings } from '@/services/app-settings.service'
 import { Status } from '@/db/enums'
 
 export const dynamic = 'force-dynamic'
 
 const BASE = API_CONFIG.CLICKUP_API_BASE
-const TWO_WEEKS_MS = 14 * 24 * 60 * 60 * 1000
+const DAY_MS = 24 * 60 * 60 * 1000
 
 // Nombre del estado "complete" a enviar a ClickUp. Preferimos el del mapeo del
 // proyecto; mantenemos 'closed' como reintento por si una lista nombra distinto
@@ -87,11 +93,20 @@ export async function GET(req: NextRequest) {
   const now = Date.now()
 
   try {
-    // 2) Listas = brands activos en Turso.
+    // 2) Listas = brands activos en Turso (con su workspace para aplicar la config por inquilino).
     const brands = await db.query.brand.findMany({
-      columns: { id: true, name: true },
+      columns: { id: true, name: true, workspaceId: true },
       where: eq(brand.isActive, true),
     })
+
+    // Agrupar por workspace: cada inquilino define on/off + días por su cuenta.
+    const byWorkspace = new Map<string, typeof brands>()
+    for (const b of brands) {
+      const ws = b.workspaceId ?? '__none__'
+      const list = byWorkspace.get(ws)
+      if (list) list.push(b)
+      else byWorkspace.set(ws, [b])
+    }
 
     let reviewed = 0 // tareas ON_APPROVAL revisadas
     let completed = 0 // tareas marcadas como completadas
@@ -102,52 +117,65 @@ export async function GET(req: NextRequest) {
       status: string
     }> = []
     const errors: Array<{ taskId: string; name: string; reason: string }> = []
+    const workspacesProcessed: Array<{ workspaceId: string; days: number }> = []
+    const workspacesSkipped: string[] = [] // función desactivada para ese workspace
 
-    for (const b of brands) {
-      let listTasks: any[] = []
-      try {
-        const { data } = await axios.get(
-          `${BASE}/list/${b.id}/task?archived=false&include_closed=false&subtasks=true`,
-          { headers: authHeaders(token) }
-        )
-        listTasks = data.tasks || []
-      } catch {
-        // Lista inaccesible (sin permisos / no existe): la omitimos sin abortar.
+    for (const [workspaceId, wsBrands] of byWorkspace) {
+      // Config de ESTE workspace. Si está desactivada, se omite por completo.
+      const cfg = await getApprovalSettings(workspaceId === '__none__' ? null : workspaceId)
+      if (!cfg.enabled) {
+        workspacesSkipped.push(workspaceId)
         continue
       }
+      const thresholdMs = cfg.days * DAY_MS
+      workspacesProcessed.push({ workspaceId, days: cfg.days })
 
-      for (const t of listTasks) {
-        const statusStr = t.status?.status || ''
-        if (mapClickUpStatusToLocal(statusStr) !== 'ON_APPROVAL') continue
+      for (const b of wsBrands) {
+        let listTasks: any[] = []
+        try {
+          const { data } = await axios.get(
+            `${BASE}/list/${b.id}/task?archived=false&include_closed=false&subtasks=true`,
+            { headers: authHeaders(token) }
+          )
+          listTasks = data.tasks || []
+        } catch {
+          // Lista inaccesible (sin permisos / no existe): la omitimos sin abortar.
+          continue
+        }
 
-        reviewed++
+        for (const t of listTasks) {
+          const statusStr = t.status?.status || ''
+          if (mapClickUpStatusToLocal(statusStr) !== 'ON_APPROVAL') continue
 
-        // Necesita due_date.
-        if (!t.due_date) continue
-        const dueMs = parseInt(t.due_date, 10)
-        if (Number.isNaN(dueMs)) continue
+          reviewed++
 
-        // ¿El deadline pasó hace más de 2 semanas?
-        if (dueMs + TWO_WEEKS_MS >= now) continue
+          // Necesita due_date.
+          if (!t.due_date) continue
+          const dueMs = parseInt(t.due_date, 10)
+          if (Number.isNaN(dueMs)) continue
 
-        // ¿Tiene el tag `keep`? -> no tocar.
-        if (hasKeepTag(t)) continue
+          // ¿El deadline pasó hace más de los días configurados de este workspace?
+          if (dueMs + thresholdMs >= now) continue
 
-        const applied = await setTaskStatus(t.id, token)
-        if (applied) {
-          completed++
-          completedTasks.push({
-            id: t.id,
-            name: t.name,
-            brand: b.name,
-            status: applied,
-          })
-        } else {
-          errors.push({
-            taskId: t.id,
-            name: t.name,
-            reason: 'Could not apply any valid complete status',
-          })
+          // ¿Tiene el tag `keep`? -> no tocar.
+          if (hasKeepTag(t)) continue
+
+          const applied = await setTaskStatus(t.id, token)
+          if (applied) {
+            completed++
+            completedTasks.push({
+              id: t.id,
+              name: t.name,
+              brand: b.name,
+              status: applied,
+            })
+          } else {
+            errors.push({
+              taskId: t.id,
+              name: t.name,
+              reason: 'Could not apply any valid complete status',
+            })
+          }
         }
       }
     }
@@ -160,6 +188,8 @@ export async function GET(req: NextRequest) {
       completedNames: completedTasks.map((c) => c.name),
       errors,
       brandsChecked: brands.length,
+      workspacesProcessed,
+      workspacesSkipped,
       ranAt: new Date(now).toISOString(),
     })
   } catch (error: any) {
