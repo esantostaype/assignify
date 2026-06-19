@@ -4,7 +4,7 @@ import React, { useEffect, useMemo, useRef } from "react";
 import { MultiSelect, Button, Alert } from "@/components/ui";
 import type { SelectOption } from "@/components/ui";
 import { cn } from "@/lib/cn";
-import { User, RankedCandidate, DesignerStatus } from "@/interfaces";
+import { User, RankedCandidate, MemberStatus } from "@/interfaces";
 import {
   Icon,
   PiUserCheck,
@@ -32,9 +32,9 @@ interface UserAssignmentSelectProps {
   onApplySuggestion?: () => void;
 }
 
-// "suggested" no es un DesignerStatus real: es un marcador visual para el
+// "suggested" no es un MemberStatus real: es un marcador visual para el
 // candidato que el motor recomienda.
-type BadgeKind = "suggested" | DesignerStatus;
+type BadgeKind = "suggested" | MemberStatus;
 
 const BADGE_TEXT: Record<BadgeKind, string> = {
   suggested: "Suggested",
@@ -214,10 +214,10 @@ export const UserAssignmentSelect: React.FC<UserAssignmentSelectProps> = ({
         value={values}
         options={options}
         onChange={(val) => onChange(val)}
-        placeholder={fetchingSuggestion ? "Searching for suggestion..." : "Assign Designer(s)"}
+        placeholder={fetchingSuggestion ? "Searching for suggestion..." : "Assign member(s)"}
         disabled={isLoading || !info?.tierId || !info?.brandId}
         error={touched && error ? error : undefined}
-        noResultsLabel="No compatible designers found"
+        noResultsLabel="No compatible members found"
       />
 
       {/* "Por qué" del sugerido cuando es la selección activa (genera confianza). */}

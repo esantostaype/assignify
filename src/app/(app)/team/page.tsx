@@ -1,5 +1,5 @@
 import { ClickUpUsersSync } from '@/components'
 
-export default function PageDesigners() {
+export default function PageTeam() {
   return <ClickUpUsersSync />
 }

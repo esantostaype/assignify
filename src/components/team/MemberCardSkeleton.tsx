@@ -1,10 +1,10 @@
-// src/components/designers/DesignerCardSkeleton.tsx
-// UN único skeleton que refleja SyncedDesignerCard: cabecera (avatar + nombre /
+// src/components/team/MemberCardSkeleton.tsx
+// UN único skeleton que refleja SyncedMemberCard: cabecera (avatar + nombre /
 // puesto + botón editar), barra de carga (label + valor + barra) y línea de
 // disponibilidad con el chip de estado. Sin email (la tarjeta ya no lo muestra).
 import { Card, Skeleton } from '@/components/ui'
 
-export const DesignerCardSkeleton = () => (
+export const MemberCardSkeleton = () => (
   <Card variant="outlined" padding="md" className="flex flex-col gap-3">
     {/* Cabecera: avatar + nombre/puesto + botón editar */}
     <div className="flex items-start gap-3">

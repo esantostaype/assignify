@@ -1,4 +1,4 @@
-// src/components/designers/UserEditModal.tsx - FIXED VERSION
+// src/components/team/UserEditModal.tsx - FIXED VERSION
 import React from 'react'
 import axios from 'axios'
 import { hotToast as toast } from '@/lib/hotToast'
@@ -35,7 +35,7 @@ const LEVEL_OPTIONS: SelectOption<UserLevel>[] = [
 interface UserEditModalProps {
   userId: string
   /**
-   * Compatibilidad con el wrapper de Designers. El alta de rol se gestiona
+   * Compatibilidad con el wrapper del equipo. El alta de rol se gestiona
    * internamente (vía useAddUserRole) para poder enviar también `isPrimary`,
    * así que esta prop ya no se usa directamente para crear el rol.
    */
@@ -83,7 +83,7 @@ export const UserEditModal: React.FC<UserEditModalProps> = ({
 
   // Alta de rol gestionada aquí para poder enviar también `isPrimary`.
   const { mutate: addRole, isPending: addingRole } = useAddUserRole({
-    onSuccess: () => toast.success({ title: 'Role added successfully', description: 'Assigned to the designer.' }),
+    onSuccess: () => toast.success({ title: 'Role added successfully', description: 'Assigned to the member.' }),
     // Muestra el mensaje real del servidor (p.ej. "Role already exists for this
     // user" en un 409) en lugar del genérico, para que los errores sean visibles.
     onError: (error) => toast.error({ title: "Couldn't add role", description: serverErrorMessage(error, 'Error adding role') }),
@@ -126,11 +126,11 @@ export const UserEditModal: React.FC<UserEditModalProps> = ({
 
   return (
     <div className="space-y-6">
-      {/* Designer Level Section */}
+      {/* Member Level Section */}
       <div>
         <h3 className="text-lg font-medium text-(--color-text-strong) mb-2 flex items-center gap-2">
           <Icon icon={PiMedal} size={20} />
-          Designer Level
+          Level
         </h3>
         <div className="max-w-[16rem]">
           <Select<UserLevel>

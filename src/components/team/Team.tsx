@@ -1,11 +1,11 @@
 /* eslint-disable @typescript-eslint/no-unused-vars */
 /* eslint-disable @typescript-eslint/no-explicit-any */
-// src/components/designers/Designers.tsx - FIXED VERSION
+// src/components/team/Team.tsx
 'use client'
 
 import React, { useState, useMemo } from 'react'
 import { hotToast as toast } from '@/lib/hotToast'
-import { DesignersHeader } from './DesignersHeader'
+import { TeamHeader } from './TeamHeader'
 import { UsersList } from './UsersList'
 import { CapacityTimeline } from './CapacityTimeline'
 import { UserEditModal } from './UserEditModal'
@@ -51,7 +51,7 @@ export const ClickUpUsersSync: React.FC = () => {
         successMessage += ` (${errors.length} errors)`
       }
 
-      toast.success({ title: successMessage, description: 'Designers are now available.' })
+      toast.success({ title: successMessage, description: 'Members are now available.' })
 
       if (notFoundUsers && notFoundUsers.length > 0) {
         toast.neutral({ title: `Users not found in teams: ${notFoundUsers.join(', ')}`, description: 'They were skipped.' })
@@ -73,7 +73,7 @@ export const ClickUpUsersSync: React.FC = () => {
 
   const { mutate: addRole, isPending: addingRole } = useAddUserRole({
     onSuccess: () => {
-      toast.success({ title: 'Role added successfully', description: 'Assigned to the designer.' })
+      toast.success({ title: 'Role added successfully', description: 'Assigned to the member.' })
     },
     onError: () => {
       toast.error({ title: 'Error adding role', description: 'The role was not assigned.' })
@@ -151,7 +151,7 @@ export const ClickUpUsersSync: React.FC = () => {
 
   return (
     <>
-      <DesignersHeader
+      <TeamHeader
         searchValue={searchFilter}
         onSearchChange={setSearchFilter}
         selectedCount={selectedUsers.size}
@@ -179,7 +179,7 @@ export const ClickUpUsersSync: React.FC = () => {
       </div>
 
       {/* Modal de edición renderizado EN VIVO con estado local (patrón de la
-          referencia): el modal forma parte del árbol de Designers y se
+          referencia): el modal forma parte del árbol del equipo y se
           re-renderiza cuando las queries cambian, reflejando al instante
           nivel / cargo / vacaciones tras cada mutación. */}
       <Modal

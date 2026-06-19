@@ -1,4 +1,4 @@
-// src/components/designers/UserRoleRow.tsx
+// src/components/team/UserRoleRow.tsx
 import React, { useState } from "react";
 import { IconButton, Tooltip, DeleteConfirmDialog } from "@/components/ui";
 import { Switch } from "@/components/ui/choice/Switch";

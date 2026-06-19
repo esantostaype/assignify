@@ -302,7 +302,7 @@ export const CreateTaskForm: FC = () => {
             />
           </div>
           <Typography variant="bodySm" color="white" className="font-medium">
-            Finding suggested designer...
+            Finding the best match...
           </Typography>
         </div>
       )}

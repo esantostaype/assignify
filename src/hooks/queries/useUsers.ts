@@ -339,7 +339,7 @@ export const useUpdateUserLevel = (userId: string, options?: {
         old ? { ...old, level } : old
       )
 
-      // El nivel se muestra en la tarjeta (p.ej. "Senior UX/UI Designer"):
+      // El nivel se muestra en la tarjeta (p.ej. "Senior UX/UI"):
       // refrescar detalle + workload + lista de usuarios, y los caches del motor.
       queryClient.invalidateQueries({ queryKey: userKeys.details(userId) })
       queryClient.invalidateQueries({ queryKey: workloadKeys.all })

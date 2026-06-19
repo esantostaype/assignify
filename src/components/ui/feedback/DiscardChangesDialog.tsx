@@ -58,7 +58,7 @@ export function DiscardChangesDialog({
       confirmLabel={confirmLabel}
       cancelLabel={cancelLabel}
       onConfirm={onConfirm}
-      // Surface the wrapper name in the Dev Mode inspector so designers
+      // Surface the wrapper name in the Dev Mode inspector so developers
       // can spot the canonical "Discard" dialog as a first-class entity
       // instead of seeing the underlying `AlertDialog` primitive.
       dataComponentName="DiscardChangesDialog"

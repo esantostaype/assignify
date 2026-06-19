@@ -31,7 +31,7 @@ export const Header = () => {
 
   const navItems = [
     { href: '/tasks', label: 'Tasks', icon: Queue01Icon },
-    { href: '/designers', label: 'Designers', icon: UserGroup03Icon },
+    { href: '/team', label: 'Team', icon: UserGroup03Icon },
     { onClick: () => setTypesOpen(true), label: 'Types', icon: SwatchIcon },
     { onClick: () => setListsOpen(true), label: 'Lists', icon: Folder01Icon },
     { onClick: () => setSettingsOpen(true), label: 'Settings', icon: Settings01Icon }

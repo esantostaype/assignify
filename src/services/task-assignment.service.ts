@@ -6,7 +6,7 @@ import { db } from '@/db';
 import { user as userTable, userRole, userVacation } from '@/db/schema';
 import { eq, and, or, isNull, gte } from 'drizzle-orm';
 import { Priority, Status, Level } from '@/db/enums';
-import { UserSlot, UserWithRoles, Task, TaskTimingResult, UserVacation, VacationAwareUserSlot, RankedCandidate, DesignerStatus } from '@/interfaces';
+import { UserSlot, UserWithRoles, Task, TaskTimingResult, UserVacation, VacationAwareUserSlot, RankedCandidate, MemberStatus } from '@/interfaces';
 import { getNextAvailableStart, calculateWorkingDeadline, OCCUPYING_STATUSES } from '@/utils/task-calculation-utils';
 import { CACHE_KEYS } from '@/config';
 import { getAppSettings } from '@/services/app-settings.service';
@@ -270,7 +270,7 @@ async function getVacationAwareUserSlots(
     );
     const shiftedByVacation = availableDate.getTime() !== baseAvailableDate.getTime();
     const hasVacationConflict = onVacationNow || shiftedByVacation;
-    const status: DesignerStatus = hasVacationConflict
+    const status: MemberStatus = hasVacationConflict
       ? 'on_vacation'
       : totalAssignedDurationDays > OVERLOAD_THRESHOLD_DAYS
         ? 'overloaded'
@@ -368,7 +368,7 @@ export async function getBestUserWithCache(
 }
 
 // Orden de los badges al ordenar la lista del selector: disponibles primero.
-const STATUS_DISPLAY_RANK: Record<DesignerStatus, number> = {
+const STATUS_DISPLAY_RANK: Record<MemberStatus, number> = {
   available: 0,
   overloaded: 1,
   on_vacation: 2,

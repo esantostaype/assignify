@@ -1,12 +1,12 @@
 import React, { useMemo } from "react";
 import { UserCard } from "./UserCard";
-import { SyncedDesignerCard, type DesignerUser } from "./SyncedDesignerCard";
+import { SyncedMemberCard, type MemberUser } from "./SyncedMemberCard";
 import { Icon, PiFileMagnifyingGlass } from "@/lib/icons";
-import { DesignerCardSkeleton } from "./DesignerCardSkeleton";
+import { MemberCardSkeleton } from "./MemberCardSkeleton";
 import type { UserWorkload } from "@/hooks/queries/useWorkload";
 
 interface UsersListProps {
-  users: DesignerUser[];
+  users: MemberUser[];
   selectedUsers: Set<string>;
   onUserSelect: (userId: string, selected: boolean) => void;
   onUserEdit: (userId: string) => void;
@@ -49,9 +49,9 @@ export const UsersList: React.FC<UsersListProps> = ({
             Synced
           </h2>
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
-            <DesignerCardSkeleton />
-            <DesignerCardSkeleton />
-            <DesignerCardSkeleton />
+            <MemberCardSkeleton />
+            <MemberCardSkeleton />
+            <MemberCardSkeleton />
           </div>
         </section>
       </div>
@@ -88,12 +88,12 @@ export const UsersList: React.FC<UsersListProps> = ({
         </h2>
         {syncedUsers.length === 0 ? (
           <p className="text-sm text-(--color-text-muted)">
-            No synced designers yet.
+            No synced members yet.
           </p>
         ) : (
           <div className="grid grid-cols-1 gap-4 md:grid-cols-1 lg:grid-cols-2 xl:grid-cols-3">
             {syncedUsers.map((user) => (
-              <SyncedDesignerCard
+              <SyncedMemberCard
                 key={user.clickupId}
                 user={user}
                 workload={workloadById.get(user.clickupId)}

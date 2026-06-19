@@ -66,11 +66,11 @@ export interface VacationAwareUserSlot extends UserSlot {
    */
   samePriorityOrHigherLoad?: number
   /** Estado para la UI del selector. */
-  status?: DesignerStatus
+  status?: MemberStatus
 }
 
 /** Estado de un diseñador para los badges del selector de asignación. */
-export type DesignerStatus = 'available' | 'on_vacation' | 'overloaded'
+export type MemberStatus = 'available' | 'on_vacation' | 'overloaded'
 
 /**
  * Candidato “aplanado” que el motor devuelve a la UI: misma fuente de verdad
@@ -80,7 +80,7 @@ export type DesignerStatus = 'available' | 'on_vacation' | 'overloaded'
 export interface RankedCandidate {
   userId: string
   userName: string
-  status: DesignerStatus
+  status: MemberStatus
   /** Fecha (YYYY-MM-DD) desde la que el diseñador podría empezar la tarea. */
   availableFrom: string
   /** true para el diseñador que el motor sugiere. */

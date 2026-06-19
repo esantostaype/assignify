@@ -1,4 +1,4 @@
-// src/components/designers/UserVacationRow.tsx
+// src/components/team/UserVacationRow.tsx
 import React, { useState } from "react";
 import { IconButton, DeleteConfirmDialog } from "@/components/ui";
 import { Icon, PiTrash } from "@/lib/icons";

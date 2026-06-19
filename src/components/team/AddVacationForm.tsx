@@ -1,5 +1,5 @@
 /* eslint-disable @typescript-eslint/no-unused-vars */
-// src/components/designers/AddVacationForm.tsx - ENHANCED VERSION
+// src/components/team/AddVacationForm.tsx - ENHANCED VERSION
 import React, { useState, useEffect } from 'react';
 import { Button, Alert } from '@/components/ui';
 import { DateField } from '@/components/ui/date/DateField';

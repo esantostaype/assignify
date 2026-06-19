@@ -1,7 +1,7 @@
 'use client'
 // [SaaS fase 4] Selector del workspace ACTIVO de ClickUp, montado en el Header. Solo
 // aparece si el usuario conectó ClickUp y tiene MÁS de un workspace autorizado.
-// Cambiarlo recarga la app para que todo (kanban, designers, listas…) se lea con el
+// Cambiarlo recarga la app para que todo (kanban, listas…) se lea con el
 // nuevo activo. El admin email/password no lo ve (opera DEFAULT_WORKSPACE_ID).
 import { Select } from '@/components/ui'
 import { Icon, PiBuildings } from '@/lib/icons'

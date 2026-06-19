@@ -33,7 +33,7 @@ export const useSetActiveWorkspace = (options?: { onError?: (e: unknown) => void
       return data
     },
     onSuccess: () => {
-      // Cambiar de workspace cambia TODO lo que sirve el servidor (kanban, designers,
+      // Cambiar de workspace cambia TODO lo que sirve el servidor (kanban,
       // listas, settings…). Un reload completo es lo más seguro: re-lee todo con el
       // nuevo activo (el crawl de ClickUp ya cachea por workspaceId, así que sin fugas).
       window.location.reload()

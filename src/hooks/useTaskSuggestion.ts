@@ -77,7 +77,7 @@ export const useTaskSuggestion = (
 
         // 400 = parámetros incompletos mientras se escribe: sin toast.
         if (axios.isAxiosError(error) && error.response?.status !== 400) {
-          toast.error({ title: 'Failed to get assignment suggestion.', description: 'No designer suggested.' })
+          toast.error({ title: 'Failed to get assignment suggestion.', description: 'No member suggested.' })
         }
       } finally {
         setFetchingSuggestion(false)

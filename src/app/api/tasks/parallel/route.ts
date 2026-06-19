@@ -108,7 +108,7 @@ export async function POST(req: Request) {
 
       if (!bestUser) {
         return NextResponse.json({
-          error: 'Could not find an optimal designer for automatic assignment',
+          error: 'Could not find an optimal member for automatic assignment',
           details: 'No available users meet the assignment criteria considering vacations and workload',
         }, { status: 400 })
       }

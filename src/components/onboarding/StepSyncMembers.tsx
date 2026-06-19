@@ -4,7 +4,7 @@
 // reutilizando UserCard para la selección. No reescribe la lógica de sync.
 import { useState } from 'react'
 import { Button, Spinner } from '@/components/ui'
-import { UserCard } from '@/components/designers/UserCard'
+import { UserCard } from '@/components/team/UserCard'
 import { useClickUpUsers, useSyncUsers } from '@/hooks/queries/useUsers'
 import { hotToast as toast } from '@/lib/hotToast'
 

@@ -1,5 +1,5 @@
 "use client";
-// src/components/designers/CapacityTimeline.tsx
+// src/components/team/CapacityTimeline.tsx
 // Timeline de capacidad del equipo: una fila por diseñador con sus tareas
 // pendientes como barras (color por prioridad), bandas de vacaciones y un marcador
 // de "se libera el…". Sirve para VER lo que ve el motor (por qué sugiere a quien

@@ -1,9 +1,9 @@
 "use client";
-// src/components/designers/SyncedDesignerCard.tsx
+// src/components/team/SyncedMemberCard.tsx
 // Tarjeta COMPLETA de un diseñador sincronizado: identidad (foto, nombre, puesto,
 // botón editar) + carga de trabajo (barra, "Frees up on…", aprobación, vacaciones),
 // con el chip de estado abajo a la derecha. Mientras la carga no está disponible
-// se muestra UN ÚNICO skeleton de toda la tarjeta (DesignerCardSkeleton), no
+// se muestra UN ÚNICO skeleton de toda la tarjeta (MemberCardSkeleton), no
 // skeletons sueltos por partes.
 import React from "react";
 import { Card, Chip, Progress, Avatar, Tooltip } from "@/components/ui";
@@ -18,8 +18,8 @@ import {
 } from "@/lib/icons";
 import { IconButton } from "@/components/ui";
 import type { UserWorkload, WorkloadStatus } from "@/hooks/queries/useWorkload";
-import { levelLabel, primaryRole, typeToJobTitle } from "./designerUtils";
-import { DesignerCardSkeleton } from "./DesignerCardSkeleton";
+import { levelLabel, primaryRole, typeToJobTitle } from "./memberUtils";
+import { MemberCardSkeleton } from "./MemberCardSkeleton";
 import { avatarColor } from "@/lib/avatarColor";
 
 // Estado de carga: labels y colores (compartidos con la vista de "team workload").
@@ -43,7 +43,7 @@ function fmtDate(d: string) {
   });
 }
 
-export interface DesignerUser {
+export interface MemberUser {
   clickupId: string;
   name: string;
   email: string;
@@ -55,8 +55,8 @@ export interface DesignerUser {
   lastActive?: string;
 }
 
-interface SyncedDesignerCardProps {
-  user: DesignerUser;
+interface SyncedMemberCardProps {
+  user: MemberUser;
   /** Carga de trabajo cruzada por id (workload.id === user.clickupId). */
   workload?: UserWorkload;
   /** True mientras la query de carga está cargando. */
@@ -64,7 +64,7 @@ interface SyncedDesignerCardProps {
   onEdit?: () => void;
 }
 
-export const SyncedDesignerCard: React.FC<SyncedDesignerCardProps> = ({
+export const SyncedMemberCard: React.FC<SyncedMemberCardProps> = ({
   user,
   workload,
   workloadLoading = false,
@@ -72,7 +72,7 @@ export const SyncedDesignerCard: React.FC<SyncedDesignerCardProps> = ({
 }) => {
   // Mientras la carga no está disponible, UN solo skeleton de toda la tarjeta
   // (evita mostrar identidad real + skeleton parcial, que se veía "por partes").
-  if (workloadLoading || !workload) return <DesignerCardSkeleton />;
+  if (workloadLoading || !workload) return <MemberCardSkeleton />;
 
   const st = STATUS[workload.status];
 

@@ -77,7 +77,7 @@ export async function GET(req: Request) {
 
     if (candidates.length === 0) {
       return NextResponse.json({
-        error: 'Could not find an optimal designer',
+        error: 'Could not find an optimal member',
         details: brandId
           ? `No available users for brand ${brandId}`
           : 'No available users in any active brand'
