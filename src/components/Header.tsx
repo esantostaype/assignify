@@ -1,7 +1,7 @@
 'use client'
 import { useState } from 'react'
 import { Queue01Icon, Settings01Icon, SwatchIcon, UserGroup03Icon, Folder01Icon } from '@hugeicons/core-free-icons'
-import { NavItem, SettingsForm, TaskTypesForm } from '@/components'
+import { NavItem, TaskTypesForm } from '@/components'
 import { ListsSyncForm } from '@/components/ListsSyncForm'
 import { WorkspaceSwitcher } from '@/components/WorkspaceSwitcher'
 import { UserMenu } from '@/components/UserMenu'
@@ -14,19 +14,20 @@ export const Header = () => {
   // content stays part of the live React tree and reflects updates).
   const [typesOpen, setTypesOpen] = useState(false)
   const [listsOpen, setListsOpen] = useState(false)
-  const [settingsOpen, setSettingsOpen] = useState(false)
 
   const navItems = [
     { href: '/tasks', label: 'Tasks', icon: Queue01Icon },
     { href: '/team', label: 'Team', icon: UserGroup03Icon },
     { onClick: () => setTypesOpen(true), label: 'Types', icon: SwatchIcon },
     { onClick: () => setListsOpen(true), label: 'Lists', icon: Folder01Icon },
-    { onClick: () => setSettingsOpen(true), label: 'Settings', icon: Settings01Icon }
+    { href: '/settings', label: 'Settings', icon: Settings01Icon }
   ]
 
   return (
     <>
-      <header className="sticky top-0 bg-(--color-surface-header) z-50 flex items-center justify-between px-4 border-b border-b-(--color-border-default)">
+      {/* z por encima de las barras sticky de Tasks/Team (z-50): si no, sus
+          contextos de apilamiento tapan los dropdowns del header. */}
+      <header className="sticky top-0 bg-(--color-surface-header) z-[60] flex items-center justify-between px-4 border-b border-b-(--color-border-default)">
         <div className='flex items-center gap-4'>
           <Logo width={132} height={38} />
           <ul className="flex items-center gap-3 text-sm mb-[-1px]">
@@ -64,16 +65,6 @@ export const Header = () => {
         <ListsSyncForm />
       </Modal>
 
-      {/* Settings — larger configuration modal */}
-      <Modal
-        open={settingsOpen}
-        onClose={() => setSettingsOpen(false)}
-        title="Settings"
-        description="Changes will take effect immediately after saving"
-        size="lg"
-      >
-        <SettingsForm />
-      </Modal>
     </>
   )
 }
