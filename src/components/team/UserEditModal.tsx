@@ -250,7 +250,6 @@ export const UserEditModal: React.FC<UserEditModalProps> = ({ open, userId, user
       <Modal
         open={open}
         onClose={attemptClose}
-        staticBackdrop
         title={`Edit Member${userName ? `: ${userName}` : ''}`}
         size="lg"
         footer={
