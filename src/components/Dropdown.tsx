@@ -1,9 +1,14 @@
 'use client'
 // Dropdown ligero (trigger + panel flotante) con cierre por click-fuera y Escape,
-// y animación de entrada/salida (fade + slide) como la intranet. Mismo lifecycle
-// mounted/visible que los popovers de @/components/ui para que el panel se anime al
-// salir antes de desmontarse. Es propio (no el Popover de ui) porque ese centra el
-// panel y `cn` no resuelve conflictos de Tailwind para realinearlo.
+// y animación de entrada/salida (fade + slide) como la intranet.
+//
+// Dos detalles importantes:
+//  - DOBLE requestAnimationFrame para entrar: si se monta el panel y se pone
+//    `visible` en el mismo frame, el navegador no pinta el estado inicial
+//    (opacity-0) y la transición "salta". Esperar 2 frames la hace fluida.
+//  - Fondo `surface-card` (no `surface-raised`): en dark, raised/hover/border son
+//    todos neutral-300; con el panel en card (neutral-200) el hover y los dividers
+//    (neutral-300) sí contrastan.
 import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { cn } from '@/lib/cn'
 
@@ -29,16 +34,17 @@ export const Dropdown = ({
   ariaLabel,
 }: DropdownProps) => {
   const [open, setOpen] = useState(false)
-  const [mounted, setMounted] = useState(false) // en el DOM (incluye salida)
+  const [mounted, setMounted] = useState(false) // en el DOM (incluye la salida)
   const [visible, setVisible] = useState(false) // estado animado (entrada)
   const ref = useRef<HTMLDivElement>(null)
 
-  // Montaje/animación: al abrir, monta y entra en el siguiente frame; al cerrar,
-  // dispara la salida y desmonta tras la transición.
+  // Montaje + animación gobernados por `open`:
+  //  - abrir: monta y, tras 2 frames (para pintar opacity-0), entra.
+  //  - cerrar: dispara la salida y desmonta cuando termina la transición.
   useEffect(() => {
     if (open) {
       setMounted(true)
-      const id = requestAnimationFrame(() => setVisible(true))
+      const id = requestAnimationFrame(() => requestAnimationFrame(() => setVisible(true)))
       return () => cancelAnimationFrame(id)
     }
     setVisible(false)
@@ -78,8 +84,8 @@ export const Dropdown = ({
         <div
           role="menu"
           className={cn(
-            'absolute top-full z-[80] mt-2 origin-top overflow-hidden rounded-lg border border-(--color-border-default) bg-(--color-surface-raised) shadow-lg',
-            'transition-[opacity,transform] duration-150 ease-[cubic-bezier(0.32,0.72,0,1)]',
+            'absolute top-full z-[80] mt-2 origin-top overflow-hidden rounded-lg border border-(--color-border-default) bg-(--color-surface-card) shadow-lg',
+            'transition-[opacity,transform] duration-150 ease-[cubic-bezier(0.32,0.72,0,1)] motion-reduce:transition-none',
             visible ? 'opacity-100 translate-y-0 scale-100' : 'pointer-events-none opacity-0 -translate-y-1 scale-[0.98]',
             align === 'right' ? 'right-0' : 'left-0',
             className,

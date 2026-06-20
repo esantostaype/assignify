@@ -34,7 +34,7 @@ export const UserMenu = () => {
         {(close) => (
           <div className="flex flex-col">
             {/* Identidad */}
-            <div className="flex items-center gap-3 border-b border-(--color-border-default) px-3 py-3">
+            <div className="flex items-center gap-3 border-b border-(--color-border-strong) px-3 py-3">
               <Avatar src={user.image} size="sm">{initials}</Avatar>
               <div className="min-w-0">
                 {user.name && (
@@ -45,7 +45,7 @@ export const UserMenu = () => {
             </div>
 
             {/* Tema */}
-            <div className="flex items-center justify-between gap-2 border-b border-(--color-border-default) px-3 py-2.5">
+            <div className="flex items-center justify-between gap-2 border-b border-(--color-border-strong) px-3 py-2.5">
               <span className="text-xs font-medium text-(--color-text-muted)">Theme</span>
               <ThemeToggle />
             </div>
