@@ -18,10 +18,11 @@ const DAY_MS = 24 * 60 * 60 * 1000;
 const DAY_W = 46; // px per day column
 const PAST_DAYS = 60; // up to 2 months back
 const FUTURE_DAYS = 60; // up to 2 months ahead
-const HEADER_H = 38;
+const WEEK_H = 22; // week-number row height
+const HEADER_H = 38; // day-header row height
 const ROW_H = 34;
 const NAME_W = 200;
-const BAR_PAD = 4; // px inset of a work day inside its column (10:00 .. 19:00)
+const BAR_PAD = 2; // px inset of a work day inside its column (10:00 .. 19:00)
 // Local work-day bounds (hours) used to map a task's time to a position inside its day.
 // Inszone: 10:00–19:00 local. (If made fully multi-tenant, pass these from settings.)
 const WORK_START_H = 10;
@@ -44,6 +45,14 @@ const PRIORITY_LABEL: Record<PendingTaskBar["priority"], string> = {
   LOW: "Low",
 };
 
+// Diagonal stripes built from a translucent COLOR (works in light & dark, unlike a fixed
+// black). Tight pitch (6px). Each band uses its own hue.
+const stripes = (rgba: string) =>
+  `repeating-linear-gradient(45deg, transparent, transparent 3px, ${rgba} 3px, ${rgba} 6px)`;
+const WEEKEND_STRIPES = stripes("rgba(148,163,184,0.20)"); // slate
+const HOLIDAY_STRIPES = stripes("rgba(239,68,68,0.18)"); // red
+const VACATION_STRIPES = stripes("rgba(245,158,11,0.30)"); // amber
+
 // Holidays (YYYY-MM-DD) → name. The engine never schedules on these (skips them like weekends).
 const HOLIDAY_NAME_BY_YMD: Record<string, string> = Object.fromEntries(
   (usHolidays as Array<{ date: string; name: string }>).map((h) => [h.date, h.name])
@@ -64,6 +73,13 @@ function fmt(ts: number): string {
 function hhmm(d: Date): string {
   return `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
 }
+/** Week number of the year (US, weeks start on Sunday). Matches ClickUp's W-numbers. */
+function weekOfYear(ts: number): number {
+  const d = new Date(ts);
+  const jan1 = new Date(d.getFullYear(), 0, 1);
+  const dayOfYear = Math.round((midnightLocal(d) - jan1.getTime()) / DAY_MS) + 1;
+  return Math.max(1, Math.floor((dayOfYear + jan1.getDay() - 1) / 7));
+}
 /** Tooltip range: "Monday 19 10:00 - 14:00" (same day) or with an arrow across days. */
 function rangeLabel(startStr: string, dueStr: string): string {
   const s = new Date(startStr);
@@ -83,10 +99,16 @@ interface DayCell {
   dom: number;
   weekday: string;
   isWeekend: boolean;
+  isWeekStart: boolean; // Sunday → solid week divider
   isToday: boolean;
   isFirstOfMonth: boolean;
   monthLabel: string;
   holiday?: string;
+}
+interface WeekCell {
+  startIdx: number;
+  len: number;
+  label: string;
 }
 
 interface CapacityTimelineProps {
@@ -98,7 +120,7 @@ export const CapacityTimeline: React.FC<CapacityTimelineProps> = ({ workload, lo
   const scrollRef = useRef<HTMLDivElement>(null);
   const drag = useRef({ active: false, startX: 0, startScroll: 0 });
 
-  const { rangeStart, totalDays, days, rows, todayOffset } = useMemo(() => {
+  const { rangeStart, totalDays, days, weeks, rows, todayOffset } = useMemo(() => {
     const today = midnightLocal(new Date());
     const start = today - PAST_DAYS * DAY_MS;
     const total = PAST_DAYS + FUTURE_DAYS + 1;
@@ -113,6 +135,7 @@ export const CapacityTimeline: React.FC<CapacityTimelineProps> = ({ workload, lo
         dom: d.getDate(),
         weekday: WEEKDAY[dow],
         isWeekend: dow === 0 || dow === 6,
+        isWeekStart: dow === 0,
         isToday: ts === today,
         isFirstOfMonth: d.getDate() === 1,
         monthLabel: MONTH[d.getMonth()],
@@ -120,22 +143,32 @@ export const CapacityTimeline: React.FC<CapacityTimelineProps> = ({ workload, lo
       });
     }
 
-    // Active members only (inactive don't get assigned); most loaded on top.
+    // Group days into weeks (Sunday→Saturday) for the top week-number row.
+    const weekList: WeekCell[] = [];
+    for (let i = 0; i < total; ) {
+      let len = 1;
+      while (i + len < total && !dayList[i + len].isWeekStart) len++;
+      const sTs = dayList[i].ts;
+      const eTs = dayList[i + len - 1].ts;
+      const sD = new Date(sTs);
+      const eD = new Date(eTs);
+      const end = sD.getMonth() === eD.getMonth() ? `${eD.getDate()}` : fmt(eTs);
+      weekList.push({ startIdx: i, len, label: `W${weekOfYear(sTs)} · ${fmt(sTs)} - ${end}` });
+      i += len;
+    }
+
     const sorted = [...workload]
       .filter((w) => w.active !== false)
       .sort((a, b) => b.availableInDays - a.availableInDays);
 
-    return { rangeStart: start, totalDays: total, days: dayList, rows: sorted, todayOffset: PAST_DAYS };
+    return { rangeStart: start, totalDays: total, days: dayList, weeks: weekList, rows: sorted, todayOffset: PAST_DAYS };
   }, [workload]);
 
   const trackW = totalDays * DAY_W;
 
-  // Day index (whole days from the axis start) — used for full-day vacation bands.
   const dayOffset = (date: string) => Math.round((midnightLocal(new Date(date)) - rangeStart) / DAY_MS);
 
-  // Horizontal position mapping the WORK DAY (10:00–19:00) to the column: 10:00 → left
-  // edge + BAR_PAD, 19:00 → right edge − BAR_PAD. So a 4h task fills ~half a column and a
-  // full work day fills it (minus padding), and bars line up with their day's column.
+  // Horizontal position mapping the WORK DAY (10:00–19:00) to the column.
   const xOfWork = (date: string) => {
     const d = new Date(date);
     const dayIdx = Math.round((midnightLocal(d) - rangeStart) / DAY_MS);
@@ -214,22 +247,21 @@ export const CapacityTimeline: React.FC<CapacityTimelineProps> = ({ workload, lo
 
   if (rows.length === 0) return null;
 
-  // A single dashed vertical grid line, same tone for every day.
-  const gridLine = "border-l border-dashed border-(--color-border-default)/20";
-  // Weekend / holiday shading (more visible than before).
-  const weekendBg =
-    "bg-(--color-text-muted)/[0.10] [background-image:repeating-linear-gradient(45deg,transparent,transparent_5px,rgba(0,0,0,0.14)_5px,rgba(0,0,0,0.14)_10px)]";
-  const holidayBg =
-    "bg-error-500/[0.12] [background-image:repeating-linear-gradient(45deg,transparent,transparent_5px,rgba(0,0,0,0.10)_5px,rgba(0,0,0,0.10)_10px)]";
+  // Grid lines: dashed + faint for days, SOLID for week dividers (Sunday). Separators
+  // (names↔days, header↔rows) use the card border color.
+  const dayLine = "border-l border-dashed border-(--color-border-default)/20";
+  const weekLine = "border-l border-(--color-border-default)/50";
+  const lineOf = (d: DayCell) => (d.isWeekStart ? weekLine : dayLine);
+  const TOTAL_HEADER = WEEK_H + HEADER_H;
 
   return (
     <>
       {header}
 
       <Card variant="outlined" padding="none" className="mt-3 flex overflow-hidden">
-        {/* Names column (fixed; doesn't scroll). */}
-        <div className="shrink-0 z-20 px-4" style={{ width: NAME_W }}>
-          <div style={{ height: HEADER_H }} />
+        {/* Names column (fixed; doesn't scroll). Vertical separator = card border. */}
+        <div className="shrink-0 z-20 border-r border-(--color-border-default) px-4" style={{ width: NAME_W }}>
+          <div style={{ height: TOTAL_HEADER }} className="border-b border-(--color-border-default)" />
           {rows.map((u) => (
             <div key={u.id} className="flex items-center justify-between gap-2" style={{ height: ROW_H }}>
               <span className="truncate text-sm text-(--color-text-default)" title={u.name}>
@@ -251,16 +283,29 @@ export const CapacityTimeline: React.FC<CapacityTimelineProps> = ({ workload, lo
           ))}
         </div>
 
-        {/* Scrollable area: day header + tracks. */}
+        {/* Scrollable area: week row + day header + tracks. */}
         <div ref={scrollRef} onMouseDown={onMouseDown} className="flex-1 cursor-grab select-none overflow-x-auto">
           <div className="relative" style={{ width: trackW }}>
-            {/* Day header (today badged). */}
-            <div className="flex" style={{ height: HEADER_H }}>
+            {/* Week-number row. */}
+            <div className="flex" style={{ height: WEEK_H }}>
+              {weeks.map((w, i) => (
+                <div
+                  key={i}
+                  className="flex items-center overflow-hidden whitespace-nowrap border-l border-(--color-border-default)/50 px-1.5 text-[10px] font-medium text-(--color-text-muted)"
+                  style={{ width: w.len * DAY_W }}
+                >
+                  {w.label}
+                </div>
+              ))}
+            </div>
+
+            {/* Day header. Horizontal separator below = card border. */}
+            <div className="flex border-b border-(--color-border-default)" style={{ height: HEADER_H }}>
               {days.map((d, i) => (
                 <div
                   key={i}
-                  className={`flex flex-col items-center justify-center text-[10px] leading-tight ${gridLine} ${
-                    d.isWeekend ? "text-(--color-text-muted)/40" : "text-(--color-text-muted)"
+                  className={`flex flex-col items-center justify-center text-[10px] leading-tight ${lineOf(d)} ${
+                    d.isWeekend ? "bg-(--color-text-muted)/[0.07] text-(--color-text-muted)/50" : "text-(--color-text-muted)"
                   }`}
                   style={{ width: DAY_W }}
                 >
@@ -281,8 +326,13 @@ export const CapacityTimeline: React.FC<CapacityTimelineProps> = ({ workload, lo
               {/* Background (once for all rows). */}
               <div className="absolute inset-0 flex">
                 {days.map((d, i) => {
-                  const bg = d.holiday ? holidayBg : d.isWeekend ? weekendBg : "";
-                  const cell = <div className={`h-full ${gridLine} ${bg}`} style={{ width: DAY_W }} />;
+                  const stripe = d.holiday ? HOLIDAY_STRIPES : d.isWeekend ? WEEKEND_STRIPES : undefined;
+                  const cell = (
+                    <div
+                      className={`h-full ${lineOf(d)}`}
+                      style={{ width: DAY_W, backgroundImage: stripe }}
+                    />
+                  );
                   return d.holiday ? (
                     <Tooltip key={i} content={`Holiday · ${d.holiday}`}>
                       {cell}
@@ -312,8 +362,8 @@ export const CapacityTimeline: React.FC<CapacityTimelineProps> = ({ workload, lo
                       return (
                         <Tooltip key={`v${i}`} content={`Vacation · ${fmt(new Date(v.startDate).getTime())} – ${fmt(new Date(v.endDate).getTime())}`}>
                           <div
-                            className="absolute inset-y-0 bg-warning-400/25 [background-image:repeating-linear-gradient(45deg,transparent,transparent_4px,rgba(0,0,0,0.06)_4px,rgba(0,0,0,0.06)_8px)]"
-                            style={{ left: s * DAY_W, width: (e - s) * DAY_W }}
+                            className="absolute inset-y-0"
+                            style={{ left: s * DAY_W, width: (e - s) * DAY_W, backgroundImage: VACATION_STRIPES }}
                           />
                         </Tooltip>
                       );
