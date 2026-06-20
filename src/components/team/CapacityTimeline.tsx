@@ -76,8 +76,11 @@ export const CapacityTimeline: React.FC<CapacityTimelineProps> = ({ workload, lo
       } else d++;
     }
 
-    // Más cargados arriba (mayor fecha de liberación primero) → los cuellos de botella saltan a la vista.
-    const sorted = [...workload].sort((a, b) => b.availableInDays - a.availableInDays);
+    // Solo ACTIVOS en la capacidad (los inactivos no asignan); más cargados arriba
+    // (mayor fecha de liberación primero) → los cuellos de botella saltan a la vista.
+    const sorted = [...workload]
+      .filter((w) => w.active !== false)
+      .sort((a, b) => b.availableInDays - a.availableInDays);
     return { windowStart: start, spanMs: span, ticks: tickList, rows: sorted, weekends: weekendList };
   }, [workload]);
 
@@ -108,7 +111,7 @@ export const CapacityTimeline: React.FC<CapacityTimelineProps> = ({ workload, lo
     );
   }
 
-  if (workload.length === 0) return null;
+  if (rows.length === 0) return null;
 
   return (
     <Card variant="outlined" padding="md" className="flex flex-col gap-3">

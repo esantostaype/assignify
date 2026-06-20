@@ -33,8 +33,11 @@ export async function GET() {
     // En el dev server (cliente libSQL reusado) la versión relacional devolvía
     // roles/vacaciones/nivel OBSOLETOS; las directas siempre son frescas.
     const [activeUsers, allRoles, allTypes, futureVacations, tasks] = await Promise.all([
+      // Incluye activos E inactivos del workspace: el Team necesita mostrar a los
+      // inactivos (con su estado) en vez de dejarlos en skeleton; `active` viaja en
+      // la respuesta y el motor de asignación ya filtra por su cuenta.
       db.query.user.findMany({
-        where: and(eq(user.active, true), eq(user.workspaceId, wsId ?? '__none__')),
+        where: eq(user.workspaceId, wsId ?? '__none__'),
         orderBy: asc(user.name),
       }),
       // [SaaS] Roles, tipos y vacaciones ACOTADOS al workspace activo: el mismo userId
@@ -120,6 +123,7 @@ export async function GET() {
         id: u.id,
         name: u.name,
         email: u.email,
+        active: u.active,
         level: u.level,
         roles,
         roleDetails: userRoleDetails,

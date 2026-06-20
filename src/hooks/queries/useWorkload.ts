@@ -16,6 +16,9 @@ export interface UserWorkload {
   id: string
   name: string
   email: string
+  /** Si el miembro está activo. Los inactivos se muestran con badge "Inactive"
+   *  (no en skeleton) y se excluyen del timeline de capacidad. */
+  active: boolean
   level: UserLevel
   roles: string[]
   /** Cargos con su tipo e indicador de primario (para derivar el título del puesto). */
