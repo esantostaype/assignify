@@ -16,6 +16,7 @@ import { TaskCreationParams, UserWithRoles, ClickUpBrand } from '@/interfaces'
 import { calculateParallelPriorityInsertion } from '@/services/parallel-priority-insertion.service'
 import { invalidateAllCache } from '@/utils/cache'
 import { publishTaskUpdate } from '@/lib/pusher'
+import { withWorkspaceLock } from '@/lib/workspace-lock'
 
 // Lee DB y crea tareas en ClickUp en vivo: nunca pre-renderizar/cachear en build.
 export const dynamic = 'force-dynamic'
@@ -72,6 +73,12 @@ export async function POST(req: Request) {
 
     // ¿La duración es personalizada (distinta a la del tier)?
     const isCustomDuration = Math.abs(durationDays - tier.duration) > 0.001
+
+    // Lock por workspace: serializa las creaciones del MISMO workspace. Si dos
+    // personas crean casi a la vez, la 2ª espera a la 1ª y así calcula la fecha (y,
+    // en automático, el mejor diseñador) viendo YA la tarea de la 1ª — sin apilar dos
+    // tareas solapadas en el mismo miembro. Si el lock falla, no bloquea la creación.
+    return await withWorkspaceLock(wsId, async () => {
 
     // Determinar diseñadores a asignar.
     let usersToAssign: string[] = []
@@ -231,6 +238,7 @@ export async function POST(req: Request) {
         noTasksAffected: true,
       },
     })
+    }) // fin withWorkspaceLock
   } catch (error) {
     console.error('Failed to create task:', error)
     return NextResponse.json({

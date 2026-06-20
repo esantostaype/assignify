@@ -186,6 +186,14 @@ export const clickupConnection = sqliteTable('clickup_connection', {
   updatedAt: updatedAt(),
 })
 
+// [SaaS fase 8] Lock por workspace para serializar la creación de tareas (evita que
+// dos creaciones simultáneas asignen tareas solapadas al mismo miembro). `locked_at`
+// (epoch ms) sirve de TTL: un lock más viejo que el TTL se considera colgado.
+export const assignmentLock = sqliteTable('assignment_lock', {
+  workspaceId: text('workspace_id').primaryKey(),
+  lockedAt: integer('locked_at').notNull(),
+})
+
 // [SaaS fase 4] Webhook de ClickUp registrado POR WORKSPACE (no por usuario). Al
 // conectar un workspace registramos su webhook vía la API de ClickUp y guardamos su
 // `secret` (CIFRADO) para validar la firma de SUS eventos. El handler resuelve el
