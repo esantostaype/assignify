@@ -45,13 +45,14 @@ const PRIORITY_LABEL: Record<PendingTaskBar["priority"], string> = {
   LOW: "Low",
 };
 
-// Diagonal stripes built from a translucent COLOR (works in light & dark, unlike a fixed
-// black). Tight pitch (6px). Each band uses its own hue.
+// Diagonal stripes from a translucent COLOR (consistent in light & dark, unlike fixed
+// black). Painted per CONTIGUOUS block (not per day) so the pattern never breaks between
+// e.g. Saturday and Sunday. Each band uses its own hue.
 const stripes = (rgba: string) =>
   `repeating-linear-gradient(45deg, transparent, transparent 3px, ${rgba} 3px, ${rgba} 6px)`;
 const WEEKEND_STRIPES = stripes("rgba(148,163,184,0.20)"); // slate
 const HOLIDAY_STRIPES = stripes("rgba(239,68,68,0.18)"); // red
-const VACATION_STRIPES = stripes("rgba(245,158,11,0.30)"); // amber
+const VACATION_STRIPES = stripes("rgba(245,158,11,0.32)"); // amber
 
 // Holidays (YYYY-MM-DD) → name. The engine never schedules on these (skips them like weekends).
 const HOLIDAY_NAME_BY_YMD: Record<string, string> = Object.fromEntries(
@@ -105,10 +106,15 @@ interface DayCell {
   monthLabel: string;
   holiday?: string;
 }
-interface WeekCell {
+interface Block {
   startIdx: number;
   len: number;
+}
+interface WeekCell extends Block {
   label: string;
+}
+interface ShadeBlock extends Block {
+  type: "holiday" | "weekend";
 }
 
 interface CapacityTimelineProps {
@@ -120,7 +126,7 @@ export const CapacityTimeline: React.FC<CapacityTimelineProps> = ({ workload, lo
   const scrollRef = useRef<HTMLDivElement>(null);
   const drag = useRef({ active: false, startX: 0, startScroll: 0 });
 
-  const { rangeStart, totalDays, days, weeks, rows, todayOffset } = useMemo(() => {
+  const { rangeStart, totalDays, days, weeks, shades, rows, todayOffset } = useMemo(() => {
     const today = midnightLocal(new Date());
     const start = today - PAST_DAYS * DAY_MS;
     const total = PAST_DAYS + FUTURE_DAYS + 1;
@@ -143,17 +149,35 @@ export const CapacityTimeline: React.FC<CapacityTimelineProps> = ({ workload, lo
       });
     }
 
-    // Group days into weeks (Sunday→Saturday) for the top week-number row.
+    // Weeks (Sunday→Saturday) for the top week-number row.
     const weekList: WeekCell[] = [];
     for (let i = 0; i < total; ) {
       let len = 1;
       while (i + len < total && !dayList[i + len].isWeekStart) len++;
       const sTs = dayList[i].ts;
-      const eTs = dayList[i + len - 1].ts;
+      const eD = new Date(dayList[i + len - 1].ts);
       const sD = new Date(sTs);
-      const eD = new Date(eTs);
-      const end = sD.getMonth() === eD.getMonth() ? `${eD.getDate()}` : fmt(eTs);
+      const end = sD.getMonth() === eD.getMonth() ? `${eD.getDate()}` : fmt(eD.getTime());
       weekList.push({ startIdx: i, len, label: `W${weekOfYear(sTs)} · ${fmt(sTs)} - ${end}` });
+      i += len;
+    }
+
+    // Non-working shading grouped into CONTIGUOUS blocks of the same type (holiday wins
+    // over weekend) → diagonal stripes stay continuous across e.g. Sat+Sun.
+    const shadeList: ShadeBlock[] = [];
+    for (let i = 0; i < total; ) {
+      const type: ShadeBlock["type"] | null = dayList[i].holiday ? "holiday" : dayList[i].isWeekend ? "weekend" : null;
+      if (!type) {
+        i++;
+        continue;
+      }
+      let len = 1;
+      while (i + len < total) {
+        const t2 = dayList[i + len].holiday ? "holiday" : dayList[i + len].isWeekend ? "weekend" : null;
+        if (t2 === type) len++;
+        else break;
+      }
+      shadeList.push({ startIdx: i, len, type });
       i += len;
     }
 
@@ -161,12 +185,10 @@ export const CapacityTimeline: React.FC<CapacityTimelineProps> = ({ workload, lo
       .filter((w) => w.active !== false)
       .sort((a, b) => b.availableInDays - a.availableInDays);
 
-    return { rangeStart: start, totalDays: total, days: dayList, weeks: weekList, rows: sorted, todayOffset: PAST_DAYS };
+    return { rangeStart: start, totalDays: total, days: dayList, weeks: weekList, shades: shadeList, rows: sorted, todayOffset: PAST_DAYS };
   }, [workload]);
 
   const trackW = totalDays * DAY_W;
-
-  const dayOffset = (date: string) => Math.round((midnightLocal(new Date(date)) - rangeStart) / DAY_MS);
 
   // Horizontal position mapping the WORK DAY (10:00–19:00) to the column.
   const xOfWork = (date: string) => {
@@ -175,6 +197,29 @@ export const CapacityTimeline: React.FC<CapacityTimelineProps> = ({ workload, lo
     const h = d.getHours() + d.getMinutes() / 60;
     const frac = Math.max(0, Math.min(1, (h - WORK_START_H) / (WORK_END_H - WORK_START_H)));
     return dayIdx * DAY_W + BAR_PAD + frac * (DAY_W - 2 * BAR_PAD);
+  };
+
+  // Vacation bands restricted to WORKING days (skip weekends & holidays → holiday/weekend
+  // prevails, no overlap). Returns contiguous working-day blocks inside the vacations.
+  const vacationBlocks = (vacations: { startDate: string; endDate: string }[]): Block[] => {
+    if (vacations.length === 0) return [];
+    const inVac = (ts: number) =>
+      vacations.some((v) => ts >= midnightLocal(new Date(v.startDate)) && ts <= midnightLocal(new Date(v.endDate)));
+    const blocks: Block[] = [];
+    for (let i = 0; i < totalDays; ) {
+      const d = days[i];
+      if (inVac(d.ts) && !d.isWeekend && !d.holiday) {
+        let len = 1;
+        while (i + len < totalDays) {
+          const d2 = days[i + len];
+          if (inVac(d2.ts) && !d2.isWeekend && !d2.holiday) len++;
+          else break;
+        }
+        blocks.push({ startIdx: i, len });
+        i += len;
+      } else i++;
+    }
+    return blocks;
   };
 
   // On mount, center the view on TODAY (no manual scroll needed).
@@ -247,12 +292,11 @@ export const CapacityTimeline: React.FC<CapacityTimelineProps> = ({ workload, lo
 
   if (rows.length === 0) return null;
 
-  // Grid lines: dashed + faint for days, SOLID for week dividers (Sunday). Separators
-  // (names↔days, header↔rows) use the card border color.
+  // Grid lines: dashed + faint for days, SOLID for week dividers (Sunday).
   const dayLine = "border-l border-dashed border-(--color-border-default)/20";
   const weekLine = "border-l border-(--color-border-default)/50";
   const lineOf = (d: DayCell) => (d.isWeekStart ? weekLine : dayLine);
-  const TOTAL_HEADER = WEEK_H + HEADER_H;
+  const tracksH = rows.length * ROW_H;
 
   return (
     <>
@@ -261,7 +305,9 @@ export const CapacityTimeline: React.FC<CapacityTimelineProps> = ({ workload, lo
       <Card variant="outlined" padding="none" className="mt-3 flex overflow-hidden">
         {/* Names column (fixed; doesn't scroll). Vertical separator = card border. */}
         <div className="shrink-0 z-20 border-r border-(--color-border-default) px-4" style={{ width: NAME_W }}>
-          <div style={{ height: TOTAL_HEADER }} className="border-b border-(--color-border-default)" />
+          {/* line UNDER the weeks row only */}
+          <div style={{ height: WEEK_H }} className="border-b border-(--color-border-default)" />
+          <div style={{ height: HEADER_H }} />
           {rows.map((u) => (
             <div key={u.id} className="flex items-center justify-between gap-2" style={{ height: ROW_H }}>
               <span className="truncate text-sm text-(--color-text-default)" title={u.name}>
@@ -286,8 +332,8 @@ export const CapacityTimeline: React.FC<CapacityTimelineProps> = ({ workload, lo
         {/* Scrollable area: week row + day header + tracks. */}
         <div ref={scrollRef} onMouseDown={onMouseDown} className="flex-1 cursor-grab select-none overflow-x-auto">
           <div className="relative" style={{ width: trackW }}>
-            {/* Week-number row. */}
-            <div className="flex" style={{ height: WEEK_H }}>
+            {/* Week-number row (line below = card border). */}
+            <div className="flex border-b border-(--color-border-default)" style={{ height: WEEK_H }}>
               {weeks.map((w, i) => (
                 <div
                   key={i}
@@ -299,48 +345,58 @@ export const CapacityTimeline: React.FC<CapacityTimelineProps> = ({ workload, lo
               ))}
             </div>
 
-            {/* Day header. Horizontal separator below = card border. */}
-            <div className="flex border-b border-(--color-border-default)" style={{ height: HEADER_H }}>
-              {days.map((d, i) => (
-                <div
-                  key={i}
-                  className={`flex flex-col items-center justify-center text-[10px] leading-tight ${lineOf(d)} ${
-                    d.isWeekend ? "bg-(--color-text-muted)/[0.07] text-(--color-text-muted)/50" : "text-(--color-text-muted)"
-                  }`}
-                  style={{ width: DAY_W }}
-                >
-                  <span>{d.isFirstOfMonth ? d.monthLabel : d.weekday}</span>
-                  {d.isToday ? (
-                    <span className="mt-0.5 flex size-5 items-center justify-center rounded-full bg-error-500 text-[10px] font-semibold text-white">
-                      {d.dom}
-                    </span>
-                  ) : (
-                    <span className="mt-0.5 font-medium text-(--color-text-default)">{d.dom}</span>
-                  )}
-                </div>
-              ))}
+            {/* Day header (no bottom line; weekends slightly lighter). */}
+            <div className="flex" style={{ height: HEADER_H }}>
+              {days.map((d, i) => {
+                const cell = (
+                  <div
+                    className={`flex h-full flex-col items-center justify-center text-[10px] leading-tight ${lineOf(d)} ${
+                      d.isWeekend ? "bg-(--color-text-muted)/[0.07] text-(--color-text-muted)/50" : "text-(--color-text-muted)"
+                    }`}
+                    style={{ width: DAY_W }}
+                  >
+                    <span>{d.isFirstOfMonth ? d.monthLabel : d.weekday}</span>
+                    {d.isToday ? (
+                      <span className="mt-0.5 flex size-5 items-center justify-center rounded-full bg-error-500 text-[10px] font-semibold text-white">
+                        {d.dom}
+                      </span>
+                    ) : (
+                      <span className="mt-0.5 font-medium text-(--color-text-default)">{d.dom}</span>
+                    )}
+                  </div>
+                );
+                return d.holiday ? (
+                  <Tooltip key={i} content={`Holiday · ${d.holiday}`}>
+                    {cell}
+                  </Tooltip>
+                ) : (
+                  <React.Fragment key={i}>{cell}</React.Fragment>
+                );
+              })}
             </div>
 
-            {/* Tracks + background layer (columns, weekends, holidays). */}
-            <div className="relative">
-              {/* Background (once for all rows). */}
-              <div className="absolute inset-0 flex">
-                {days.map((d, i) => {
-                  const stripe = d.holiday ? HOLIDAY_STRIPES : d.isWeekend ? WEEKEND_STRIPES : undefined;
-                  const cell = (
-                    <div
-                      className={`h-full ${lineOf(d)}`}
-                      style={{ width: DAY_W, backgroundImage: stripe }}
-                    />
-                  );
-                  return d.holiday ? (
-                    <Tooltip key={i} content={`Holiday · ${d.holiday}`}>
-                      {cell}
-                    </Tooltip>
-                  ) : (
-                    <React.Fragment key={i}>{cell}</React.Fragment>
-                  );
-                })}
+            {/* Tracks area: shading (continuous) + grid lines + today + rows. */}
+            <div className="relative" style={{ minHeight: tracksH }}>
+              {/* Shading: contiguous blocks → continuous diagonals across the whole block. */}
+              <div className="pointer-events-none absolute inset-0">
+                {shades.map((b, i) => (
+                  <div
+                    key={i}
+                    className="absolute inset-y-0"
+                    style={{
+                      left: b.startIdx * DAY_W,
+                      width: b.len * DAY_W,
+                      backgroundImage: b.type === "holiday" ? HOLIDAY_STRIPES : WEEKEND_STRIPES,
+                    }}
+                  />
+                ))}
+              </div>
+
+              {/* Grid lines (above shading, below bars). */}
+              <div className="pointer-events-none absolute inset-0 flex">
+                {days.map((d, i) => (
+                  <div key={i} className={`h-full ${lineOf(d)}`} style={{ width: DAY_W }} />
+                ))}
               </div>
 
               {/* Today line (centered on today's column). */}
@@ -351,23 +407,19 @@ export const CapacityTimeline: React.FC<CapacityTimelineProps> = ({ workload, lo
 
               {/* Rows: one per designer. */}
               {rows.map((u) => {
-                const vacations = [...(u.currentVacation ? [u.currentVacation] : []), ...u.upcomingVacations];
+                const vacs = [...(u.currentVacation ? [u.currentVacation] : []), ...u.upcomingVacations];
+                const vBlocks = vacationBlocks(vacs);
                 return (
                   <div key={u.id} className="relative" style={{ height: ROW_H }}>
-                    {/* Vacations (full-day bands, behind the bars). */}
-                    {vacations.map((v, i) => {
-                      const s = Math.max(0, dayOffset(v.startDate));
-                      const e = Math.min(totalDays, dayOffset(v.endDate) + 1);
-                      if (e <= s) return null;
-                      return (
-                        <Tooltip key={`v${i}`} content={`Vacation · ${fmt(new Date(v.startDate).getTime())} – ${fmt(new Date(v.endDate).getTime())}`}>
-                          <div
-                            className="absolute inset-y-0"
-                            style={{ left: s * DAY_W, width: (e - s) * DAY_W, backgroundImage: VACATION_STRIPES }}
-                          />
-                        </Tooltip>
-                      );
-                    })}
+                    {/* Vacation bands (working days only → don't overlap holiday/weekend). */}
+                    {vBlocks.map((b, i) => (
+                      <Tooltip key={`v${i}`} content={`Vacation · ${fmt(days[b.startIdx].ts)} – ${fmt(days[b.startIdx + b.len - 1].ts)}`}>
+                        <div
+                          className="absolute inset-y-0"
+                          style={{ left: b.startIdx * DAY_W, width: b.len * DAY_W, backgroundImage: VACATION_STRIPES }}
+                        />
+                      </Tooltip>
+                    ))}
 
                     {/* Task bars: positioned/sized over the WORK DAY (real duration). */}
                     {u.pendingTasks.map((t, i) => {
