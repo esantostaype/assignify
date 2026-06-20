@@ -1,6 +1,9 @@
 // src/components/team/UserRoleRow.tsx
-import React, { useState } from "react";
-import { IconButton, Tooltip, DeleteConfirmDialog } from "@/components/ui";
+// Fila de rol dentro del editor de miembro. El borrado es DIRECTO (solo marca el
+// cambio en el formulario; se confirma al pulsar Save y se revierte con Discard),
+// por eso ya no lleva un diálogo de confirmación propio.
+import React from "react";
+import { IconButton, Tooltip } from "@/components/ui";
 import { Switch } from "@/components/ui/choice/Switch";
 import { Icon, PiTrash } from "@/lib/icons";
 
@@ -26,59 +29,41 @@ export const UserRoleRow: React.FC<UserRoleRowProps> = ({
   togglingPrimary = false,
   loading = false,
 }) => {
-  const [confirming, setConfirming] = useState(false);
-
   return (
-    <>
-      <tr className="border-b border-(--color-border-default) text-sm">
-        <td className="p-2 first:pl-4 last:pr-4">{loading ? "Loading..." : role.type.name}</td>
-        <td className="p-2 first:pl-4 last:pr-4">{loading ? "Loading..." : role.brand?.name || "Global"}</td>
-        <td className="p-2 first:pl-4 last:pr-4">
-          {loading ? (
-            "Loading..."
-          ) : (
-            <Tooltip content={role.isPrimary ? "Unset as primary role" : "Set as primary role"}>
-              <Switch
-                size="sm"
-                aria-label={role.isPrimary ? "Unset as primary role" : "Set as primary role"}
-                checked={role.isPrimary}
-                onChange={() => onTogglePrimary(role.id, !role.isPrimary)}
-                disabled={togglingPrimary}
-              />
-            </Tooltip>
-          )}
-        </td>
-        <td className="p-2 first:pl-4 last:pr-4">
-          {loading ? (
-            "Loading..."
-          ) : (
-            <IconButton
-              aria-label="Delete role"
+    <tr className="border-b border-(--color-border-default) text-sm">
+      <td className="p-2 first:pl-4 last:pr-4">{loading ? "Loading..." : role.type.name}</td>
+      <td className="p-2 first:pl-4 last:pr-4">{loading ? "Loading..." : role.brand?.name || "Global"}</td>
+      <td className="p-2 first:pl-4 last:pr-4">
+        {loading ? (
+          "Loading..."
+        ) : (
+          <Tooltip content={role.isPrimary ? "Unset as primary role" : "Set as primary role"}>
+            <Switch
               size="sm"
-              color="error"
-              variant="soft"
-              onClick={() => setConfirming(true)}
-              disabled={deleting}
-            >
-              <Icon icon={PiTrash} size={16} />
-            </IconButton>
-          )}
-        </td>
-      </tr>
-
-      <DeleteConfirmDialog
-        open={confirming}
-        onClose={() => setConfirming(false)}
-        onConfirm={() => {
-          onDelete(role.id);
-          setConfirming(false);
-        }}
-        title="Delete Role"
-        description={`Are you sure you want to delete the "${role.type.name}" role${
-          role.brand ? ` for "${role.brand.name}"` : " (Global)"
-        }? This action cannot be undone.`}
-        confirmLabel="Delete Role"
-      />
-    </>
+              aria-label={role.isPrimary ? "Unset as primary role" : "Set as primary role"}
+              checked={role.isPrimary}
+              onChange={() => onTogglePrimary(role.id, !role.isPrimary)}
+              disabled={togglingPrimary}
+            />
+          </Tooltip>
+        )}
+      </td>
+      <td className="p-2 first:pl-4 last:pr-4">
+        {loading ? (
+          "Loading..."
+        ) : (
+          <IconButton
+            aria-label="Remove role"
+            size="sm"
+            color="error"
+            variant="soft"
+            onClick={() => onDelete(role.id)}
+            disabled={deleting}
+          >
+            <Icon icon={PiTrash} size={16} />
+          </IconButton>
+        )}
+      </td>
+    </tr>
   );
 };

@@ -40,13 +40,13 @@ export const UserMenu = () => {
                 {user.name && (
                   <p className="truncate text-sm font-semibold text-(--color-text-strong)">{user.name}</p>
                 )}
-                <p className="truncate text-xs text-(--color-text-muted)">{user.email}</p>
+                <p className="truncate text-xs text-neutral-600">{user.email}</p>
               </div>
             </div>
 
             {/* Tema */}
             <div className="flex items-center justify-between gap-2 border-b border-(--color-border-strong) px-3 py-2.5">
-              <span className="text-xs font-medium text-(--color-text-muted)">Theme</span>
+              <span className="text-xs font-medium text-neutral-600">Theme</span>
               <ThemeToggle />
             </div>
 

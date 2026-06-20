@@ -9,14 +9,9 @@ import { TeamHeader } from './TeamHeader'
 import { UsersList } from './UsersList'
 import { CapacityTimeline } from './CapacityTimeline'
 import { UserEditModal } from './UserEditModal'
-import { Modal } from '@/components/ui'
 import {
   useClickUpUsers,
   useSyncUsers,
-  useAddUserRole,
-  useDeleteUserRole,
-  useAddUserVacation,
-  useDeleteUserVacation,
 } from '@/hooks/queries/useUsers'
 import { useUsersWorkload } from '@/hooks/queries/useWorkload'
 
@@ -68,21 +63,6 @@ export const ClickUpUsersSync: React.FC = () => {
       const message = error.response?.data?.error || error.message
       toast.error({ title: 'Sync failed', description: message })
     },
-  })
-
-  const { mutate: addRole, isPending: addingRole } = useAddUserRole({
-    onSuccess: () => {
-      toast.success({ title: 'Role added successfully', description: 'Assigned to the member.' })
-    },
-    onError: () => {
-      toast.error({ title: 'Error adding role', description: 'The role was not assigned.' })
-    },
-  })
-
-  const { mutate: addVacation, isPending: addingVacation } = useAddUserVacation({
-    onSuccess: () => {
-      toast.success({ title: 'Vacation added successfully', description: 'Saved to the calendar.' })
-    }
   })
 
   // Computed values
@@ -171,85 +151,13 @@ export const ClickUpUsersSync: React.FC = () => {
         />
       </div>
 
-      {/* Modal de edición renderizado EN VIVO con estado local (patrón de la
-          referencia): el modal forma parte del árbol del equipo y se
-          re-renderiza cuando las queries cambian, reflejando al instante
-          nivel / cargo / vacaciones tras cada mutación. */}
-      <Modal
+      {/* Editor de miembro (autónomo: maneja su propio Modal + Save/Discard). */}
+      <UserEditModal
         open={!!editingUserId}
+        userId={editingUserId ?? ''}
+        userName={clickupUsers.find((u) => u.clickupId === editingUserId)?.name}
         onClose={() => setEditingUserId(null)}
-        title={
-          editingUserId
-            ? `Edit User: ${clickupUsers.find((u) => u.clickupId === editingUserId)?.name ?? ''}`
-            : ''
-        }
-        size="lg"
-      >
-        {editingUserId && (
-          <UserEditModalWrapper
-            userId={editingUserId}
-            onAddRole={(typeId, brandId) =>
-              addRole({ userId: editingUserId, typeId, brandId: brandId || null })
-            }
-            onAddVacation={(startDate, endDate) =>
-              addVacation({ userId: editingUserId, startDate, endDate })
-            }
-            onRemoved={() => setEditingUserId(null)}
-            loadingStates={{ addingRole, addingVacation }}
-          />
-        )}
-      </Modal>
+      />
     </>
-  )
-}
-
-// ✅ Wrapper component to handle mutations properly within modal context
-interface UserEditModalWrapperProps {
-  userId: string
-  onAddRole: (typeId: number, brandId?: string) => void
-  onAddVacation: (startDate: string, endDate: string) => void
-  onRemoved?: () => void
-  loadingStates: {
-    addingRole?: boolean
-    addingVacation?: boolean
-  }
-}
-
-const UserEditModalWrapper: React.FC<UserEditModalWrapperProps> = ({
-  userId,
-  onAddRole,
-  onAddVacation,
-  onRemoved,
-  loadingStates
-}) => {
-  // ✅ Create deletion mutations with proper userId context
-  const { mutate: deleteRole } = useDeleteUserRole(userId, {
-    onSuccess: () => {
-      toast.success({ title: 'Role removed successfully', description: 'No longer assigned.' })
-    },
-    onError: () => {
-      toast.error({ title: 'Error removing role', description: 'The role is still assigned.' })
-    },
-  })
-
-  const { mutate: deleteVacation } = useDeleteUserVacation(userId, {
-    onSuccess: () => {
-      toast.success({ title: 'Vacation removed successfully', description: 'Removed from the calendar.' })
-    },
-    onError: () => {
-      toast.error({ title: 'Error removing vacation', description: 'It is still on the calendar.' })
-    },
-  })
-
-  return (
-    <UserEditModal
-      userId={userId}
-      onAddRole={onAddRole}
-      onDeleteRole={(roleId) => deleteRole(roleId)}
-      onAddVacation={onAddVacation}
-      onDeleteVacation={(vacationId) => deleteVacation(vacationId)}
-      onRemoved={onRemoved}
-      loadingStates={loadingStates}
-    />
   )
 }
