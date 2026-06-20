@@ -334,7 +334,7 @@ export const CapacityTimeline: React.FC<CapacityTimelineProps> = ({ workload, lo
         <div
           ref={scrollRef}
           onMouseDown={onMouseDown}
-          className="flex-1 cursor-grab select-none overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+          className="no-scrollbar flex-1 cursor-grab select-none overflow-x-auto"
         >
           <div className="relative" style={{ width: trackW }}>
             {/* Week-number row (line below = card border). */}

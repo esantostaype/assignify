@@ -375,6 +375,13 @@
   background: var(--color-scrollbar-thumb-hover);
 }
 
+/* ─── Hidden scrollbar ──────────────────────────────────────────────────────
+   Opt-in class that fully hides the scrollbar (overrides the global `*` thin
+   scrollbar above — higher specificity). Used by the capacity gantt, which is
+   scrolled by dragging / the wheel. */
+.no-scrollbar { scrollbar-width: none; }
+.no-scrollbar::-webkit-scrollbar { display: none; width: 0; height: 0; }
+
 /* ─── Body scroll lock (Modal / Drawer) ─────────────────────────────────────
    When a modal or drawer opens it sets `data-scroll-locked` on <html> and
    exposes the missing scrollbar width as `--scrollbar-width`.  Elements
