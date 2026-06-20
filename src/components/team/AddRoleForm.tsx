@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { Button, Select, type SelectOption } from '@/components/ui';
 import { Switch } from '@/components/ui/choice/Switch';
@@ -6,73 +5,52 @@ import { Icon, PiPlus } from '@/lib/icons';
 
 interface AddRoleFormProps {
   taskTypes: Array<{ id: number; name: string }>;
-  brands: Array<{ id: string; name: string }>;
-  onAdd: (typeId: number, brandId?: string, isPrimary?: boolean) => void;
+  /** Tipos YA asignados (incluye los pendientes): se excluyen del selector para
+   *  no duplicar — un miembro no puede tener el mismo rol dos veces. */
+  assignedTypeIds: number[];
+  onAdd: (typeId: number, isPrimary: boolean) => void;
   loading?: boolean;
   loadingTypes?: boolean;
-  loadingBrands?: boolean;
 }
 
+// Un rol = un TIPO de tarea (aplica a todo; ya no hay brand). No se puede repetir.
 export const AddRoleForm: React.FC<AddRoleFormProps> = ({
   taskTypes,
-  brands,
+  assignedTypeIds,
   onAdd,
   loading = false,
   loadingTypes = false,
-  loadingBrands = false
 }) => {
   const [typeId, setTypeId] = useState<string>('');
-  const [brandId, setBrandId] = useState<string>('');
   const [isPrimary, setIsPrimary] = useState<boolean>(false);
 
+  const available = taskTypes.filter((t) => !assignedTypeIds.includes(t.id));
+
   const handleAdd = () => {
-    if (typeId) {
-      onAdd(parseInt(typeId), brandId || undefined, isPrimary);
-      setTypeId('');
-      setBrandId('');
-      setIsPrimary(false);
-    }
+    if (!typeId) return;
+    onAdd(parseInt(typeId), isPrimary);
+    setTypeId('');
+    setIsPrimary(false);
   };
+
+  const allAssigned = !loadingTypes && taskTypes.length > 0 && available.length === 0;
 
   const typeOptions: SelectOption[] =
     loadingTypes && taskTypes.length === 0
       ? [{ value: '', label: 'Loading types...', disabled: true }]
-      : taskTypes.map((type) => ({
-          value: type.id.toString(),
-          label: type.name,
-        }));
-
-  const brandOptions: SelectOption[] =
-    loadingBrands && brands.length === 0
-      ? [{ value: '', label: 'Loading brands...', disabled: true }]
-      : [
-          { value: '', label: 'Global (All brands)' },
-          ...brands.map((brand) => ({ value: brand.id, label: brand.name })),
-        ];
+      : available.map((type) => ({ value: type.id.toString(), label: type.name }));
 
   return (
     <div className="mt-3 space-y-2">
-      <div className="flex gap-2 items-end">
+      <div className="flex items-end gap-2">
         <div className="flex-1">
           <Select
             label="Role Type"
             options={typeOptions}
             value={typeId}
             onChange={(value) => setTypeId(value)}
-            placeholder="Select role type"
-            disabled={loadingTypes}
-            size="sm"
-          />
-        </div>
-
-        <div className="flex-1">
-          <Select
-            label="Brand (Optional)"
-            options={brandOptions}
-            value={brandId}
-            onChange={(value) => setBrandId(value)}
-            placeholder="Select brand (optional)"
-            disabled={loadingBrands}
+            placeholder={allAssigned ? 'All roles already added' : 'Select role type'}
+            disabled={loadingTypes || allAssigned}
             size="sm"
           />
         </div>
@@ -82,7 +60,7 @@ export const AddRoleForm: React.FC<AddRoleFormProps> = ({
           color="primary"
           startIcon={<Icon icon={PiPlus} size={16} />}
           onClick={handleAdd}
-          disabled={!typeId || loadingTypes || loadingBrands}
+          disabled={!typeId || loadingTypes}
           loading={loading}
           size="sm"
         >

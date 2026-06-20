@@ -11,7 +11,6 @@ interface UserRoleRowProps {
   role: {
     id: number;
     type: { name: string };
-    brand?: { name: string } | null;
     isPrimary: boolean;
   };
   onDelete: (roleId: number) => void;
@@ -32,7 +31,6 @@ export const UserRoleRow: React.FC<UserRoleRowProps> = ({
   return (
     <tr className="border-b border-(--color-border-default) text-sm">
       <td className="p-2 first:pl-4 last:pr-4">{loading ? "Loading..." : role.type.name}</td>
-      <td className="p-2 first:pl-4 last:pr-4">{loading ? "Loading..." : role.brand?.name || "Global"}</td>
       <td className="p-2 first:pl-4 last:pr-4">
         {loading ? (
           "Loading..."

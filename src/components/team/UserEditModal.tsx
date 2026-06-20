@@ -13,7 +13,7 @@ import { UserVacationRow } from './UserVacationRow'
 import { AddRoleForm } from './AddRoleForm'
 import { AddVacationForm } from './AddVacationForm'
 import { Icon, PiUser, PiCalendarBlank, PiMedal, PiUserCheck, PiTrash } from '@/lib/icons'
-import { useUserDetails, useTaskTypes, useBrands, userKeys } from '@/hooks/queries/useUsers'
+import { useUserDetails, useTaskTypes, userKeys } from '@/hooks/queries/useUsers'
 import { workloadKeys } from '@/hooks/queries/useWorkload'
 import {
   Alert,
@@ -31,7 +31,6 @@ type UserLevel = 'JUNIOR' | 'MID' | 'SENIOR'
 interface PendingRole {
   tempId: number
   typeId: number
-  brandId: string | null
   isPrimary: boolean
 }
 interface PendingVacation {
@@ -67,7 +66,6 @@ export const UserEditModal: React.FC<UserEditModalProps> = ({ open, userId, user
 
   const { data: user, isLoading: loadingUser, error: userError } = useUserDetails(userId, open && !!userId)
   const { data: taskTypes = [], isLoading: loadingTypes, error: typesError } = useTaskTypes()
-  const { data: brands = [], isLoading: loadingBrands, error: brandsError } = useBrands()
 
   // ── Cambios pendientes (no tocan el servidor hasta Save) ──────────────────
   const [pendingLevel, setPendingLevel] = useState<UserLevel | null>(null)
@@ -115,12 +113,12 @@ export const UserEditModal: React.FC<UserEditModalProps> = ({ open, userId, user
   const visibleRoles = [
     ...(user?.roles ?? [])
       .filter((r) => !roleIdsToRemove.includes(r.id))
-      .map((r) => ({ ...r, isPrimary: primaryOverrides[r.id] ?? r.isPrimary })),
+      .map((r) => ({ id: r.id, typeId: r.typeId, type: { name: r.type.name }, isPrimary: primaryOverrides[r.id] ?? r.isPrimary })),
     ...rolesToAdd.map((p) => ({
       id: p.tempId,
-      isPrimary: p.isPrimary,
+      typeId: p.typeId,
       type: { name: taskTypes.find((t) => t.id === p.typeId)?.name ?? '—' },
-      brand: p.brandId ? { name: brands.find((b) => b.id === p.brandId)?.name ?? '—' } : null,
+      isPrimary: p.isPrimary,
     })),
   ]
 
@@ -130,8 +128,8 @@ export const UserEditModal: React.FC<UserEditModalProps> = ({ open, userId, user
   ]
 
   // ── Handlers de edición (solo estado local) ───────────────────────────────
-  const addRole = (typeId: number, brandId?: string, isPrimary?: boolean) =>
-    setRolesToAdd((prev) => [...prev, { tempId: tempId.current--, typeId, brandId: brandId || null, isPrimary: !!isPrimary }])
+  const addRole = (typeId: number, isPrimary: boolean) =>
+    setRolesToAdd((prev) => [...prev, { tempId: tempId.current--, typeId, isPrimary }])
 
   const deleteRole = (roleId: number) => {
     if (roleId < 0) {
@@ -186,7 +184,7 @@ export const UserEditModal: React.FC<UserEditModalProps> = ({ open, userId, user
         await axios.patch(`/api/users/${userId}/roles/${roleId}`, { isPrimary })
       }
       for (const r of rolesToAdd) {
-        await axios.post(`/api/users/${userId}/roles`, { typeId: r.typeId, brandId: r.brandId, isPrimary: r.isPrimary })
+        await axios.post(`/api/users/${userId}/roles`, { typeId: r.typeId, brandId: null, isPrimary: r.isPrimary })
       }
 
       // Vacaciones: quitar y añadir.
@@ -243,7 +241,7 @@ export const UserEditModal: React.FC<UserEditModalProps> = ({ open, userId, user
     }
   }
 
-  const loadError = userError || typesError || brandsError
+  const loadError = userError || typesError
 
   return (
     <>
@@ -305,7 +303,6 @@ export const UserEditModal: React.FC<UserEditModalProps> = ({ open, userId, user
                   <thead className="bg-(--color-surface-hover)">
                     <tr>
                       <th className="p-2 text-left text-sm font-medium text-(--color-text-muted) first:pl-4 last:pr-4">Type</th>
-                      <th className="p-2 text-left text-sm font-medium text-(--color-text-muted) first:pl-4 last:pr-4">Brand</th>
                       <th className="p-2 text-left text-sm font-medium text-(--color-text-muted) first:pl-4 last:pr-4">Primary</th>
                       <th className="w-[5rem] p-2 text-left text-sm font-medium text-(--color-text-muted) first:pl-4 last:pr-4">Actions</th>
                     </tr>
@@ -322,14 +319,14 @@ export const UserEditModal: React.FC<UserEditModalProps> = ({ open, userId, user
                     ))}
                     {!loadingUser && visibleRoles.length === 0 && (
                       <tr>
-                        <td colSpan={4} className="px-3 py-4 text-center text-(--color-text-subtle)">
+                        <td colSpan={3} className="px-3 py-4 text-center text-(--color-text-subtle)">
                           No roles assigned
                         </td>
                       </tr>
                     )}
                     {loadingUser && (
                       <tr>
-                        <td colSpan={4} className="px-3 py-4 text-center text-(--color-text-subtle)">
+                        <td colSpan={3} className="px-3 py-4 text-center text-(--color-text-subtle)">
                           Loading roles...
                         </td>
                       </tr>
@@ -340,11 +337,10 @@ export const UserEditModal: React.FC<UserEditModalProps> = ({ open, userId, user
 
               <AddRoleForm
                 taskTypes={taskTypes}
-                brands={brands}
-                onAdd={(typeId, brandId, isPrimary) => addRole(typeId, brandId, isPrimary)}
+                assignedTypeIds={visibleRoles.map((r) => r.typeId)}
+                onAdd={addRole}
                 loading={false}
                 loadingTypes={loadingTypes}
-                loadingBrands={loadingBrands}
               />
             </div>
 
