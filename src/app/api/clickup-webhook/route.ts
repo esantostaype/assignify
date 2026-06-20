@@ -5,7 +5,7 @@
 import { NextResponse } from 'next/server'
 import crypto from 'crypto'
 import { eq } from 'drizzle-orm'
-import { publishTaskUpdate } from '@/lib/pusher'
+import { publishTaskUpdate, publishListsUpdate } from '@/lib/pusher'
 import {
   invalidateActiveClickUpTasksCache,
   invalidateActiveClickUpTasksCacheForTeam,
@@ -32,6 +32,9 @@ const MUTATING_EVENTS = [
   'taskDueDateUpdated',
   'taskMoved',
 ]
+
+// Eventos de LISTAS de ClickUp: no traen task_id; refrescan las listas asignables.
+const LIST_EVENTS = ['listCreated', 'listUpdated', 'listDeleted']
 
 const dlog = (...args: any[]) => {
   if (process.env.DEBUG_WEBHOOK === 'true') console.log(...args)
@@ -102,6 +105,14 @@ export async function POST(req: Request) {
     const event: string | undefined = body.event
     const taskId: string | undefined = body.task_id
     dlog(`🎯 Evento ${event} para tarea ${taskId} (ws=${teamId ?? 'global'})`)
+
+    // Eventos de LISTAS: no traen task_id. Notificamos al workspace para que el
+    // cliente refresque sus listas asignables en vivo.
+    if (event && LIST_EVENTS.includes(event)) {
+      dlog(`📂 Evento de lista ${event} (ws=${teamId ?? 'global'})`)
+      await publishListsUpdate(teamId ?? undefined)
+      return NextResponse.json({ success: true, event })
+    }
 
     if (!event || !taskId) {
       return NextResponse.json({ success: true, message: 'sin event/task_id (probable test de ClickUp)' })

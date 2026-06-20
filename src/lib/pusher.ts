@@ -10,9 +10,11 @@ export const pusherServer = new Pusher({
   useTLS: true,
 })
 
-// Canal y evento únicos para sincronización de tareas.
+// Canal y eventos para sincronización en tiempo real (mismo canal por workspace).
 export const TASKS_CHANNEL = 'tasks'
 export const TASK_UPDATED_EVENT = 'task-updated'
+// Cambios en las LISTAS de ClickUp (crear/editar/borrar lista del workspace).
+export const LISTS_UPDATED_EVENT = 'lists-updated'
 
 export interface TaskUpdatePayload {
   taskId?: string
@@ -44,5 +46,17 @@ export async function publishTaskUpdate(
     await pusherServer.trigger(taskChannelForWorkspace(workspaceId), TASK_UPDATED_EVENT, payload)
   } catch (err) {
     console.error('[pusher] Failed to emit task-updated:', err instanceof Error ? err.message : err)
+  }
+}
+
+/**
+ * Notifica que las LISTAS del workspace cambiaron en ClickUp (crear/editar/borrar)
+ * para que el cliente refresque su lista de listas. No lanza si Pusher falla.
+ */
+export async function publishListsUpdate(workspaceId?: string | null): Promise<void> {
+  try {
+    await pusherServer.trigger(taskChannelForWorkspace(workspaceId), LISTS_UPDATED_EVENT, { at: Date.now() })
+  } catch (err) {
+    console.error('[pusher] Failed to emit lists-updated:', err instanceof Error ? err.message : err)
   }
 }

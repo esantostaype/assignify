@@ -113,6 +113,18 @@ export const useTaskSuggestion = (
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [typeId, durationDays, brandId, priority, triggerSuggestion, level])
 
+  // Sugerencia VIVA: si otro usuario crea/cambia tareas (evento realtime de Pusher),
+  // recalcula para reflejar la carga actual del equipo. Solo si el formulario ya
+  // tiene todos los datos válidos; usa el debounce para no spamear ante ráfagas.
+  useEffect(() => {
+    const onExternalChange = () => {
+      if (areParamsValid(typeId, durationDays)) getSuggestion()
+    }
+    window.addEventListener('assignify:tasks-changed', onExternalChange)
+    return () => window.removeEventListener('assignify:tasks-changed', onExternalChange)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [typeId, durationDays, brandId, priority, level])
+
   return {
     suggestedAssignment,
     candidates,

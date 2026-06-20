@@ -9,7 +9,8 @@ import { db } from '@/db'
 import { workspaceWebhook } from '@/db/schema'
 import { encryptSecret } from '@/lib/crypto'
 
-// Eventos de tarea que nos interesan (mismo set que el handler).
+// Eventos que nos interesan (mismo set que el handler). Incluye los de LISTAS para
+// refrescar en vivo las listas asignables cuando cambian en ClickUp.
 const WEBHOOK_EVENTS = [
   'taskCreated',
   'taskUpdated',
@@ -19,6 +20,9 @@ const WEBHOOK_EVENTS = [
   'taskPriorityUpdated',
   'taskDueDateUpdated',
   'taskMoved',
+  'listCreated',
+  'listUpdated',
+  'listDeleted',
 ]
 
 /** Endpoint público (estable) del webhook para un workspace, o null si no hay base. */
@@ -42,7 +46,20 @@ export async function ensureWorkspaceWebhook(teamId: string, token: string): Pro
     const existing = await db.query.workspaceWebhook.findFirst({
       where: eq(workspaceWebhook.workspaceId, teamId),
     })
-    if (existing) return
+    if (existing) {
+      // Ya registrado: actualiza los eventos por si el set cambió (p.ej. al añadir
+      // los de listas a un webhook viejo). Best-effort; endpoint/secret no cambian.
+      try {
+        await axios.put(
+          `${API_CONFIG.CLICKUP_API_BASE}/webhook/${existing.webhookId}`,
+          { endpoint, events: WEBHOOK_EVENTS, status: 'active' },
+          { headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' } }
+        )
+      } catch {
+        /* best-effort: si ClickUp rechaza el update, el webhook viejo sigue activo */
+      }
+      return
+    }
 
     const { data } = await axios.post(
       `${API_CONFIG.CLICKUP_API_BASE}/team/${teamId}/webhook`,

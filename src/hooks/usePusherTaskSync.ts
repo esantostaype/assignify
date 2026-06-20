@@ -65,6 +65,12 @@ export const usePusherTaskSync = () => {
       queryClient.invalidateQueries({ queryKey: taskKeys.clickup() })
       queryClient.invalidateQueries({ queryKey: workloadKeys.all })
 
+      // Avisa al formulario de crear tarea (si está abierto) para que recalcule la
+      // sugerencia: si otro usuario acaba de asignar/crear, el motor debe reflejarlo.
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent('assignify:tasks-changed'))
+      }
+
       // Anti-duplicados: si el mismo taskId llegó hace < 4s, no volver a notificar.
       const now = Date.now()
       if (lastNotified.taskId === payload?.taskId && now - lastNotified.at < 4000) {
@@ -96,16 +102,24 @@ export const usePusherTaskSync = () => {
       notifyTaskChange('Assignify · ClickUp', body)
     }
 
+    // Cambios en las LISTAS del workspace → refrescar la lista de listas asignables.
+    const listsHandler = () => {
+      queryClient.invalidateQueries({ queryKey: ['clickup-lists'] })
+    }
+
     // Rebind defensivo: quita cualquier handler previo del evento antes de
     // añadir el nuevo, para que un re-montaje (StrictMode) no acumule listeners.
     channel.unbind('task-updated')
     channel.bind('task-updated', handler)
+    channel.unbind('lists-updated')
+    channel.bind('lists-updated', listsHandler)
 
     return () => {
-      // Quitamos NUESTRO handler y nos desuscribimos del canal del workspace; la
+      // Quitamos NUESTROS handlers y nos desuscribimos del canal del workspace; la
       // conexión singleton se reutiliza. Al cambiar de workspace activo, el effect
       // se re-ejecuta y deja el canal previo antes de suscribir el nuevo.
       channel.unbind('task-updated', handler)
+      channel.unbind('lists-updated', listsHandler)
       client.unsubscribe(channelName)
     }
   }, [queryClient, activeId])
