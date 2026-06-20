@@ -361,6 +361,17 @@ export const CreateTaskForm: FC = () => {
                 loading={dataLoading}
               />
 
+              <LevelSelect
+                value={values.level}
+                onChange={(value) => {
+                  setFieldValue("level", value);
+                  // Recalcular el diseñador sugerido al cambiar el nivel solicitado.
+                  setTimeout(() => setTriggerSuggestion((prev) => prev + 1), 0);
+                }}
+                touched={touched.level}
+                error={errors.level}
+              />
+
               <TaskNameField touched={touched.name} error={errors.name} />
 
               <BrandSelect
@@ -391,17 +402,6 @@ export const CreateTaskForm: FC = () => {
                 error={errors.tierId}
                 loading={dataLoading}
                 unit={durationUnit}
-              />
-
-              <LevelSelect
-                value={values.level}
-                onChange={(value) => {
-                  setFieldValue("level", value);
-                  // Recalcular el diseñador sugerido al cambiar el nivel solicitado.
-                  setTimeout(() => setTriggerSuggestion((prev) => prev + 1), 0);
-                }}
-                touched={touched.level}
-                error={errors.level}
               />
 
               <PrioritySelect

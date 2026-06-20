@@ -236,8 +236,8 @@ export const AddVacationForm: React.FC<AddVacationFormProps> = ({
           <div>
             <div className="font-medium mb-2">
               {conflictInfo.conflictType === 'overlap'
-                ? '⚠️ Date Overlap Detected'
-                : '📅 Adjacent Vacation Detected'
+                ? 'Date Overlap Detected'
+                : 'Adjacent Vacation Detected'
               }
             </div>
 
