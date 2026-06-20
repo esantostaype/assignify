@@ -13,9 +13,13 @@ description: >-
 
 # Assignify → SaaS multi-inquilino (roadmap v2)
 
-> Estado: **EN CURSO en la rama `feat/saas-multi-tenant`.** Fases 1–3 implementadas;
-> Fase 4 avanzada (PK compuesto, tipos dinámicos, sync de listas). `main`/producción
-> sigue single-tenant e INTACTO (esta rama NO se ha mergeado). Trabajar siempre aquí.
+> Estado: **EN PRODUCCIÓN.** El SaaS multi-inquilino se MERGEÓ a `main` y está
+> desplegado en Vercel (login ClickUp OAuth + datos aislados por workspace). Fases 1–8
+> implementadas. Se sigue iterando en `feat/saas-multi-tenant` y se mergea a `main` por
+> tandas (deploy = push a `main` → Vercel → el usuario prueba en vivo). El login
+> email/password (admin Inszone) sigue conviviendo con el de ClickUp.
+> **Ver "Fases 6–8" al final** para lo último (motor fecha-manda, lock de concurrencia,
+> realtime de listas/miembros, UX/UI alineada con la intranet, Settings como página).
 
 ## ⚡ CÓMO RETOMAR (otra PC / sesión nueva) — LEER PRIMERO
 
@@ -208,6 +212,76 @@ tareas, y todo queda **aislado por inquilino** (un usuario nunca ve datos de otr
   componentes: `StepSyncMembers` (sobre `useClickUpUsers`/`useSyncUsers`) → `ListsSyncForm` →
   `TaskTypesForm`. Skip/Finish → `PATCH /api/onboarding {completed:true}` (flag en `system_settings`).
 - **Pendiente Fase 5**: renombrar **"Designers" → "Team/Members"** (la app deja de ser solo de diseño).
+
+### Fases 6–8 — EN PRODUCCIÓN (post-merge a `main`)
+Tras mergear el SaaS a `main`, se iteró en motor, gestión de equipo, UX/UI y tiempo real.
+Todo desplegado en Vercel.
+
+**Motor / asignación:**
+- ✅ **La fecha/hora EXACTA de liberación MANDA** (no el día redondeado ni el nº de
+  tareas). `compareSlots` (`src/services/assignment-ranking.ts`) compara
+  `effectiveAvailableMs` exacto: quien se libera antes gana con CUALQUIER diferencia
+  (medio día, horas). La carga (congestión en días → carga total → id estable) solo
+  desempata cuando se liberan EXACTAMENTE a la vez. Se **eliminó** el umbral de "fechas
+  parecidas" (`closeWindowDays`). Umbrales que quedan, por-eje: `forceGeneralistDays`
+  (especialista/generalista dentro del nivel), `levelEscalationDays`,
+  `crossRoleEscalationDays`, `overloadSoftCapDays` (tope blando: único que mueve la fecha
+  efectiva). Núcleo puro + tests Vitest siguen verdes.
+- ✅ **Lock de creación por workspace (anti-concurrencia)**: dos creaciones casi
+  simultáneas del mismo workspace ya no asignan tareas solapadas al mismo miembro.
+  `withWorkspaceLock(wsId, fn)` (`src/lib/workspace-lock.ts`) serializa sobre la tabla
+  Turso `assignment_lock` (PK `workspace_id` + `locked_at`, TTL 15s, INSERT ON CONFLICT +
+  roba locks colgados; **degrada** a ejecutar sin lock si falla). `/api/tasks/parallel`
+  envuelve "elegir diseñador + fecha + crear + invalidar" en él. Migración:
+  `scripts/add-assignment-lock-table.js` (CREATE TABLE IF NOT EXISTS, idempotente).
+
+**Gestión de equipo:**
+- ✅ **Form de crear**: arranca 100% vacío; sugiere SOLO con todo lleno (type, duración,
+  brand, priority, level); limpia Tier/TaskType/Assignee al crear y por inactividad
+  (gotcha: el `Select` necesita `value={value ?? ''}`, con `undefined` se vuelve no
+  controlado y no limpia).
+- ✅ **Miembros**: activar/desactivar (reversible; el motor lo excluye pero conserva
+  roles/vacaciones), quitar del workspace (borra user+roles+vacaciones, NO toca ClickUp),
+  editar nivel/roles/vacaciones. Modal de detalle con patrón **Save/Discard** (acumula
+  cambios en estado local; `DiscardChangesDialog` al cerrar con cambios; "quitar" va
+  aparte). Roles **SIN brand** (un rol = para todo el workspace); no permite rol duplicado.
+- ✅ **Approvals auto-completar**: configurable y con on/off en Settings.
+- ✅ **Fix auth**: `clickup_connection` ya no se duplicaba en cada login (se usa
+  `account.providerAccountId` como id estable en `auth.config.ts` jwt + `auth.ts`).
+
+**UX/UI (alineada con la intranet `inszone-intranet-patterns-okd`; mismo design system):**
+- ✅ **Settings es una PÁGINA** `/settings` (ya NO un modal); el nav link va a la ruta.
+- ✅ **Header**: badge de usuario con foto de ClickUp → dropdown `UserMenu` (identidad +
+  ThemeToggle + Logout); `WorkspaceSwitcher` como dropdown en el nav. Componente
+  `Dropdown` reutilizable con la transición exacta de la intranet (ENTER 220ms / EXIT
+  160ms, `cubic-bezier(0.32,0.72,0,1)`, doble rAF). Header `z-[60]` por encima de la barra
+  sticky. **Gotcha dark mode**: paneles flotantes usan `surface-card` (un paso más oscuro
+  que `surface-raised`/`hover`/`border`, que en dark son todos `neutral-300`).
+- ✅ **Lists como tabla con `Switch`** por lista (assignable), no MultiSelect.
+- ✅ **Tasks**: solo el buscador (se quitó el botón Refresh; el realtime ya actualiza).
+  Skeletons que hacen match (sin "salto" de tamaño). Capacity en una sola fila. Skeleton
+  para usuarios sin sincronizar; los inactivos muestran card "Inactive" (no skeleton
+  infinito — el endpoint `/api/users/workload` ya no filtra `active=true` y devuelve `active`).
+
+**Tiempo real (Pusher, canal por workspace `tasks-{wsId}`; helpers en `src/lib/pusher.ts`,
+cliente en `src/hooks/usePusherTaskSync.ts`):**
+- ✅ **Tareas** (ya existía): webhook ClickUp → `task-updated` → invalida kanban/carga (+
+  notificación del navegador).
+- ✅ **Listas**: webhook ClickUp `listCreated/listUpdated/listDeleted` →
+  `publishListsUpdate` → `lists-updated` → invalida `['clickup-lists']`.
+  `ensureWorkspaceWebhook` hace **PUT** para añadir los eventos de listas a webhooks ya
+  registrados → los workspaces existentes deben **RE-LOGUEAR** para recibirlos.
+- ✅ **Sugerencia viva (A)**: todo evento realtime dispara el evento `window`
+  `assignify:tasks-changed`; el form abierto y completo recalcula la sugerencia.
+- ✅ **Miembros (interno)**: los endpoints que mutan el equipo (`/api/sync/clickup-users`
+  POST, `/api/users/[userId]` PATCH/DELETE, `roles` POST + `roles/[roleId]` DELETE/PATCH,
+  `vacations` POST + `vacations/[vacationId]` DELETE) emiten `members-updated`
+  (`publishMembersUpdate`) → los demás usuarios del workspace refrescan equipo/carga en
+  vivo y recalculan la sugerencia. **OJO: ClickUp NO emite webhook de altas/bajas de
+  miembros del team** (solo tareas/listas/carpetas/espacios/goals); para detectar a quien
+  se unió en ClickUp habría que hacer **polling** de `GET /team/{id}/member` (no
+  implementado; `useClickUpUsers` tiene staleTime 2min + refetch al montar/focus como
+  aproximación).
 
 **Pendiente (operativo, al desplegar a prod):**
 - En Vercel (Production): `WEBHOOK_PUBLIC_URL`, `CRON_SECRET` y `AUTH_URL=https://assignify.vercel.app`

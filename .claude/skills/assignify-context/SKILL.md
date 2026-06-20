@@ -3,7 +3,7 @@ name: assignify-context
 description: >-
   Contexto, arquitectura y convenciones del proyecto Assignify (app de asignación
   automática de tareas de diseño: Next.js 14 + Drizzle/Turso + ClickUp, en
-  D:\Next\assignify). CONSULTA esta skill SIEMPRE antes de tocar este repo —al
+  E:\Next\assignify). CONSULTA esta skill SIEMPRE antes de tocar este repo —al
   iniciar la sesión o tras limpiar el contexto— para entender cómo funciona el
   motor de asignación, dónde vive cada dato (ClickUp = tareas en vivo; Turso =
   config), el flujo de crear tareas y los gotchas (force-dynamic, barrel @/utils,
@@ -61,9 +61,10 @@ en `src/services/task-assignment.service.ts`.
 - Carga y tareas pendientes (`TO_DO`/`IN_PROGRESS`; **`ON_APPROVAL` NO cuenta**) leídas de ClickUp. La **carga total** = suma de **duraciones reales** (de `task_meta` cuando existe; si no, derivadas de las fechas `start→due` en días hábiles), no el conteo de tareas.
 - **Disponibilidad por CARRIL de prioridad (QUIÉN↔CUÁNDO reconciliados):** `availableDate` se mide sobre las tareas de prioridad **igual o mayor** a la pedida (el "carril"), no sobre toda la cola — igual que el motor de fechas (paso 2). Así un URGENT puede empezar antes que la última deadline absoluta del diseñador si lo que tiene por delante es de menor prioridad.
 - Orden: **quien se libera antes** → desempate por **menos congestión de prioridad** → menos carga total.
-- **La PRIORIDAD influye en QUIÉN (balanceo de carga)**: por candidato se calcula `samePriorityOrHigherLoad` = nº de tareas de prioridad **igual o mayor** a la pedida. Entre quienes se liberan en **fechas parecidas** (dentro del umbral `DEADLINE_DIFFERENCE_TO_FORCE_GENERALIST`), gana el de **menor congestión de esa prioridad** —así no se apilan urgentes en el mismo diseñador, **aunque sea especialista**. Si las fechas difieren más que el umbral, manda la fecha. Comparador `compareSlots`.
-- **Escalado por cargo (eje superior al de nivel)**: se elige el mejor de los PRIMARIOS; si se libera más de `DEADLINE_DIFFERENCE_TO_FORCE_GENERALIST` días después que el mejor de los SECUNDARIOS, escala a secundarios; y si esos también están saturados, a otros cargos (1→2→3). Reusa el **mismo** umbral que separa especialista/generalista.
-- Dentro de cada grupo de cargo se aplica el **escalado por nivel** (nivel ≥ requerido; si el del nivel pedido se libera mucho más tarde, escala a uno superior) y, como desempate final, especialista vs generalista (umbral `DEADLINE_DIFFERENCE_TO_FORCE_GENERALIST`).
+- **La fecha/hora EXACTA de liberación MANDA** (criterio dominante en `compareSlots`): quien se libera antes gana con CUALQUIER diferencia (medio día, horas), porque la cola del candidato ya está reflejada en esa fecha. La **carga NO compite con la fecha**: `samePriorityOrHigherLoadDays` (congestión de prioridad igual o mayor, **en días**) y la carga total solo **desempatan cuando dos se liberan EXACTAMENTE a la vez** (y como último recurso, un id estable). El ÚNICO factor que puede mover la fecha *efectiva* es `overloadSoftCapDays` (tope blando: a quien arrastra una cola enorme se le penaliza-empuja la fecha). **Ya NO existe** el umbral de "fechas parecidas" (`closeWindowDays`) en el desempate base.
+- **Escalado por cargo (eje superior al de nivel)**: se elige el mejor de los PRIMARIOS; si se libera más de `crossRoleEscalationDays` días después que el mejor de los SECUNDARIOS, escala a secundarios; y si esos también están saturados, a otros cargos (1→2→3).
+- Dentro de cada grupo de cargo se aplica el **escalado por nivel** (nivel ≥ requerido; si el del nivel pedido se libera más de `levelEscalationDays` después que uno superior, escala) y, como desempate final, especialista vs generalista (umbral `forceGeneralistDays`).
+- **Umbrales del núcleo** (en `RankingConfig`, editables en Settings): `forceGeneralistDays`, `levelEscalationDays`, `crossRoleEscalationDays`, `overloadSoftCapDays`. (El antiguo umbral único `DEADLINE_DIFFERENCE_TO_FORCE_GENERALIST`/`closeWindowDays` se separó por eje y el de "fechas parecidas" se eliminó.)
 - **Núcleo PURO y testeado:** toda la decisión (comparador, escalado de nivel y de cargo, especialista/generalista) vive en `src/services/assignment-ranking.ts` (sin IO) y se prueba con Vitest en `assignment-ranking.test.ts` (`npm test`). `task-assignment.service.ts` solo hace el IO (leer DB/ClickUp/Settings) y delega la decisión en ese núcleo. Cada candidato trae un `reason` legible para la UI.
 - El override **manual** ignora cargo y nivel. Se registra en `task_meta.wasOverride` (sugerido vs. asignado real) para medir el motor.
 
@@ -77,6 +78,7 @@ en `src/services/task-assignment.service.ts`.
   - **LOW** → al final.
 - Ajusta la fecha si choca con **vacaciones** del usuario.
 - **Crea SOLO en ClickUp** (`createTaskInClickUp` en `src/services/clickup.service.ts`). NO escribe la tarea en la DB. Tras crear, notifica por Pusher.
+- **Lock por workspace (anti-concurrencia)**: `/api/tasks/parallel` envuelve elegir-diseñador + calcular-fecha + crear + invalidar en `withWorkspaceLock` (`src/lib/workspace-lock.ts`; tabla Turso `assignment_lock` con TTL, INSERT ON CONFLICT + roba locks colgados; **degrada** a ejecutar sin lock si falla). Así dos creaciones casi simultáneas del MISMO workspace no asignan tareas solapadas: la 2ª espera y ve ya la tarea de la 1ª. Migración: `scripts/add-assignment-lock-table.js`.
 
 ### Fechas, horario y festivos
 - `src/utils/task-calculation-utils.ts`: `getNextAvailableStart`, `calculateWorkingDeadline`, `isNonWorkingDay`.
@@ -86,7 +88,7 @@ en `src/services/task-assignment.service.ts`.
 - **Fechas de calendario** (vacaciones): se anclan a **mediodía UTC** para que el día no se corra (zona Perú UTC-5).
 
 ### Configuración editable (Settings en Turso)
-`WORK_HOURS` y `TASK_ASSIGNMENT_THRESHOLDS` ya NO son constantes fijas: viven en `system_settings` (Turso) y las lee `getAppSettings()` (`src/services/app-settings.service.ts`, cacheado 60s, con FALLBACK a `@/config` si la DB falla). El horario se edita en **hora local + huso** y se convierte a UTC (`utcHour = localHour - utcOffset`). Catálogo en `src/config/settings-catalog.ts`. Modal de Settings accesible desde el Header. `app-settings.service` es **solo-servidor** (no importar en componentes cliente). PATCH/reset invalidan la cache.
+`WORK_HOURS` y `TASK_ASSIGNMENT_THRESHOLDS` ya NO son constantes fijas: viven en `system_settings` (Turso) y las lee `getAppSettings()` (`src/services/app-settings.service.ts`, cacheado 60s, con FALLBACK a `@/config` si la DB falla). El horario se edita en **hora local + huso** y se convierte a UTC (`utcHour = localHour - utcOffset`). Catálogo en `src/config/settings-catalog.ts`. Settings es una **página** (`/settings`, `SettingsForm`); antes era un modal del Header. `app-settings.service` es **solo-servidor** (no importar en componentes cliente). PATCH/reset invalidan la cache.
 
 ### Niveles de diseñador (Jr/Mid/Sr)
 `user.level` (`JUNIOR`/`MID`/`SENIOR`, en Turso; enum `Level` en `src/db/enums.ts`). Se elige al crear la tarea (`LevelSelect`; NO se persiste en la tarea) y se edita por diseñador (UserEditModal → `PATCH /api/users/[userId]`). El motor (`selectBestUserWithVacationLogic`) asigna a nivel **≥ el requerido**; si el mejor del nivel pedido se libera más de `levelEscalationDays` (Settings, def 3) después que el de un nivel superior, **escala** (Jr→Mid→Sr; Mid→Sr; Sr solo Sr). El override manual (asignar a mano) ignora el nivel. Especialista/generalista quedó como desempate dentro del mismo nivel.
@@ -97,7 +99,11 @@ en `src/services/task-assignment.service.ts`.
 - Cron `GET /api/cron/complete-stale-approvals` (Vercel cron diario via `vercel.json`; protegido con `CRON_SECRET`): pasa a Complete las On Approval con deadline + 14 días, salvo tag `keep`.
 
 ## Tiempo real
-`/api/clickup-webhook` recibe eventos de ClickUp y solo hace `publishTaskUpdate` (Pusher) — **ya no escribe en la DB**. En el cliente, `usePusherTaskSync` (montado por `RealtimeListener`) invalida las queries `taskKeys.clickup()` y `workloadKeys.all` → el kanban y el panel "Carga del equipo" se repintan solos.
+`/api/clickup-webhook` recibe eventos de ClickUp y solo hace `publishTaskUpdate` (Pusher) — **ya no escribe en la DB**. En el cliente, `usePusherTaskSync` (montado por `RealtimeListener`) invalida las queries `taskKeys.clickup()` y `workloadKeys.all` → el kanban y el panel "Carga del equipo" se repintan solos. Eventos (helpers en `src/lib/pusher.ts`, canal **por workspace** `tasks-{workspaceId}` → aislamiento entre inquilinos; el cliente solo escucha el de su workspace activo):
+- **`task-updated`** — cambios de tareas (crea/estado/borra). Único que dispara notificación del navegador + sonido.
+- **`lists-updated`** (`publishListsUpdate`) — el webhook maneja `listCreated/listUpdated/listDeleted` → invalida `['clickup-lists']` (la lista de listas asignables se refresca sola). Los webhooks ya registrados necesitan **RE-LOGIN** para recibir los eventos de listas (`ensureWorkspaceWebhook` hace PUT para añadirlos).
+- **`members-updated`** (`publishMembersUpdate`) — los endpoints que mutan el EQUIPO (sync, nivel, roles, vacaciones, activar/desactivar, quitar) lo emiten → los demás usuarios del workspace refrescan equipo/carga. **ClickUp NO emite webhook de altas/bajas de miembros** (solo tareas/listas/carpetas/espacios/goals); para detectar a alguien que se unió en ClickUp habría que hacer polling de `GET /team/{id}/member` (no implementado).
+- **Sugerencia viva**: todo evento realtime dispara el evento `window` `assignify:tasks-changed`; el form de crear (si está abierto y completo) recalcula la sugerencia para reflejar la carga actual del equipo.
 
 ## Vistas y endpoints
 - **/tasks** — kanban; lee ClickUp en vivo (`useClickUpTasks` → `GET /api/sync/clickup-tasks`).
