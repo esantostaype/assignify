@@ -46,7 +46,10 @@ export const TierSelect: React.FC<TierSelectProps> = ({
 
       <Select
         placeholder={loading ? "Loading tiers..." : "Select a tier"}
-        value={value ?? undefined}
+        // Pasar '' (no undefined) cuando no hay tier: con undefined el Select se
+        // vuelve NO controlado y conserva su estado interno, así que tras limpiar el
+        // formulario seguía mostrando el tier viejo. Con '' permanece controlado.
+        value={value ?? ''}
         onChange={(val) => onChange(val)}
         disabled={loading}
         error={touched && error ? error : undefined}

@@ -2,18 +2,24 @@
 // NÚCLEO DE DECISIÓN del motor "¿QUIÉN?", PURO y sin IO (no toca DB, ClickUp ni
 // settings). Recibe los slots ya calculados + los umbrales y decide a quién elegir.
 // Vive aparte de task-assignment.service.ts para poder testearlo sin mocks: toda la
-// lógica sutil (carril/congestión, escalado de nivel y de cargo, especialista vs
+// lógica sutil (fecha de liberación, escalado de nivel y de cargo, especialista vs
 // generalista) se ejercita con fixtures sintéticas.
 //
+// CRITERIO PRINCIPAL: entre candidatos comparables (mismo cargo y nivel) manda la
+// FECHA DE LIBERACIÓN — quien se libera antes gana, porque puede empezar (y terminar)
+// la tarea nueva antes. El tamaño de la cola (cuántas tareas o cuántos días arrastra)
+// NO se mira directamente: ya está reflejado en esa fecha. Solo cuando dos se liberan
+// el MISMO día se desempata por carga.
+//
 // Refinamientos sobre el review del motor:
-//   #1 Congestión medida en DÍAS de trabajo del carril (no nº de tareas).
-//   #2 Tope blando de carga (overloadSoftCapDays): empuja la fecha efectiva de
-//      quien arrastra una cola grande de trabajo de menor prioridad, que el
-//      carril por sí solo ignora → menos sobreasignación.
-//   #3 Tres escalados con umbral PROPIO (closeWindow / forceGeneralist /
-//      crossRole) en vez de un único forceGeneralistThreshold compartido.
-//   #4 Equidad: a igualdad de fecha/congestión, decide la MENOR carga acumulada
-//      (reparte hacia el menos cargado) y, en último término, un id estable.
+//   #1 El desempate del mismo día mide la carga en DÍAS de trabajo, no en nº de tareas.
+//   #2 Tope blando de carga (overloadSoftCapDays): empuja la fecha efectiva de quien
+//      arrastra una cola grande, para no sobreasignarle. 0 = desactivado.
+//   #3 Escalados de NIVEL y de CARGO con umbral propio (levelEscalationDays /
+//      crossRoleEscalationDays) en vez de un único umbral compartido.
+//   #4 Equidad: a igualdad de día, decide la MENOR carga acumulada y, en último
+//      término, un id estable (reparte y es reproducible).
+//   #5 `isSpecialist` se deriva de los cargos del miembro (en el service).
 //   #6 Desempate final DETERMINISTA por id (no el orden de llegada al array).
 import { Level, Priority } from '@/db/enums';
 import { VacationAwareUserSlot } from '@/interfaces';
@@ -34,15 +40,11 @@ export const PRIORITY_RANK: Record<Priority, number> = { LOW: 1, NORMAL: 2, HIGH
 export const ROLE_AFFINITY_ASCENDING: Array<1 | 2 | 3> = [1, 2, 3];
 
 /**
- * Umbrales del núcleo de decisión, ya SEPARADOS. Antes un único
- * `forceGeneralistThreshold` gobernaba los tres escalados (fechas parejas,
- * especialista/generalista y cargo); separarlos permite afinar cada uno sin
- * mover los otros. Poner el mismo valor en los tres reproduce el comportamiento
- * del umbral único.
+ * Umbrales del núcleo de decisión. Cada escalado (nivel y cargo) tiene su propio
+ * umbral para poder afinarlos por separado; `forceGeneralistDays` resuelve el
+ * desempate especialista/generalista dentro de un nivel.
  */
 export interface RankingConfig {
-  /** Ventana (días) para considerar dos fechas de liberación "parejas". */
-  closeWindowDays: number;
   /** Umbral (días) para preferir generalista sobre especialista dentro de un nivel. */
   forceGeneralistDays: number;
   /** Umbral (días) para escalar al NIVEL superior. */
@@ -57,9 +59,8 @@ export interface RankingConfig {
  * Fecha de liberación EFECTIVA para comparar candidatos. Con el tope blando de
  * carga activo (overloadSoftCapDays > 0), a quien ya supera ese tope de trabajo
  * total pendiente se le empuja la fecha hacia adelante en proporción al exceso.
- * Así dejamos de apilar tareas en quien arrastra una cola enorme de trabajo de
- * MENOR prioridad (que el carril ignora). Con 0, no hay penalización y la fecha
- * efectiva es la real (comportamiento previo).
+ * Así dejamos de apilar tareas en quien arrastra una cola enorme. Con 0, no hay
+ * penalización y la fecha efectiva es la real (comportamiento por defecto).
  */
 function effectiveAvailableMs(s: VacationAwareUserSlot, cfg: RankingConfig): number {
   const base = s.availableDate.getTime();
@@ -70,22 +71,27 @@ function effectiveAvailableMs(s: VacationAwareUserSlot, cfg: RankingConfig): num
 
 /**
  * Orden de preferencia entre candidatos:
- *   1. Quien se libera ANTES (fecha EFECTIVA, ya penalizada por sobrecarga), si la
- *      diferencia supera `closeWindowDays`.
- *   2. Si se liberan en fechas PARECIDAS, gana quien tenga MENOS congestión de
- *      prioridad medida en DÍAS de trabajo (no en nº de tareas) — así no se apilan
- *      urgentes en el mismo diseñador aunque sea especialista.
- *   3. Desempates (equidad): menor carga total acumulada → fecha real → id estable
- *      (nunca el orden de llegada al array, que era arbitrario).
+ *   1. DÍA de liberación (fecha efectiva): quien se libera antes gana. Es el criterio
+ *      dominante — determina cuándo arranca y termina la tarea nueva. La cola del
+ *      candidato ya está reflejada aquí, así que NO se cuenta aparte.
+ *   2. Solo si se liberan el MISMO día se desempata: menor congestión de prioridad
+ *      (en días de trabajo) → menor carga total → id estable (nunca el orden de
+ *      llegada al array, que era arbitrario).
  */
 export function compareSlots(
   a: VacationAwareUserSlot,
   b: VacationAwareUserSlot,
   cfg: RankingConfig
 ): number {
-  const effDiff = effectiveAvailableMs(a, cfg) - effectiveAvailableMs(b, cfg);
-  if (Math.abs(effDiff) / MS_PER_DAY > cfg.closeWindowDays) return effDiff;
+  const aMs = effectiveAvailableMs(a, cfg);
+  const bMs = effectiveAvailableMs(b, cfg);
 
+  // 1. Día de liberación: si caen en días distintos, gana el más temprano.
+  const dayA = Math.floor(aMs / MS_PER_DAY);
+  const dayB = Math.floor(bMs / MS_PER_DAY);
+  if (dayA !== dayB) return aMs - bMs;
+
+  // 2. Mismo día → desempates de carga (no de fecha).
   const congestionDiff =
     (a.samePriorityOrHigherLoadDays ?? 0) - (b.samePriorityOrHigherLoadDays ?? 0);
   if (congestionDiff !== 0) return congestionDiff;
@@ -93,16 +99,12 @@ export function compareSlots(
   const loadDiff = a.totalAssignedDurationDays - b.totalAssignedDurationDays;
   if (loadDiff !== 0) return loadDiff;
 
-  const realDiff = a.availableDate.getTime() - b.availableDate.getTime();
-  if (realDiff !== 0) return realDiff;
-
-  // Desempate final DETERMINISTA por id (estable y reproducible) en vez de
-  // depender del orden de entrada al array.
+  // Desempate final DETERMINISTA por id (estable y reproducible).
   return a.userId < b.userId ? -1 : a.userId > b.userId ? 1 : 0;
 }
 
 // Disponible antes primero (fecha ya ajustada por cola + vacaciones + festivos);
-// entre quienes se liberan en fechas parecidas, el de menor congestión de prioridad.
+// entre quienes se liberan el mismo día, el de menor carga.
 export function sortByAvailability(
   users: VacationAwareUserSlot[],
   cfg: RankingConfig
@@ -111,11 +113,11 @@ export function sortByAvailability(
 }
 
 /**
- * Mejor candidato DENTRO de un mismo nivel. La regla de niveles manda; la de
- * especialista/generalista queda como DESEMPATE dentro del nivel: si el mejor
- * especialista se libera mucho más tarde que el mejor generalista
- * (umbral `forceGeneralistDays`), se prefiere el generalista. En caso normal gana
- * simplemente el de antes-disponible / menos-carga.
+ * Mejor candidato DENTRO de un mismo nivel. Manda la fecha de liberación; la regla
+ * especialista/generalista queda como matiz: si el mejor del nivel es especialista
+ * y existe un generalista que se libera MÁS de `forceGeneralistDays` días antes, se
+ * prefiere el generalista (reservar al especialista). En el caso normal gana el de
+ * antes-disponible.
  */
 export function pickBestInLevel(
   slots: VacationAwareUserSlot[],
@@ -129,12 +131,10 @@ export function pickBestInLevel(
   const bestSpecialist = sorted.find((s) => s.isSpecialist) ?? null;
   const bestGeneralist = sorted.find((s) => !s.isSpecialist) ?? null;
 
-  // Desempate especialista/generalista solo si el mejor del nivel es especialista
-  // y existe un generalista que se libera bastante antes.
   if (bestSpecialist && bestGeneralist && bestOverall.isSpecialist) {
-    const daysLater =
+    const daysEarlier =
       (bestSpecialist.availableDate.getTime() - bestGeneralist.availableDate.getTime()) / MS_PER_DAY;
-    if (daysLater > cfg.forceGeneralistDays) {
+    if (daysEarlier > cfg.forceGeneralistDays) {
       return bestGeneralist;
     }
   }
@@ -145,8 +145,8 @@ export function pickBestInLevel(
 /**
  * Mejor candidato de un conjunto de slots aplicando el ESCALADO POR NIVEL.
  * - Solo se consideran candidatos de nivel >= reqLevel (nunca uno inferior en automático).
- * - Se toma el mejor candidato de cada nivel (antes-disponible / menos-carga, con el
- *   desempate especialista/generalista interno).
+ * - Se toma el mejor candidato de cada nivel (antes-disponible, con el desempate
+ *   especialista/generalista interno).
  * - Se empieza por reqLevel y se compara contra el nivel inmediatamente superior:
  *   si el mejor del nivel actual se libera MÁS de `levelEscalationDays` días DESPUÉS
  *   que el mejor del nivel superior, se escala al superior. Se repite hacia SENIOR.

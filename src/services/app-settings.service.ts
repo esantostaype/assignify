@@ -47,8 +47,6 @@ export interface AppThresholds {
  * reproducen el comportamiento del umbral único.
  */
 export interface RankingThresholds {
-  /** Ventana (días) para considerar dos fechas de liberación "parejas". */
-  closeWindowDays: number;
   /** Umbral (días) para preferir generalista sobre especialista. */
   forceGeneralistDays: number;
   /** Umbral (días) para escalar al NIVEL superior. */
@@ -76,7 +74,6 @@ const FALLBACK_SETTINGS: AppSettings = {
   thresholds: { ...TASK_ASSIGNMENT_THRESHOLDS },
   levelEscalationDays: 3,
   ranking: {
-    closeWindowDays: TASK_ASSIGNMENT_THRESHOLDS.DEADLINE_DIFFERENCE_TO_FORCE_GENERALIST,
     forceGeneralistDays: TASK_ASSIGNMENT_THRESHOLDS.DEADLINE_DIFFERENCE_TO_FORCE_GENERALIST,
     levelEscalationDays: 3,
     crossRoleEscalationDays: TASK_ASSIGNMENT_THRESHOLDS.DEADLINE_DIFFERENCE_TO_FORCE_GENERALIST,
@@ -189,7 +186,6 @@ export async function getAppSettings(workspaceId?: string | null): Promise<AppSe
     // de modo que el comportamiento por defecto no cambia.
     const forceGeneralistDays = thresholds.DEADLINE_DIFFERENCE_TO_FORCE_GENERALIST;
     const ranking: RankingThresholds = {
-      closeWindowDays: readNumber(rows, 'task_assignment', 'close_dates_window_days', forceGeneralistDays),
       forceGeneralistDays,
       levelEscalationDays,
       crossRoleEscalationDays: readNumber(rows, 'task_assignment', 'cross_role_escalation_days', forceGeneralistDays),
