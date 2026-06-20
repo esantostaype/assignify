@@ -32,7 +32,9 @@ export const TaskTypeSelect: React.FC<TaskTypeSelectProps> = ({
     </Typography>
     <Select
       placeholder={loading ? "Loading types..." : "Select a task type"}
-      value={value ?? undefined}
+      // '' (no undefined) para que el Select siga CONTROLADO al limpiar: con undefined
+      // pasa a no-controlado y conserva el tipo viejo tras resetear el formulario.
+      value={value ?? ''}
       onChange={(val) => onChange(val)}
       disabled={loading}
       error={touched && error ? error : undefined}

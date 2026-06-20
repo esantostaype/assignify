@@ -23,8 +23,11 @@ export const useTaskSuggestion = (
   const debounceTimeout = useRef<NodeJS.Timeout | null>(null)
   const lastParams = useRef<string>('')
 
+  // Solo se sugiere cuando TODOS los campos requeridos del formulario están puestos:
+  // tipo, lista (brand), tier/duración, nivel y prioridad. Antes bastaban tipo +
+  // duración, así que sugería con el formulario a medio llenar.
   const areParamsValid = (typeId: number | undefined, durationDays: string) => {
-    if (!typeId || !durationDays) return false
+    if (!typeId || !durationDays || !brandId || !priority || !level) return false
     const duration = parseFloat(durationDays)
     return !isNaN(duration) && duration > 0
   }
@@ -38,15 +41,11 @@ export const useTaskSuggestion = (
 
     if (!areParamsValid(typeId, durationDays)) {
       setFetchingSuggestion(false)
-      // Sin tipo de tarea (formulario reseteado tras crear o por inactividad) →
-      // limpiar la sugerencia; si no, el sugerido viejo se re-elevaba al form y el
-      // selector volvía a auto-aplicarlo. Con tipo pero duración aún incompleta
-      // (el usuario está tecleando) la conservamos para no parpadear.
-      if (!typeId) {
-        setSuggestedAssignment(null)
-        setCandidates([])
-        lastParams.current = createParamsKey(typeId, durationDays, brandId)
-      }
+      // Falta algún campo requerido → no hay sugerencia: la limpiamos para no
+      // mostrar una parcial ni la vieja (tras resetear el form o al borrar un campo).
+      setSuggestedAssignment(null)
+      setCandidates([])
+      lastParams.current = createParamsKey(typeId, durationDays, brandId)
       return
     }
 
