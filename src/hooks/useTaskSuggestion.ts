@@ -38,7 +38,15 @@ export const useTaskSuggestion = (
 
     if (!areParamsValid(typeId, durationDays)) {
       setFetchingSuggestion(false)
-      // No limpiar la sugerencia: esperamos a que llegue una duración válida.
+      // Sin tipo de tarea (formulario reseteado tras crear o por inactividad) →
+      // limpiar la sugerencia; si no, el sugerido viejo se re-elevaba al form y el
+      // selector volvía a auto-aplicarlo. Con tipo pero duración aún incompleta
+      // (el usuario está tecleando) la conservamos para no parpadear.
+      if (!typeId) {
+        setSuggestedAssignment(null)
+        setCandidates([])
+        lastParams.current = createParamsKey(typeId, durationDays, brandId)
+      }
       return
     }
 
