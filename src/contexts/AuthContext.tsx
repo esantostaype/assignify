@@ -10,6 +10,8 @@ import { useSession, signOut } from 'next-auth/react';
 
 interface AuthUser {
   email: string;
+  name?: string;
+  image?: string;
   role?: string;
 }
 
@@ -25,7 +27,14 @@ export function useAuth(): AuthContextType {
   const email = session?.user?.email;
 
   return {
-    user: email ? { email, role: session?.user?.role } : null,
+    user: email
+      ? {
+          email,
+          name: session?.user?.name ?? undefined,
+          image: session?.user?.image ?? undefined,
+          role: session?.user?.role,
+        }
+      : null,
     loading: status === 'loading',
     isAuthenticated: status === 'authenticated',
     logout: async () => {

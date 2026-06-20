@@ -4,30 +4,17 @@ import { Queue01Icon, Settings01Icon, SwatchIcon, UserGroup03Icon, Folder01Icon 
 import { NavItem, SettingsForm, TaskTypesForm } from '@/components'
 import { ListsSyncForm } from '@/components/ListsSyncForm'
 import { WorkspaceSwitcher } from '@/components/WorkspaceSwitcher'
-import { Button, Modal, AlertDialog } from '@/components/ui'
-import { Icon, PiUser, PiSignOut } from '@/lib/icons'
-import { useAuth } from '@/contexts/AuthContext'
-import { ThemeToggle } from '@/components/ThemeToggle'
+import { UserMenu } from '@/components/UserMenu'
+import { Modal } from '@/components/ui'
 import { Logo } from '@/components/Logo'
 
 export const Header = () => {
-  const { logout, user } = useAuth()
-
   // Modals / dialogs are rendered inline with local state (mirrors the
   // reference project: no global modal store holding a JSX snapshot — the
   // content stays part of the live React tree and reflects updates).
   const [typesOpen, setTypesOpen] = useState(false)
   const [listsOpen, setListsOpen] = useState(false)
   const [settingsOpen, setSettingsOpen] = useState(false)
-  const [logoutOpen, setLogoutOpen] = useState(false)
-
-  const handleLogout = () => {
-    // logout() navigates away on success; fire-and-forget like the
-    // reference's AlertDialog confirms (no loading state on the dialog).
-    Promise.resolve(logout()).catch((error) => {
-      console.error('Logout failed:', error)
-    })
-  }
 
   const navItems = [
     { href: '/tasks', label: 'Tasks', icon: Queue01Icon },
@@ -47,31 +34,12 @@ export const Header = () => {
               <NavItem key={item.href || index} {...item} />
             ))}
           </ul>
-        </div>
-
-        <div className="flex items-center gap-3">
+          {/* Workspace activo como dropdown, dentro del nav. */}
           <WorkspaceSwitcher />
-          <ThemeToggle />
-
-          {/* User info - opcional */}
-          {user && (
-            <span className="text-sm text-(--color-text-muted) hidden sm:flex sm:items-center sm:gap-1">
-              <Icon icon={PiUser} size={20} />
-              {user.email}
-            </span>
-          )}
-
-          {/* Logout button */}
-          <Button
-            size='sm'
-            variant='ghost'
-            onClick={() => setLogoutOpen(true)}
-            color='error'
-            startIcon={<Icon icon={PiSignOut} size={20} />}
-          >
-            Logout
-          </Button>
         </div>
+
+        {/* Badge del usuario: foto de ClickUp → dropdown (identidad, tema, logout). */}
+        <UserMenu />
       </header>
 
       {/* Task Types — small editing modal */}
@@ -106,18 +74,6 @@ export const Header = () => {
       >
         <SettingsForm />
       </Modal>
-
-      {/* Sign out confirmation */}
-      <AlertDialog
-        open={logoutOpen}
-        onClose={() => setLogoutOpen(false)}
-        tone="warning"
-        title="Sign Out"
-        description={`Are you sure you want to sign out${user?.email ? ` from ${user.email}` : ''}? You'll need to log in again to access your account.`}
-        confirmLabel="Sign Out"
-        cancelLabel="Cancel"
-        onConfirm={handleLogout}
-      />
     </>
   )
 }
