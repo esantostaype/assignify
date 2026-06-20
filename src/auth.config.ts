@@ -28,9 +28,16 @@ export const authConfig = {
       return isLoggedIn // false → Auth.js redirige a pages.signIn (/login)
     },
     // Propaga id/role al token y a la sesión.
-    jwt({ token, user }) {
+    jwt({ token, user, account }) {
       if (user) {
-        token.id = user.id as string
+        // ClickUp OAuth: usar el id ESTABLE de ClickUp (account.providerAccountId).
+        // Sin adapter de DB, Auth.js genera un user.id efímero (UUID) distinto en
+        // cada login; usarlo creaba una clickup_connection nueva cada vez. Para
+        // credenciales se mantiene el id de authUser.
+        token.id =
+          account?.provider === 'clickup' && account.providerAccountId
+            ? account.providerAccountId
+            : (user.id as string)
         token.role = (user as { role?: string }).role
       }
       return token

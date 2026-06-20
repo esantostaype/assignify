@@ -82,6 +82,12 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       if (account?.provider !== 'clickup' || !account.access_token || !user?.id) return
       const token = account.access_token
       const cu = (profile as ClickUpProfile | undefined)?.user
+      // ID ESTABLE del usuario en ClickUp. NO usar user.id: sin adapter de DB,
+      // Auth.js genera un UUID efímero por login → se creaba una clickup_connection
+      // nueva cada vez. providerAccountId (== id de ClickUp) es estable y coincide
+      // con el token.id que pone el callback jwt, que es por lo que filtra
+      // getCurrentWorkspaceId.
+      const clickupUserId = account.providerAccountId ?? String(cu?.id ?? user.id)
       const enc = encryptSecret(token)
       const now = new Date()
 
@@ -104,7 +110,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       // Activo: si ya había uno elegido y sigue entre los autorizados, lo
       // respetamos (no pisamos la elección del usuario); si no, el primero.
       const existing = await db.query.clickupConnection.findFirst({
-        where: eq(clickupConnection.clickupUserId, user.id),
+        where: eq(clickupConnection.clickupUserId, clickupUserId),
       })
       const prevActive = existing?.workspaceId ?? null
       const active =
@@ -115,7 +121,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       await db
         .insert(clickupConnection)
         .values({
-          clickupUserId: user.id,
+          clickupUserId,
           email: cu?.email ?? user.email ?? null,
           username: cu?.username ?? user.name ?? null,
           accessTokenEnc: enc,
