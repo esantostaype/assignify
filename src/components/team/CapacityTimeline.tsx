@@ -196,7 +196,7 @@ export const CapacityTimeline: React.FC<CapacityTimelineProps> = ({ workload, lo
           {rows.map((u) => (
             <div
               key={u.id}
-              className="flex items-center justify-between gap-2 pr-3 border-t border-(--color-border-subtle)"
+              className="flex items-center justify-between gap-2 pr-3"
               style={{ height: ROW_H }}
             >
               <span className="truncate text-sm text-(--color-text-default)" title={u.name}>
@@ -230,8 +230,8 @@ export const CapacityTimeline: React.FC<CapacityTimelineProps> = ({ workload, lo
               {days.map((d, i) => (
                 <div
                   key={i}
-                  className={`flex flex-col items-center justify-center text-[10px] leading-tight ${
-                    d.isMonday ? "border-l border-(--color-border-strong)" : "border-l border-(--color-border-subtle)/40"
+                  className={`flex flex-col items-center justify-center text-[10px] leading-tight border-l border-dashed ${
+                    d.isMonday ? "border-(--color-border-default)/40" : "border-(--color-border-subtle)/20"
                   } ${d.isWeekend ? "text-(--color-text-muted)/60" : "text-(--color-text-muted)"}`}
                   style={{ width: DAY_W }}
                 >
@@ -261,8 +261,8 @@ export const CapacityTimeline: React.FC<CapacityTimelineProps> = ({ workload, lo
                         : "";
                   const cell = (
                     <div
-                      className={`h-full ${
-                        d.isMonday ? "border-l border-(--color-border-strong)" : "border-l border-(--color-border-subtle)/30"
+                      className={`h-full border-l border-dashed ${
+                        d.isMonday ? "border-(--color-border-default)/40" : "border-(--color-border-subtle)/20"
                       } ${bg}`}
                       style={{ width: DAY_W }}
                     />
@@ -292,7 +292,7 @@ export const CapacityTimeline: React.FC<CapacityTimelineProps> = ({ workload, lo
                 return (
                   <div
                     key={u.id}
-                    className="relative border-t border-(--color-border-subtle)"
+                    className="relative"
                     style={{ height: ROW_H }}
                   >
                     {/* Vacaciones (al fondo). */}
