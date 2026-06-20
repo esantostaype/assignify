@@ -234,6 +234,17 @@ Todo desplegado en Vercel.
   roba locks colgados; **degrada** a ejecutar sin lock si falla). `/api/tasks/parallel`
   envuelve "elegir diseñador + fecha + crear + invalidar" en él. Migración:
   `scripts/add-assignment-lock-table.js` (CREATE TABLE IF NOT EXISTS, idempotente).
+- ✅ **Empuje en cascada de Low**: al crear una tarea de prioridad **> LOW** (Normal/High/
+  Urgent), las Low **movibles** de cada diseñador asignado se recolocan DESPUÉS de ella en
+  cascada, reprogramando fechas EN ClickUp. Una Low es movible solo si: TO_DO + creada hoy
+  (mismo día local, `task_meta.createdAt`) + falta >1h para el cierre del día laboral; pasada
+  esa ventana o en días anteriores, queda **fija** (su deadline ya se "comunicó" al
+  solicitante). Núcleo puro `src/services/low-cascade.ts` (`isMovableLow`/`computeLowCascade`,
+  con tests) + orquestador `cascadeLowTasksForUser` (`parallel-priority-insertion.service.ts`)
+  + `rescheduleClickUpTaskDates` (clickup.service: PUT SOLO de fechas, token-aware — el viejo
+  `updateTaskInClickUp` NO sirve: reescribe status/assignees, postea comentario, token global).
+  Se expuso `utcOffsetHours` en `AppSettings` para anclar el "día local". **Único punto donde
+  el motor modifica tareas existentes en ClickUp**; todo dentro del lock por workspace.
 
 **Gestión de equipo:**
 - ✅ **Form de crear**: arranca 100% vacío; sugiere SOLO con todo lleno (type, duración,

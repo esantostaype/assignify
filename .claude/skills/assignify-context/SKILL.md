@@ -71,7 +71,7 @@ en `src/services/task-assignment.service.ts`.
 ### 2) ¿CUÁNDO? — fechas (modelo de carriles por prioridad)
 `POST /api/tasks/parallel` → `calculateParallelPriorityInsertion`
 (en `src/services/parallel-priority-insertion.service.ts`).
-- Una tarea se **encola tras la última de prioridad IGUAL o MAYOR** del diseñador y corre **en paralelo con las de menor** prioridad (no las empuja):
+- Una tarea se **encola tras la última de prioridad IGUAL o MAYOR** del diseñador y corre **en paralelo con las de menor** prioridad, con UNA excepción: las **Low SÍ se empujan** al crear una tarea de mayor prioridad (ver "Empuje en cascada de Low" abajo):
   - **URGENT** → cola de urgentes (la 1ª arranca hoy).
   - **HIGH** → tras la última URGENT/HIGH.
   - **NORMAL** → tras la última URGENT/HIGH/NORMAL.
@@ -79,6 +79,7 @@ en `src/services/task-assignment.service.ts`.
 - Ajusta la fecha si choca con **vacaciones** del usuario.
 - **Crea SOLO en ClickUp** (`createTaskInClickUp` en `src/services/clickup.service.ts`). NO escribe la tarea en la DB. Tras crear, notifica por Pusher.
 - **Lock por workspace (anti-concurrencia)**: `/api/tasks/parallel` envuelve elegir-diseñador + calcular-fecha + crear + invalidar en `withWorkspaceLock` (`src/lib/workspace-lock.ts`; tabla Turso `assignment_lock` con TTL, INSERT ON CONFLICT + roba locks colgados; **degrada** a ejecutar sin lock si falla). Así dos creaciones casi simultáneas del MISMO workspace no asignan tareas solapadas: la 2ª espera y ve ya la tarea de la 1ª. Migración: `scripts/add-assignment-lock-table.js`.
+- **Empuje en cascada de Low (la prioridad reordena)**: al crear una tarea de prioridad **> LOW**, las Low **movibles** de cada diseñador asignado se recolocan DESPUÉS de ella, en cascada (reprograman fechas EN ClickUp vía `rescheduleClickUpTaskDates` — PUT solo de fechas, token-aware; **NO** el viejo `updateTaskInClickUp`, que reescribe status/assignees y usa el token global). Una Low es **movible** solo si está en **TO_DO**, fue **creada hoy** (mismo día local, `task_meta.createdAt`) y **falta >1h** para el cierre del día laboral; si no, queda **fija** (su deadline ya se considera comunicado al solicitante y no debe cambiar). Núcleo puro testeable en `src/services/low-cascade.ts` (`isMovableLow`/`computeLowCascade`); orquesta `cascadeLowTasksForUser` (`parallel-priority-insertion.service.ts`), enganchado en `/tasks/parallel` dentro del lock. **Es el ÚNICO punto donde el motor modifica tareas existentes en ClickUp.**
 
 ### Fechas, horario y festivos
 - `src/utils/task-calculation-utils.ts`: `getNextAvailableStart`, `calculateWorkingDeadline`, `isNonWorkingDay`.
