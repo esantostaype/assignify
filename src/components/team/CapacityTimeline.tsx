@@ -293,8 +293,8 @@ export const CapacityTimeline: React.FC<CapacityTimelineProps> = ({ workload, lo
   if (rows.length === 0) return null;
 
   // Grid lines: dashed + faint for days, SOLID for week dividers (Sunday).
-  const dayLine = "border-l border-dashed border-(--color-border-default)/20";
-  const weekLine = "border-l border-(--color-border-default)/50";
+  const dayLine = "border-l border-dashed border-(--color-border-default)";
+  const weekLine = "border-l border-(--color-border-default)";
   const lineOf = (d: DayCell) => (d.isWeekStart ? weekLine : dayLine);
   const tracksH = rows.length * ROW_H;
 
@@ -305,9 +305,9 @@ export const CapacityTimeline: React.FC<CapacityTimelineProps> = ({ workload, lo
       <Card variant="outlined" padding="none" className="mt-3 flex overflow-hidden">
         {/* Names column (fixed; doesn't scroll). Vertical separator = card border. */}
         <div className="shrink-0 z-20 border-r border-(--color-border-default) px-4" style={{ width: NAME_W }}>
-          {/* line UNDER the weeks row only */}
-          <div style={{ height: WEEK_H }} className="border-b border-(--color-border-default)" />
-          <div style={{ height: HEADER_H }} />
+          {/* full-header spacer; the only horizontal line here sits ABOVE the rows
+              (not above the names). */}
+          <div style={{ height: WEEK_H + HEADER_H }} className="border-b border-(--color-border-default)" />
           {rows.map((u) => (
             <div key={u.id} className="flex items-center justify-between gap-2" style={{ height: ROW_H }}>
               <span className="truncate text-sm text-(--color-text-default)" title={u.name}>
@@ -345,8 +345,8 @@ export const CapacityTimeline: React.FC<CapacityTimelineProps> = ({ workload, lo
               ))}
             </div>
 
-            {/* Day header (no bottom line; weekends slightly lighter). */}
-            <div className="flex" style={{ height: HEADER_H }}>
+            {/* Day header. Line below = above the rows (the one it had before). */}
+            <div className="flex border-b border-(--color-border-default)" style={{ height: HEADER_H }}>
               {days.map((d, i) => {
                 const cell = (
                   <div
