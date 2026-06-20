@@ -63,6 +63,13 @@ describe('compareSlots', () => {
     expect(compareSlots(a, b, cfg())).toBeLessThan(0)
   })
 
+  it('la fecha/hora manda con cualquier diferencia: medio día antes gana aunque tenga más carga', () => {
+    const earlier = slot({ userId: 'earlier', availableDate: new Date(BASE + 0.5 * DAY), samePriorityOrHigherLoadDays: 6, totalAssignedDurationDays: 10 })
+    const later = slot({ userId: 'later', availableDate: new Date(BASE + 1 * DAY), samePriorityOrHigherLoadDays: 1, totalAssignedDurationDays: 1 })
+    // earlier y later caen el MISMO día calendario pero earlier se libera 12h antes → gana.
+    expect(compareSlots(earlier, later, cfg())).toBeLessThan(0)
+  })
+
   it('el MISMO día desempata por menor congestión de prioridad (en días)', () => {
     const congested = slot({ userId: 'a', availableDate: at(0), samePriorityOrHigherLoadDays: 4 })
     const light = slot({ userId: 'b', availableDate: at(0), samePriorityOrHigherLoadDays: 1 })

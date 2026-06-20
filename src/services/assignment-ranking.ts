@@ -6,10 +6,11 @@
 // generalista) se ejercita con fixtures sintéticas.
 //
 // CRITERIO PRINCIPAL: entre candidatos comparables (mismo cargo y nivel) manda la
-// FECHA DE LIBERACIÓN — quien se libera antes gana, porque puede empezar (y terminar)
-// la tarea nueva antes. El tamaño de la cola (cuántas tareas o cuántos días arrastra)
-// NO se mira directamente: ya está reflejado en esa fecha. Solo cuando dos se liberan
-// el MISMO día se desempata por carga.
+// FECHA/HORA DE LIBERACIÓN — quien se libera antes gana (con cualquier diferencia,
+// aunque sea de horas), porque puede empezar y terminar la tarea nueva antes. El
+// tamaño de la cola (cuántas tareas o cuántos días arrastra) NO se mira directamente:
+// ya está reflejado en esa fecha. Solo cuando dos se liberan EXACTAMENTE a la vez se
+// desempata por carga.
 //
 // Refinamientos sobre el review del motor:
 //   #1 El desempate del mismo día mide la carga en DÍAS de trabajo, no en nº de tareas.
@@ -86,12 +87,13 @@ export function compareSlots(
   const aMs = effectiveAvailableMs(a, cfg);
   const bMs = effectiveAvailableMs(b, cfg);
 
-  // 1. Día de liberación: si caen en días distintos, gana el más temprano.
-  const dayA = Math.floor(aMs / MS_PER_DAY);
-  const dayB = Math.floor(bMs / MS_PER_DAY);
-  if (dayA !== dayB) return aMs - bMs;
+  // 1. Fecha/hora de liberación: quien se libera ANTES gana, con CUALQUIER diferencia
+  //    (aunque sea de horas / medio día). Es el criterio dominante; el tamaño de la
+  //    cola no compite con la fecha.
+  if (aMs !== bMs) return aMs - bMs;
 
-  // 2. Mismo día → desempates de carga (no de fecha).
+  // 2. Se liberan EXACTAMENTE a la vez → desempate por carga (congestión de prioridad
+  //    en días → carga total) y, por último, id estable (no el orden de llegada).
   const congestionDiff =
     (a.samePriorityOrHigherLoadDays ?? 0) - (b.samePriorityOrHigherLoadDays ?? 0);
   if (congestionDiff !== 0) return congestionDiff;
@@ -99,7 +101,6 @@ export function compareSlots(
   const loadDiff = a.totalAssignedDurationDays - b.totalAssignedDurationDays;
   if (loadDiff !== 0) return loadDiff;
 
-  // Desempate final DETERMINISTA por id (estable y reproducible).
   return a.userId < b.userId ? -1 : a.userId > b.userId ? 1 : 0;
 }
 
