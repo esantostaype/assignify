@@ -148,20 +148,6 @@ export const DEFAULT_SETTINGS: SettingDefinition[] = [
   },
   {
     category: 'task_assignment',
-    key: 'close_dates_window_days',
-    value: 10,
-    dataType: 'number',
-    label: 'Close-dates window (days)',
-    description:
-      'Two candidates freeing up within this many days of each other are treated as "tied" on date; the choice then falls to workload and role fit instead of the exact day.',
-    group: 'task_assignment',
-    order: 5,
-    minValue: 1,
-    maxValue: 60,
-    required: true,
-  },
-  {
-    category: 'task_assignment',
     key: 'cross_role_escalation_days',
     value: 10,
     dataType: 'number',
@@ -169,7 +155,7 @@ export const DEFAULT_SETTINGS: SettingDefinition[] = [
     description:
       'If the best candidate of the preferred role frees up more than this many days later than one of a secondary/other role, the other role is also considered.',
     group: 'task_assignment',
-    order: 6,
+    order: 5,
     minValue: 1,
     maxValue: 60,
     required: true,
@@ -183,7 +169,7 @@ export const DEFAULT_SETTINGS: SettingDefinition[] = [
     description:
       'Soft fairness cap: when a member already has more than this many days of total pending work, their effective availability is pushed back so heavy queues of lower-priority work stop attracting new tasks. 0 disables it.',
     group: 'task_assignment',
-    order: 7,
+    order: 6,
     minValue: 0,
     maxValue: 365,
     required: true,

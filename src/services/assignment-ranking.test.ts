@@ -39,10 +39,8 @@ function slot(overrides: Partial<VacationAwareUserSlot> = {}): VacationAwareUser
   }
 }
 
-// Config base de los tests: ventana/umbrales = 3 días, tope de carga desactivado.
-// Cada test sobreescribe lo que necesita (p.ej. overloadSoftCapDays).
+// Config base de los tests: umbrales de escalado = 3 días, tope de carga desactivado.
 const cfg = (o: Partial<RankingConfig> = {}): RankingConfig => ({
-  closeWindowDays: 3,
   forceGeneralistDays: 3,
   levelEscalationDays: 3,
   crossRoleEscalationDays: 3,
@@ -51,36 +49,40 @@ const cfg = (o: Partial<RankingConfig> = {}): RankingConfig => ({
 })
 
 describe('compareSlots', () => {
-  it('prefiere a quien se libera ANTES cuando la diferencia supera la ventana', () => {
-    const early = slot({ userId: 'early', availableDate: at(0), samePriorityOrHigherLoadDays: 9 })
-    const late = slot({ userId: 'late', availableDate: at(10), samePriorityOrHigherLoadDays: 0 })
-    // Aunque 'early' tenga más congestión, su fecha es muy anterior → gana.
+  it('manda la fecha: quien se libera ANTES gana (días distintos)', () => {
+    const early = slot({ userId: 'early', availableDate: at(0) })
+    const late = slot({ userId: 'late', availableDate: at(2) })
     expect(compareSlots(early, late, cfg())).toBeLessThan(0)
   })
 
-  it('dentro de la ventana, gana quien tiene MENOS congestión de prioridad (en días)', () => {
+  it('la fecha manda aunque el que se libera antes tenga MÁS carga (caso del usuario)', () => {
+    // A: muchas tareas en cola pero se libera el día 0. B: menos carga pero se libera el día 2.
+    const a = slot({ userId: 'A', availableDate: at(0), samePriorityOrHigherLoadDays: 10, totalAssignedDurationDays: 10 })
+    const b = slot({ userId: 'B', availableDate: at(2), samePriorityOrHigherLoadDays: 12, totalAssignedDurationDays: 12 })
+    // Debe ganar A porque se libera antes (terminaría la tarea nueva antes).
+    expect(compareSlots(a, b, cfg())).toBeLessThan(0)
+  })
+
+  it('el MISMO día desempata por menor congestión de prioridad (en días)', () => {
     const congested = slot({ userId: 'a', availableDate: at(0), samePriorityOrHigherLoadDays: 4 })
-    const light = slot({ userId: 'b', availableDate: at(1), samePriorityOrHigherLoadDays: 1 })
-    // 1 día de diferencia (< ventana) → decide la congestión: 'light' gana.
+    const light = slot({ userId: 'b', availableDate: at(0), samePriorityOrHigherLoadDays: 1 })
     expect(compareSlots(congested, light, cfg())).toBeGreaterThan(0)
   })
 
-  it('mide la congestión en DÍAS de trabajo, no en nº de tareas', () => {
+  it('el MISMO día mide la congestión en DÍAS de trabajo, no en nº de tareas', () => {
     // 'many' tiene MÁS tareas pero suman MENOS días; 'few' tiene una sola, larga.
     const many = slot({ userId: 'many', availableDate: at(0), samePriorityOrHigherLoad: 6, samePriorityOrHigherLoadDays: 0.5 })
-    const few = slot({ userId: 'few', availableDate: at(1), samePriorityOrHigherLoad: 1, samePriorityOrHigherLoadDays: 5 })
-    // Dentro de la ventana: gana 'many' porque su carga real (en días) es menor.
+    const few = slot({ userId: 'few', availableDate: at(0), samePriorityOrHigherLoad: 1, samePriorityOrHigherLoadDays: 5 })
     expect(compareSlots(many, few, cfg())).toBeLessThan(0)
   })
 
-  it('dentro de la ventana e igual congestión, gana la menor carga total', () => {
+  it('el MISMO día e igual congestión, gana la menor carga total', () => {
     const heavy = slot({ userId: 'a', availableDate: at(0), samePriorityOrHigherLoadDays: 2, totalAssignedDurationDays: 12 })
-    const lean = slot({ userId: 'b', availableDate: at(1), samePriorityOrHigherLoadDays: 2, totalAssignedDurationDays: 3 })
+    const lean = slot({ userId: 'b', availableDate: at(0), samePriorityOrHigherLoadDays: 2, totalAssignedDurationDays: 3 })
     expect(compareSlots(heavy, lean, cfg())).toBeGreaterThan(0)
   })
 
-  it('tope blando de carga: penaliza la fecha efectiva del sobrecargado (#2)', () => {
-    // 'over' se libera antes pero arrastra 30 días de trabajo total; 'free' apenas 2.
+  it('tope blando de carga: empuja la fecha efectiva del sobrecargado (#2)', () => {
     const over = slot({ userId: 'over', availableDate: at(0), totalAssignedDurationDays: 30 })
     const free = slot({ userId: 'free', availableDate: at(5), totalAssignedDurationDays: 2 })
     // Sin tope (0): decide la fecha → 'over' gana por liberarse 5 días antes.
@@ -89,41 +91,26 @@ describe('compareSlots', () => {
     expect(compareSlots(over, free, cfg({ overloadSoftCapDays: 10 }))).toBeGreaterThan(0)
   })
 
-  it('desempate final DETERMINISTA por id, no por orden de llegada (#6)', () => {
+  it('desempate final DETERMINISTA por id cuando todo empata el mismo día (#6)', () => {
     const a = slot({ userId: 'aaa' })
     const b = slot({ userId: 'zzz' })
-    // Todo idéntico salvo el id → el desempate es estable y reproducible.
     expect(compareSlots(a, b, cfg())).toBeLessThan(0)
     expect(compareSlots(b, a, cfg())).toBeGreaterThan(0)
   })
 })
 
 describe('pickBestInLevel', () => {
-  it('escala a generalista si el especialista se libera mucho más tarde', () => {
+  it('elige a quien se libera antes, sea generalista o especialista', () => {
     const specialist = slot({ userId: 'spec', isSpecialist: true, availableDate: at(10) })
     const generalist = slot({ userId: 'gen', isSpecialist: false, availableDate: at(0) })
-    const best = pickBestInLevel([specialist, generalist], cfg())
-    expect(best?.userId).toBe('gen')
+    // El generalista se libera antes → gana.
+    expect(pickBestInLevel([specialist, generalist], cfg())?.userId).toBe('gen')
   })
 
-  it('mantiene al especialista cuando se libera primero (no fuerza generalista dentro de la ventana)', () => {
+  it('mantiene al especialista cuando se libera antes', () => {
     const specialist = slot({ userId: 'spec', isSpecialist: true, availableDate: at(0) })
     const generalist = slot({ userId: 'gen', isSpecialist: false, availableDate: at(2) })
-    // El especialista se libera antes y el generalista no lo supera por más que la ventana → se queda el especialista.
-    const best = pickBestInLevel([specialist, generalist], cfg())
-    expect(best?.userId).toBe('spec')
-  })
-
-  it('usa forceGeneralistDays propio para decidir especialista vs generalista (#3)', () => {
-    // Dentro de la ventana de fechas el especialista gana el orden por tener MENOS
-    // congestión; luego forceGeneralistDays decide si se "baja" al generalista que
-    // se libera un poco antes.
-    const specialist = slot({ userId: 'spec', isSpecialist: true, availableDate: at(2), samePriorityOrHigherLoadDays: 0 })
-    const generalist = slot({ userId: 'gen', isSpecialist: false, availableDate: at(0), samePriorityOrHigherLoadDays: 5 })
-    // El generalista se libera 2 días antes. Con forceGeneralistDays alto (8) NO se fuerza → especialista.
-    expect(pickBestInLevel([specialist, generalist], cfg({ forceGeneralistDays: 8 }))?.userId).toBe('spec')
-    // Con forceGeneralistDays bajo (1): 2 > 1 → se fuerza el generalista.
-    expect(pickBestInLevel([specialist, generalist], cfg({ forceGeneralistDays: 1 }))?.userId).toBe('gen')
+    expect(pickBestInLevel([specialist, generalist], cfg())?.userId).toBe('spec')
   })
 })
 
@@ -139,7 +126,7 @@ describe('pickBestByLevelEscalation', () => {
   it('escala a un nivel superior si el del nivel pedido se libera mucho más tarde', () => {
     const mid = slot({ userId: 'mid', level: Level.MID, availableDate: at(10) })
     const senior = slot({ userId: 'sr', level: Level.SENIOR, availableDate: at(0) })
-    // Pedimos MID, pero el mid se libera 10 días después del senior (> levelEscalationDays=3) → escala.
+    // El mid se libera 10 días después del senior (> levelEscalationDays=3) → escala.
     const best = pickBestByLevelEscalation([mid, senior], Level.MID, cfg())
     expect(best?.userId).toBe('sr')
   })
@@ -153,9 +140,10 @@ describe('pickBestByLevelEscalation', () => {
 })
 
 describe('pickBestAcrossAffinity', () => {
-  it('prefiere el cargo PRIMARIO cuando se libera en fecha parecida al secundario', () => {
+  it('prefiere el cargo PRIMARIO cuando se libera en fecha cercana al secundario', () => {
     const primary = slot({ userId: 'prim', roleAffinity: 1, availableDate: at(1) })
     const secondary = slot({ userId: 'sec', roleAffinity: 2, availableDate: at(0) })
+    // El secundario se libera 1 día antes, pero no supera crossRoleEscalationDays(3) → se queda el primario.
     const best = pickBestAcrossAffinity([primary, secondary], Level.MID, cfg())
     expect(best?.userId).toBe('prim')
   })
@@ -163,22 +151,20 @@ describe('pickBestAcrossAffinity', () => {
   it('escala a otro cargo si el primario está saturado (se libera mucho más tarde)', () => {
     const primary = slot({ userId: 'prim', roleAffinity: 1, availableDate: at(20) })
     const secondary = slot({ userId: 'sec', roleAffinity: 2, availableDate: at(0) })
-    // El primario se libera 20 días después → se considera el secundario (1→2).
     const best = pickBestAcrossAffinity([primary, secondary], Level.MID, cfg())
     expect(best?.userId).toBe('sec')
   })
 
-  it('balancea por prioridad: entre dos primarios cercanos, gana el menos cargado de urgentes', () => {
-    const busyUrgent = slot({ userId: 'busy', roleAffinity: 1, availableDate: at(0), samePriorityOrHigherLoadDays: 5 })
-    const freeUrgent = slot({ userId: 'free', roleAffinity: 1, availableDate: at(2), samePriorityOrHigherLoadDays: 0 })
-    // 2 días de diferencia (< ventana) → decide la congestión de prioridad: 'free' gana.
-    const best = pickBestAcrossAffinity([busyUrgent, freeUrgent], Level.MID, cfg())
+  it('entre dos primarios que se liberan el mismo día, gana el menos cargado', () => {
+    const busy = slot({ userId: 'busy', roleAffinity: 1, availableDate: at(0), samePriorityOrHigherLoadDays: 5 })
+    const free = slot({ userId: 'free', roleAffinity: 1, availableDate: at(0), samePriorityOrHigherLoadDays: 0 })
+    const best = pickBestAcrossAffinity([busy, free], Level.MID, cfg())
     expect(best?.userId).toBe('free')
   })
 
   it('separa escalado de NIVEL y de CARGO con umbrales distintos (#3)', () => {
     // Primario MID se libera 5 días después de un secundario MID. Con crossRole alto (8)
-    // NO se escala de cargo (se queda el primario) aunque el de nivel fuese bajo.
+    // NO se escala de cargo (se queda el primario).
     const primary = slot({ userId: 'prim', roleAffinity: 1, level: Level.MID, availableDate: at(5) })
     const secondary = slot({ userId: 'sec', roleAffinity: 2, level: Level.MID, availableDate: at(0) })
     const best = pickBestAcrossAffinity(
