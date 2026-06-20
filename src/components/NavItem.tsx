@@ -18,7 +18,7 @@ export const NavItem = ({ label, icon, href, onClick, isActive: providedIsActive
 
   const commonClasses = `
     cursor-pointer flex gap-1 items-center rounded-md py-2 px-3 group-active:bg-primary-500/24 group-hover:bg-primary-500/12 transition-all
-    ${isActive ? 'text-(--color-text-strong)' : 'text-(--color-text-muted) group-hover:text-(--color-text-strong)'}
+    ${isActive ? 'text-(--color-text-strong)' : 'text-neutral-600 group-hover:text-(--color-text-strong)'}
   `
 
   const liClasses = `group h-full py-3 border-t-2 ${

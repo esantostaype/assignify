@@ -105,7 +105,7 @@ export const Dropdown = ({
             transition: `opacity ${duration}ms ${EASE}, transform ${duration}ms ${EASE}`,
           }}
           className={cn(
-            'absolute top-full z-[80] mt-2 overflow-hidden rounded-lg border border-neutral-300 dark:bg-neutral-100 shadow-lg',
+            'absolute top-full z-[80] mt-2 overflow-hidden rounded-lg border border-neutral-300 bg-white dark:bg-neutral-100 shadow-lg',
             !visible && 'pointer-events-none',
             align === 'right' ? 'right-0' : 'left-0',
             className,

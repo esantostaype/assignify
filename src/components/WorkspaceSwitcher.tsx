@@ -49,7 +49,7 @@ export function WorkspaceSwitcher() {
                   close()
                   if (!isActive) setActive.mutate(w.id)
                 }}
-                className="flex items-center justify-between gap-2 rounded-md px-2.5 py-2 text-left text-sm transition-colors hover:bg-neutral-200 disabled:opacity-60"
+                className="flex items-center justify-between gap-2 rounded-md px-2.5 py-2 text-left text-sm transition-colors hover:bg-neutral-100 dark:hover:bg-neutral-200 disabled:opacity-60"
               >
                 <span className="flex min-w-0 items-center gap-2">
                   <Icon icon={PiBuildings} size={16} />
