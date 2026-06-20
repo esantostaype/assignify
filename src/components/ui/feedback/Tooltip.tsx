@@ -94,7 +94,7 @@ export function Tooltip({
           className={cn(
             'pointer-events-none fixed z-[400] max-w-[260px] whitespace-normal break-words',
             'rounded-md px-2 py-1 text-[11px] font-medium shadow-md',
-            'bg-[#1f2937] text-white',
+            'bg-neutral-950 text-neutral-200',
             className,
           )}
           style={{ top: anchor.top, left: anchor.left, transform: anchor.transform }}

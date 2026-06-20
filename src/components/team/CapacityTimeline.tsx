@@ -435,8 +435,8 @@ export const CapacityTimeline: React.FC<CapacityTimelineProps> = ({ workload, lo
                         <Tooltip
                           key={`t${i}`}
                           content={
-                            <span className="flex flex-col gap-1">
-                              <span className="font-semibold">{t.name}</span>
+                            <span className="flex flex-col gap-0.5">
+                              <span className="font-semibold leading-tight">{t.name}</span>
                               <span className="flex items-center gap-1.5 opacity-80">
                                 <Icon icon={PiCalendarBlank} size={12} />
                                 {rangeLabel(t.startDate, t.dueDate)}
@@ -445,7 +445,7 @@ export const CapacityTimeline: React.FC<CapacityTimelineProps> = ({ workload, lo
                           }
                         >
                           <div
-                            className={`absolute inset-y-1 rounded ${PRIORITY_BAR[t.priority]}`}
+                            className={`absolute inset-y-2 rounded ${PRIORITY_BAR[t.priority]}`}
                             style={{ left, width: Math.max(right - left, 6) }}
                           />
                         </Tooltip>

@@ -32,7 +32,7 @@ import {
 import { useTaskData, useTaskSuggestion } from "@/hooks";
 import { taskKeys } from "@/hooks/queries/useTasks";
 import { validationSchema } from "@/validation/taskValidation";
-import { FormValues, User, RankedCandidate } from "@/interfaces";
+import { FormValues, RankedCandidate } from "@/interfaces";
 import { unitToDays, daysToUnit, type DurationUnit } from "@/utils/duration-utils";
 
 interface FormikSuggestionLogicProps {
