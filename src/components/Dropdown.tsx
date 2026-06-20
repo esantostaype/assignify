@@ -1,18 +1,16 @@
 'use client'
-// Dropdown ligero (trigger + panel flotante) con cierre por click-fuera y Escape,
-// y animación de entrada/salida (fade + slide) como la intranet.
-//
-// Dos detalles importantes:
-//  - DOBLE requestAnimationFrame para entrar: si se monta el panel y se pone
-//    `visible` en el mismo frame, el navegador no pinta el estado inicial
-//    (opacity-0) y la transición "salta". Esperar 2 frames la hace fluida.
-//  - Fondo `surface-card` (no `surface-raised`): en dark, raised/hover/border son
-//    todos neutral-300; con el panel en card (neutral-200) el hover y los dividers
-//    (neutral-300) sí contrastan.
+// Dropdown ligero (trigger + panel flotante) con cierre por click-fuera y Escape.
+// La transición replica EXACTAMENTE la del menú del header de la intranet:
+//   enter 220ms / exit 160ms · cubic-bezier(0.32,0.72,0,1) · opacity + translateY(-8px).
+// Doble requestAnimationFrame para que el frame inicial (opacity-0) se pinte antes
+// de entrar (si no, "salta"). Fondo surface-card (no raised): en dark, raised/hover/
+// border son todos neutral-300 y el hover/dividers quedaban invisibles.
 import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { cn } from '@/lib/cn'
 
-const EXIT_MS = 150
+const ENTER_MS = 220
+const EXIT_MS = 160
+const EASE = 'cubic-bezier(0.32, 0.72, 0, 1)'
 
 interface DropdownProps {
   trigger: ReactNode
@@ -36,21 +34,37 @@ export const Dropdown = ({
   const [open, setOpen] = useState(false)
   const [mounted, setMounted] = useState(false) // en el DOM (incluye la salida)
   const [visible, setVisible] = useState(false) // estado animado (entrada)
+  const enterScheduled = useRef(false)
   const ref = useRef<HTMLDivElement>(null)
 
-  // Montaje + animación gobernados por `open`:
-  //  - abrir: monta y, tras 2 frames (para pintar opacity-0), entra.
-  //  - cerrar: dispara la salida y desmonta cuando termina la transición.
+  // Montaje/desmontaje: al cerrar, deja que la animación de salida corra antes de
+  // quitar el elemento (igual que Modal/Drawer/menú de la intranet).
   useEffect(() => {
     if (open) {
       setMounted(true)
-      const id = requestAnimationFrame(() => requestAnimationFrame(() => setVisible(true)))
-      return () => cancelAnimationFrame(id)
+      return
     }
     setVisible(false)
+    enterScheduled.current = false
     const t = setTimeout(() => setMounted(false), EXIT_MS)
     return () => clearTimeout(t)
   }, [open])
+
+  // Entrada: una vez montado, doble rAF para pintar el frame off-screen antes de
+  // pasar al on-screen.
+  useEffect(() => {
+    if (!mounted || enterScheduled.current) return
+    enterScheduled.current = true
+    let id2 = 0
+    const id1 = requestAnimationFrame(() => {
+      id2 = requestAnimationFrame(() => setVisible(true))
+    })
+    return () => {
+      cancelAnimationFrame(id1)
+      if (id2) cancelAnimationFrame(id2)
+      enterScheduled.current = false
+    }
+  }, [mounted])
 
   // Cierre por click-fuera / Escape (solo mientras está abierto).
   useEffect(() => {
@@ -69,6 +83,8 @@ export const Dropdown = ({
     }
   }, [open])
 
+  const duration = visible ? ENTER_MS : EXIT_MS
+
   return (
     <div ref={ref} className="relative inline-flex">
       <button
@@ -83,10 +99,14 @@ export const Dropdown = ({
       {mounted && (
         <div
           role="menu"
+          style={{
+            opacity: visible ? 1 : 0,
+            transform: visible ? 'translate3d(0, 0, 0)' : 'translate3d(0, -8px, 0)',
+            transition: `opacity ${duration}ms ${EASE}, transform ${duration}ms ${EASE}`,
+          }}
           className={cn(
-            'absolute top-full z-[80] mt-2 origin-top overflow-hidden rounded-lg border border-(--color-border-default) bg-(--color-surface-card) shadow-lg',
-            'transition-[opacity,transform] duration-150 ease-[cubic-bezier(0.32,0.72,0,1)] motion-reduce:transition-none',
-            visible ? 'opacity-100 translate-y-0 scale-100' : 'pointer-events-none opacity-0 -translate-y-1 scale-[0.98]',
+            'absolute top-full z-[80] mt-2 overflow-hidden rounded-lg border border-(--color-border-default) bg-(--color-surface-card) shadow-lg',
+            !visible && 'pointer-events-none',
             align === 'right' ? 'right-0' : 'left-0',
             className,
           )}
