@@ -13,7 +13,7 @@ import { Level } from '@/db/enums'
 import { getBestUserWithCache } from '@/services/task-assignment.service'
 import { createTaskInClickUp } from '@/services/clickup.service'
 import { TaskCreationParams, UserWithRoles, ClickUpBrand } from '@/interfaces'
-import { calculateParallelPriorityInsertion } from '@/services/parallel-priority-insertion.service'
+import { calculateParallelPriorityInsertion, cascadeLowTasksForUser } from '@/services/parallel-priority-insertion.service'
 import { invalidateAllCache } from '@/utils/cache'
 import { publishTaskUpdate } from '@/lib/pusher'
 import { withWorkspaceLock } from '@/lib/workspace-lock'
@@ -180,13 +180,34 @@ export async function POST(req: Request) {
       console.error('No se pudo guardar task_meta (la tarea sí se creó en ClickUp):', metaError)
     }
 
-    // Notificar en tiempo real (el tablero se lee en vivo de ClickUp).
+    // Empuje en cascada de Low: si la tarea nueva NO es Low, las Low movibles de cada
+    // diseñador asignado se recolocan DESPUÉS de ella (la prioridad manda el orden, sin
+    // tareas solapadas). Best-effort: si falla, la tarea nueva ya está creada igual.
+    let cascadeMoved = 0
+    if (priority !== 'LOW') {
+      for (const userId of usersToAssign) {
+        const ins = insertionResults.find((r) => r.userId === userId)
+        if (!ins) continue
+        try {
+          const moves = await cascadeLowTasksForUser(userId, ins.deadline, { token: clickupToken, teamId: wsId })
+          cascadeMoved += moves.length
+        } catch (cascadeError) {
+          console.error('Empuje de Low falló (la tarea nueva sí se creó en ClickUp):', cascadeError)
+        }
+      }
+    }
+
+    // Notificar en tiempo real (el tablero se lee en vivo de ClickUp). Canal del workspace.
     await publishTaskUpdate({
       taskId: clickupTaskId,
       name,
       status: 'TO_DO',
       event: 'taskCreated',
-    })
+    }, wsId)
+    // Si se movieron Low, también cambiaron de fecha → un evento extra para refrescarlas.
+    if (cascadeMoved > 0) {
+      await publishTaskUpdate({ event: 'taskUpdated' }, wsId)
+    }
 
     invalidateAllCache()
 

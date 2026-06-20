@@ -60,6 +60,8 @@ export interface RankingThresholds {
 export interface AppSettings {
   /** Horario laboral YA convertido a UTC. */
   workHours: AppWorkHours;
+  /** Huso del workspace (horas; Perú = -5). Para anclar el "día local" del cierre. */
+  utcOffsetHours: number;
   thresholds: AppThresholds;
   /** Días para escalar de nivel (umbral nuevo). */
   levelEscalationDays: number;
@@ -71,6 +73,7 @@ export interface AppSettings {
 // Se usan cuando la DB falla o falta algún valor.
 const FALLBACK_SETTINGS: AppSettings = {
   workHours: { ...WORK_HOURS },
+  utcOffsetHours: -5,
   thresholds: { ...TASK_ASSIGNMENT_THRESHOLDS },
   levelEscalationDays: 3,
   ranking: {
@@ -192,7 +195,7 @@ export async function getAppSettings(workspaceId?: string | null): Promise<AppSe
       overloadSoftCapDays: readNumber(rows, 'task_assignment', 'overload_soft_cap_days', 0),
     };
 
-    const settings: AppSettings = { workHours, thresholds, levelEscalationDays, ranking };
+    const settings: AppSettings = { workHours, utcOffsetHours: utcOffset, thresholds, levelEscalationDays, ranking };
     setInCache(cacheKey, settings, CACHE_TTL_SECONDS);
     return settings;
   } catch (error) {

@@ -10,16 +10,21 @@
 //   NORMAL  → en cola tras la última URGENT/HIGH/NORMAL (en paralelo con LOW).
 //   LOW     → al final (en cola tras todas).
 import { db } from '@/db';
-import { user as userTable, userVacation } from '@/db/schema';
-import { eq, gte } from 'drizzle-orm';
+import { user as userTable, userVacation, taskMeta } from '@/db/schema';
+import { eq, gte, inArray } from 'drizzle-orm';
 import { Priority } from '@/db/enums';
 import { getNextAvailableStart, calculateWorkingDeadline } from '@/utils/task-calculation-utils';
 import { UserVacation } from '@/interfaces';
 import { getActiveClickUpTasksByUser, type ClickUpFetchOptions } from '@/services/clickup-tasks.service';
 import { mapClickUpPriority } from '@/utils/clickup-status-mapping-utils';
+import { getAppSettings } from '@/services/app-settings.service';
+import { rescheduleClickUpTaskDates } from '@/services/clickup.service';
+import { isMovableLow, computeLowCascade, type MovableLow, type CascadeMove } from '@/services/low-cascade';
 
 // Rango de prioridad: mayor número = más prioritaria.
 const PRIORITY_RANK: Record<Priority, number> = { LOW: 1, NORMAL: 2, HIGH: 3, URGENT: 4 };
+
+const MS_PER_DAY = 1000 * 60 * 60 * 24;
 
 export interface ParallelInsertionResult {
   startDate: Date;
@@ -207,4 +212,119 @@ export async function calculateParallelPriorityInsertion(
   };
 
   return applyVacationLogic(userId, result, durationDays, workspaceId);
+}
+
+/**
+ * Resuelve el primer hueco laboral válido para `ownerUserId` desde `fromDate`, saltando
+ * horario/festivos y las VACACIONES del dueño. Reusa la misma lógica que la inserción
+ * normal (`getNextAvailableStartAfterVacations` + `calculateWorkingDeadline`).
+ */
+async function resolveOwnerSlot(
+  ownerUserId: string,
+  fromDate: Date,
+  durationDays: number,
+  workspaceId?: string | null
+): Promise<{ start: Date; due: Date }> {
+  const userWithVacations = await db.query.user.findFirst({
+    where: eq(userTable.id, ownerUserId),
+    with: { vacations: { where: gte(userVacation.endDate, new Date()) } },
+  });
+  const vacations: UserVacation[] = (userWithVacations?.vacations ?? []).map((v) => ({
+    id: v.id,
+    userId: v.userId,
+    startDate: new Date(v.startDate),
+    endDate: new Date(v.endDate),
+  }));
+  const start = await getNextAvailableStartAfterVacations(fromDate, vacations, durationDays, workspaceId);
+  const due = await calculateWorkingDeadline(start, durationDays * 8, workspaceId);
+  return { start, due };
+}
+
+/**
+ * EMPUJE EN CASCADA DE LOW. Cuando se crea una tarea de prioridad MAYOR que LOW, las Low
+ * "movibles" de `userId` (TO_DO, creadas hoy, antes de la última hora del día laboral)
+ * se recolocan DESPUÉS de la tarea nueva, en cascada, reprogramando sus fechas EN ClickUp
+ * (`rescheduleClickUpTaskDates`). Devuelve los movimientos aplicados (para el realtime).
+ *
+ * NO debe llamarse para tareas Low (el que invoca filtra `priority !== 'LOW'`). Best-effort:
+ * al primer fallo de un PUT corta la cascada (no descuadra el orden) y devuelve lo aplicado.
+ */
+export async function cascadeLowTasksForUser(
+  userId: string,
+  newTaskDeadline: Date,
+  clickupOpts: ClickUpFetchOptions = {}
+): Promise<CascadeMove[]> {
+  const workspaceId = clickupOpts.teamId ?? null;
+
+  // 1. Low TO_DO del usuario (en vivo de ClickUp).
+  const userTasks = await getActiveClickUpTasksByUser(userId, clickupOpts);
+  const lowToDo = userTasks.filter(
+    (t) => mapClickUpPriority(t.priority) === Priority.LOW && t.status === 'TO_DO'
+  );
+  if (lowToDo.length === 0) return [];
+
+  // 2. Cruzar con task_meta (createdAt + duración real) por id de ClickUp.
+  const ids = lowToDo.map((t) => t.clickupId);
+  const metas = await db
+    .select({
+      clickupTaskId: taskMeta.clickupTaskId,
+      createdAt: taskMeta.createdAt,
+      durationDays: taskMeta.durationDays,
+    })
+    .from(taskMeta)
+    .where(inArray(taskMeta.clickupTaskId, ids));
+  const metaById = new Map(metas.map((m) => [m.clickupTaskId, m]));
+
+  // 3. Settings del workspace (cierre del día + huso) para decidir la movilidad.
+  const settings = await getAppSettings(workspaceId);
+  const nowMs = Date.now();
+
+  // 4. Quedarnos con las MOVIBLES (creadas hoy, antes de la última hora) y armarlas.
+  const movables: MovableLow[] = [];
+  for (const t of lowToDo) {
+    const meta = metaById.get(t.clickupId);
+    const createdAtMs = meta?.createdAt ? new Date(meta.createdAt).getTime() : null;
+    if (
+      !isMovableLow({
+        status: t.status,
+        createdAtMs,
+        nowMs,
+        workHoursEndUtc: settings.workHours.END,
+        utcOffsetHours: settings.utcOffsetHours,
+      })
+    ) {
+      continue;
+    }
+    const start = new Date(t.startDate);
+    const due = new Date(t.dueDate);
+    const durationDays =
+      meta?.durationDays ?? t.durationDays ?? Math.max(1, Math.round((due.getTime() - start.getTime()) / MS_PER_DAY));
+    movables.push({ taskId: t.clickupId, ownerUserId: userId, currentStart: start, currentDue: due, durationDays });
+  }
+  if (movables.length === 0) return [];
+
+  // 5. Cascada (núcleo puro) con resolvedor que respeta huecos + vacaciones del owner.
+  const moves = await computeLowCascade(movables, newTaskDeadline, (from, owner, dur) =>
+    resolveOwnerSlot(owner, from, dur, workspaceId)
+  );
+
+  // 6. Aplicar en ClickUp SECUENCIAL; al primer fallo cortar (no descuadrar el orden).
+  const applied: CascadeMove[] = [];
+  for (const move of moves) {
+    try {
+      await rescheduleClickUpTaskDates(
+        move.taskId,
+        { startDate: move.newStart, dueDate: move.newDue },
+        clickupOpts.token
+      );
+      applied.push(move);
+    } catch (err) {
+      console.error(
+        `[low-cascade] No se pudo reprogramar ${move.taskId}; corto la cascada:`,
+        err instanceof Error ? err.message : err
+      );
+      break;
+    }
+  }
+  return applied;
 }

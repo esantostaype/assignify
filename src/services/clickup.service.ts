@@ -373,6 +373,48 @@ export async function createTaskInClickUp(
   }
 }
 
+/**
+ * Reprograma SOLO las fechas (start/due) de una tarea en ClickUp. A diferencia de
+ * `updateTaskInClickUp`, NO toca status, asignados ni comentarios, y es token-aware
+ * (multi-tenant). La usa el empuje en cascada de Low: cuando entra una tarea de mayor
+ * prioridad, mueve las Low del diseñador a la siguiente fecha. Lanza si falla (el que
+ * llama decide si corta la cascada).
+ */
+export async function rescheduleClickUpTaskDates(
+  taskId: string,
+  dates: { startDate: Date; dueDate: Date },
+  token?: string
+): Promise<void> {
+  const authToken = token ?? CLICKUP_TOKEN
+  if (!authToken) {
+    throw new Error('CLICKUP token no configurado; no se puede reprogramar la tarea.')
+  }
+
+  const payload = {
+    start_date: dates.startDate.getTime(),
+    start_date_time: true,
+    due_date: dates.dueDate.getTime(),
+    due_date_time: true,
+  }
+
+  try {
+    const response = await axios.put(`${API_CONFIG.CLICKUP_API_BASE}/task/${taskId}`, payload, {
+      headers: { Authorization: authToken, 'Content-Type': 'application/json' },
+    })
+    await createSyncLog('Task', null, taskId, 'UPDATE_CLICKUP', 'SUCCESS', undefined, response.data)
+  } catch (error: unknown) {
+    const axiosError = error as any
+    const errorMessage = `Error al reprogramar fechas de la tarea ${taskId}: ${axiosError.response?.data?.err || axiosError.message || axiosError.toString()}`
+    console.error('ClickUp API error while rescheduling task dates:', {
+      status: axiosError.response?.status,
+      errorData: axiosError.response?.data,
+      taskId,
+    })
+    await createSyncLog('Task', null, taskId, 'UPDATE_CLICKUP', 'ERROR', errorMessage, axiosError.response?.data)
+    throw error
+  }
+}
+
 // También agregar debug en updateTaskInClickUp
 
 export async function updateTaskInClickUp(taskId: string, updatedTaskData: Task): Promise<void> {
