@@ -132,7 +132,7 @@ export const CapacityTimeline: React.FC<CapacityTimelineProps> = ({ workload, lo
           {ticks.map((tk, i) => (
             <span
               key={i}
-              className="absolute -translate-x-1/2 text-[10px] text-(--color-text-muted)"
+              className="absolute -translate-x-1/2 whitespace-nowrap text-[10px] text-(--color-text-muted)"
               style={{ left: `${tk.leftPct}%` }}
             >
               {tk.label}

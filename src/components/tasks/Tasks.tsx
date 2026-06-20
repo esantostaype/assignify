@@ -3,24 +3,20 @@ import React, { useState, useMemo } from "react";
 import { hotToast as toast } from "@/lib/hotToast";
 import { TasksList } from "./TaskList";
 import { useClickUpTasks, useRefreshTasks } from "@/hooks/queries/useTasks";
-import { Input, IconButton, Button, Tooltip, EmptyState } from "@/components/ui";
+import { Input, Button, EmptyState } from "@/components/ui";
 import {
   Icon,
   PiArrowsClockwise,
   PiMagnifyingGlass,
   PiListChecks,
-  PiSun,
-  PiMoon,
 } from "@/lib/icons";
-import { useUiTheme } from "@/providers/UiThemeProvider";
 
 export const TasksSync: React.FC = () => {
   const [search, setSearch] = useState("");
-  const { theme, toggleTheme } = useUiTheme();
 
   const { data: tasksData, isLoading: loadingTasks, error: tasksError } = useClickUpTasks();
 
-  const { mutate: refreshTasks, isPending: refreshing } = useRefreshTasks({
+  const { mutate: refreshTasks } = useRefreshTasks({
     onSuccess: () => toast.success({ title: "Tasks updated", description: "Synced from ClickUp." }),
     onError: () => toast.error({ title: "Failed to update tasks", description: "Try again in a moment." }),
   });
@@ -51,41 +47,21 @@ export const TasksSync: React.FC = () => {
   return (
     <div className="flex flex-col h-full">
       <div className="sticky top-16 z-50 bg-(--color-surface-app)/70 backdrop-blur-lg">
-        <div className="flex items-center justify-between border-b border-(--color-border-default) p-4">
+        <div className="flex items-center justify-between gap-4 border-b border-(--color-border-default) p-4">
           <h1 className="flex items-center gap-2 text-xl text-(--color-text-strong)">
             Tasks
           </h1>
-          <div className="flex items-center gap-3">
+          {/* Solo el buscador (mismo tamaño que el del Team). El refresco lo cubre
+              el realtime/webhook; el tema vive en el menú de usuario del header. */}
+          <div className="w-full max-w-sm">
             <Input
               size="sm"
+              fullWidth
               placeholder="Search tasks..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               startAdornment={<Icon icon={PiMagnifyingGlass} size={16} />}
             />
-            <Tooltip content="Refresh from ClickUp">
-              <IconButton
-                aria-label="Refresh"
-                variant="soft"
-                color="neutral"
-                size="sm"
-                onClick={() => refreshTasks()}
-                disabled={refreshing}
-              >
-                <Icon icon={PiArrowsClockwise} />
-              </IconButton>
-            </Tooltip>
-            <Tooltip content={theme === "dark" ? "Light mode" : "Dark mode"}>
-              <IconButton
-                aria-label="Toggle theme"
-                variant="ghost"
-                color="neutral"
-                size="sm"
-                onClick={toggleTheme}
-              >
-                <Icon icon={theme === "dark" ? PiSun : PiMoon} />
-              </IconButton>
-            </Tooltip>
           </div>
         </div>
       </div>

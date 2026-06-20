@@ -30,7 +30,6 @@ export const ClickUpUsersSync: React.FC = () => {
   const {
     data: usersData,
     isLoading,
-    refetch: refreshUsers
   } = useClickUpUsers()
 
   // Carga de trabajo de los diseñadores sincronizados (se cruza por id en UsersList).
@@ -141,10 +140,6 @@ export const ClickUpUsersSync: React.FC = () => {
     syncUsers(Array.from(selectedUsers))
   }
 
-  const handleRefresh = () => {
-    refreshUsers()
-  }
-
   const handleEditUser = (userId: string) => {
     setEditingUserId(userId)
   }
@@ -154,14 +149,6 @@ export const ClickUpUsersSync: React.FC = () => {
       <TeamHeader
         searchValue={searchFilter}
         onSearchChange={setSearchFilter}
-        selectedCount={selectedUsers.size}
-        availableCount={availableUsers.length}
-        allAvailableSelected={allAvailableSelected}
-        onSelectAll={handleSelectAll}
-        onSync={handleSync}
-        onRefresh={handleRefresh}
-        loading={isLoading}
-        syncing={syncing}
       />
 
       <div className="p-6 flex-1 flex flex-col gap-8">
@@ -175,6 +162,12 @@ export const ClickUpUsersSync: React.FC = () => {
           loading={isLoading}
           workload={workload}
           workloadLoading={workloadLoading}
+          selectedCount={selectedUsers.size}
+          availableCount={availableUsers.length}
+          allAvailableSelected={allAvailableSelected}
+          onSelectAll={handleSelectAll}
+          onSync={handleSync}
+          syncing={syncing}
         />
       </div>
 

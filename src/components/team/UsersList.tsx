@@ -1,8 +1,10 @@
 import React, { useMemo } from "react";
+import { Button } from "@/components/ui";
 import { UserCard } from "./UserCard";
 import { SyncedMemberCard, type MemberUser } from "./SyncedMemberCard";
-import { Icon, PiFileMagnifyingGlass } from "@/lib/icons";
+import { Icon, PiFileMagnifyingGlass, PiCheckSquare, PiArrowsClockwise } from "@/lib/icons";
 import { MemberCardSkeleton } from "./MemberCardSkeleton";
+import { UserCardSkeleton } from "./UserCardSkeleton";
 import type { UserWorkload } from "@/hooks/queries/useWorkload";
 
 interface UsersListProps {
@@ -14,6 +16,14 @@ interface UsersListProps {
   /** Carga de trabajo de los diseñadores sincronizados (cruzada por id). */
   workload?: UserWorkload[];
   workloadLoading?: boolean;
+  // Acciones de sync (antes en el header del Team): ahora viven en la cabecera
+  // de la sección "Available to sync".
+  selectedCount: number;
+  availableCount: number;
+  allAvailableSelected: boolean;
+  onSelectAll: () => void;
+  onSync: () => void;
+  syncing?: boolean;
 }
 
 export const UsersList: React.FC<UsersListProps> = ({
@@ -24,6 +34,12 @@ export const UsersList: React.FC<UsersListProps> = ({
   loading = false,
   workload = [],
   workloadLoading = false,
+  selectedCount,
+  availableCount,
+  allAvailableSelected,
+  onSelectAll,
+  onSync,
+  syncing = false,
 }) => {
   // Index de carga por id de ClickUp (workload.id === user.clickupId).
   const workloadById = useMemo(() => {
@@ -48,10 +64,21 @@ export const UsersList: React.FC<UsersListProps> = ({
           <h2 className="mb-4 text-lg font-semibold text-(--color-text-strong)">
             Synced
           </h2>
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-1 lg:grid-cols-2 xl:grid-cols-3">
             <MemberCardSkeleton />
             <MemberCardSkeleton />
             <MemberCardSkeleton />
+          </div>
+        </section>
+        <section>
+          <h2 className="mb-4 text-lg font-semibold text-(--color-text-strong)">
+            Available to sync
+          </h2>
+          <div className="grid grid-cols-[repeat(auto-fill,minmax(260px,1fr))] gap-3">
+            <UserCardSkeleton />
+            <UserCardSkeleton />
+            <UserCardSkeleton />
+            <UserCardSkeleton />
           </div>
         </section>
       </div>
@@ -108,12 +135,36 @@ export const UsersList: React.FC<UsersListProps> = ({
       {/* ── Disponibles para sincronizar (tarjeta compacta) ── */}
       {availableUsers.length > 0 && (
         <section>
-          <h2 className="mb-4 text-lg font-semibold text-(--color-text-strong)">
-            Available to sync
-            <span className="ml-2 text-sm font-normal text-(--color-text-muted)">
-              {availableUsers.length}
-            </span>
-          </h2>
+          <div className="mb-4 flex items-center justify-between gap-4">
+            <h2 className="text-lg font-semibold text-(--color-text-strong)">
+              Available to sync
+              <span className="ml-2 text-sm font-normal text-(--color-text-muted)">
+                {availableUsers.length}
+              </span>
+            </h2>
+            <div className="flex gap-2">
+              <Button
+                variant="soft"
+                size="sm"
+                startIcon={<Icon icon={PiCheckSquare} size={16} />}
+                onClick={onSelectAll}
+                disabled={availableCount === 0}
+              >
+                {allAvailableSelected ? "Deselect" : "Select"} Available
+              </Button>
+              <Button
+                variant="filled"
+                color="primary"
+                size="sm"
+                startIcon={<Icon icon={PiArrowsClockwise} size={16} />}
+                onClick={onSync}
+                disabled={selectedCount === 0}
+                loading={syncing}
+              >
+                Sync ({selectedCount})
+              </Button>
+            </div>
+          </div>
           <div className="grid grid-cols-[repeat(auto-fill,minmax(260px,1fr))] gap-3">
             {availableUsers.map((user) => (
               <UserCard

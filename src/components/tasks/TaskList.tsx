@@ -63,7 +63,10 @@ export const TasksList: React.FC<TasksListProps> = ({ tasks, loading = false }) 
         {columnOrder.map((column, index) => (
           <div key={column} className="flex flex-[0_0_280px] flex-col overflow-y-auto relative pr-2">
             <div className="sticky top-0 pb-2 bg-(--color-surface-app) flex items-center justify-between z-20">
-              <h2 className="font-semibold text-lg">{column}</h2>
+              {/* Mismo tamaño/estructura que con datos (text-sm + badge) para que el
+                  header no "salte" al cargar. */}
+              <h2 className="font-semibold text-sm">{column}</h2>
+              <span className="h-6 w-7 rounded-full bg-(--color-surface-hover) animate-pulse" />
             </div>
             <div className="flex-1 space-y-4">
               <TaskCardSkeleton />
