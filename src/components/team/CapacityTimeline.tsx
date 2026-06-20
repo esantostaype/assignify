@@ -8,6 +8,13 @@ import React, { useMemo } from "react";
 import { Card, Tooltip } from "@/components/ui";
 import { Icon, PiChartBar, PiCalendarBlank } from "@/lib/icons";
 import type { UserWorkload, PendingTaskBar } from "@/hooks/queries/useWorkload";
+import usHolidays from "@/data/usHolidays.json";
+
+// Feriados (YYYY-MM-DD) → nombre. El motor NO asigna en estos días (los salta como los
+// findes); aquí se sombrean en el eje para que el hueco en las barras se entienda.
+const HOLIDAY_NAME_BY_YMD: Record<string, string> = Object.fromEntries(
+  (usHolidays as Array<{ date: string; name: string }>).map((h) => [h.date, h.name])
+);
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 const MIN_DAYS = 14; // ventana mínima del eje
@@ -35,13 +42,21 @@ function fmt(d: number | string): string {
   return new Date(d).toLocaleDateString("en-US", { day: "numeric", month: "short" });
 }
 
+// Fecha de calendario LOCAL en formato YYYY-MM-DD (para cruzar con la lista de feriados).
+function localYMD(ts: number): string {
+  const d = new Date(ts);
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${d.getFullYear()}-${m}-${day}`;
+}
+
 interface CapacityTimelineProps {
   workload: UserWorkload[];
   loading?: boolean;
 }
 
 export const CapacityTimeline: React.FC<CapacityTimelineProps> = ({ workload, loading }) => {
-  const { windowStart, spanMs, ticks, rows, weekends } = useMemo(() => {
+  const { windowStart, spanMs, ticks, rows, weekends, holidays } = useMemo(() => {
     const start = startOfToday();
     let maxEnd = start + MIN_DAYS * DAY_MS;
     for (const u of workload) {
@@ -76,12 +91,26 @@ export const CapacityTimeline: React.FC<CapacityTimelineProps> = ({ workload, lo
       } else d++;
     }
 
+    // Festivos (US) dentro de la ventana: el motor NO asigna en ellos (los salta como
+    // los findes). Se marcan para explicar los huecos de las barras. Uno por día.
+    const holidayList: { leftPct: number; widthPct: number; name: string }[] = [];
+    for (let d = 0; d < totalDays; d++) {
+      const name = HOLIDAY_NAME_BY_YMD[localYMD(start + d * DAY_MS)];
+      if (name) {
+        holidayList.push({
+          leftPct: ((d * DAY_MS) / span) * 100,
+          widthPct: (DAY_MS / span) * 100,
+          name,
+        });
+      }
+    }
+
     // Solo ACTIVOS en la capacidad (los inactivos no asignan); más cargados arriba
     // (mayor fecha de liberación primero) → los cuellos de botella saltan a la vista.
     const sorted = [...workload]
       .filter((w) => w.active !== false)
       .sort((a, b) => b.availableInDays - a.availableInDays);
-    return { windowStart: start, spanMs: span, ticks: tickList, rows: sorted, weekends: weekendList };
+    return { windowStart: start, spanMs: span, ticks: tickList, rows: sorted, weekends: weekendList, holidays: holidayList };
   }, [workload]);
 
   const clampPct = (p: number) => Math.max(0, Math.min(100, p));
@@ -125,6 +154,10 @@ export const CapacityTimeline: React.FC<CapacityTimelineProps> = ({ workload, lo
               {PRIORITY_LABEL[p]}
             </span>
           ))}
+          <span className="flex items-center gap-1">
+            <span className="inline-block size-2.5 rounded-sm bg-error-500/30 [background-image:repeating-linear-gradient(45deg,transparent,transparent_2px,rgba(0,0,0,0.12)_2px,rgba(0,0,0,0.12)_4px)]" />
+            Holiday
+          </span>
         </div>
       </div>
 
@@ -165,6 +198,16 @@ export const CapacityTimeline: React.FC<CapacityTimelineProps> = ({ workload, lo
                     className="absolute inset-y-0 bg-(--color-text-muted)/[0.12]"
                     style={{ left: `${w.leftPct}%`, width: `${w.widthPct}%` }}
                   />
+                ))}
+
+                {/* Festivos: el motor no asigna en estos días (los salta como los findes). */}
+                {holidays.map((h, i) => (
+                  <Tooltip key={`h${i}`} content={`Holiday · ${h.name}`}>
+                    <div
+                      className="absolute inset-y-0 bg-error-500/[0.13] [background-image:repeating-linear-gradient(45deg,transparent,transparent_5px,rgba(0,0,0,0.06)_5px,rgba(0,0,0,0.06)_10px)]"
+                      style={{ left: `${h.leftPct}%`, width: `${h.widthPct}%` }}
+                    />
+                  </Tooltip>
                 ))}
 
                 {/* Bandas de vacaciones (al fondo). */}
