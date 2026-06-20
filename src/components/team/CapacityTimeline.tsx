@@ -23,6 +23,7 @@ const ROW_H = 34;
 const NAME_W = 168;
 
 const WEEKDAY_ES = ["do", "lu", "ma", "mi", "ju", "vi", "sa"];
+const WEEKDAY_LONG_ES = ["Domingo", "Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado"];
 const MONTH_ES = ["ene", "feb", "mar", "abr", "may", "jun", "jul", "ago", "sep", "oct", "nov", "dic"];
 
 const PRIORITY_BAR: Record<PendingTaskBar["priority"], string> = {
@@ -54,6 +55,22 @@ function ymdLocal(ts: number): string {
 function fmt(ts: number): string {
   const d = new Date(ts);
   return `${d.getDate()} ${MONTH_ES[d.getMonth()]}`;
+}
+function hhmm(d: Date): string {
+  return `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
+}
+/** Rango para el tooltip: "Lunes 19 10:00 - 14:00" (mismo día) o con flecha si cruza días. */
+function rangeLabel(startStr: string, dueStr: string): string {
+  const s = new Date(startStr);
+  const e = new Date(dueStr);
+  if (midnightLocal(s) === midnightLocal(e)) {
+    return `${WEEKDAY_LONG_ES[s.getDay()]} ${s.getDate()} ${hhmm(s)} - ${hhmm(e)}`;
+  }
+  return `${WEEKDAY_ES[s.getDay()]} ${s.getDate()} ${hhmm(s)} → ${WEEKDAY_ES[e.getDay()]} ${e.getDate()} ${hhmm(e)}`;
+}
+function dateTimeLabel(str: string): string {
+  const d = new Date(str);
+  return `${WEEKDAY_LONG_ES[d.getDay()]} ${d.getDate()} · ${hhmm(d)}`;
 }
 
 interface DayCell {
@@ -110,6 +127,9 @@ export const CapacityTimeline: React.FC<CapacityTimelineProps> = ({ workload, lo
 
   // Posición (en días desde el inicio del eje) de una fecha, alineada a su columna.
   const dayOffset = (date: string) => Math.round((midnightLocal(new Date(date)) - rangeStart) / DAY_MS);
+  // Posición horizontal EXACTA por timestamp → la barra refleja la DURACIÓN real (una
+  // tarea de 4 h ocupa ~medio día, no la columna entera) y arranca a su hora del día.
+  const xOf = (date: string) => ((new Date(date).getTime() - rangeStart) / DAY_MS) * DAY_W;
 
   // Centrar la vista al abrir: mostrar INITIAL_PAST_VISIBLE días de historia antes de hoy.
   useEffect(() => {
@@ -186,12 +206,12 @@ export const CapacityTimeline: React.FC<CapacityTimelineProps> = ({ workload, lo
   if (rows.length === 0) return null;
 
   return (
-    <Card variant="outlined" padding="md" className="flex flex-col gap-3">
+    <>
       {header}
 
-      <div className="flex">
+      <Card variant="outlined" padding="none" className="flex">
         {/* Columna de nombres (fija; no scrollea). */}
-        <div className="shrink-0 z-20 bg-(--color-surface-card)" style={{ width: NAME_W }}>
+        <div className="px-6 shrink-0 z-20 " style={{ width: NAME_W }}>
           <div style={{ height: HEADER_H }} />
           {rows.map((u) => (
             <div
@@ -199,7 +219,7 @@ export const CapacityTimeline: React.FC<CapacityTimelineProps> = ({ workload, lo
               className="flex items-center justify-between gap-2 pr-3"
               style={{ height: ROW_H }}
             >
-              <span className="truncate text-sm text-(--color-text-default)" title={u.name}>
+              <span className="truncate  text-sm text-(--color-text-default)" title={u.name}>
                 {u.name}
               </span>
               <span className="shrink-0 text-[11px] text-(--color-text-muted)">
@@ -231,8 +251,8 @@ export const CapacityTimeline: React.FC<CapacityTimelineProps> = ({ workload, lo
                 <div
                   key={i}
                   className={`flex flex-col items-center justify-center text-[10px] leading-tight border-l border-dashed ${
-                    d.isMonday ? "border-(--color-border-default)/40" : "border-(--color-border-subtle)/20"
-                  } ${d.isWeekend ? "text-(--color-text-muted)/60" : "text-(--color-text-muted)"}`}
+                    d.isMonday ? "border-(--color-border-default)/32" : "border-(--color-border-subtle)/20"
+                  } ${d.isWeekend ? "text-(--color-text-muted)/32" : "text-(--color-text-muted)"}`}
                   style={{ width: DAY_W }}
                 >
                   <span>{d.isFirstOfMonth ? d.monthLabel : d.weekday}</span>
@@ -262,7 +282,7 @@ export const CapacityTimeline: React.FC<CapacityTimelineProps> = ({ workload, lo
                   const cell = (
                     <div
                       className={`h-full border-l border-dashed ${
-                        d.isMonday ? "border-(--color-border-default)/40" : "border-(--color-border-subtle)/20"
+                        d.isMonday ? "border-(--color-border-default)/32" : "border-(--color-border-subtle)/20"
                       } ${bg}`}
                       style={{ width: DAY_W }}
                     />
@@ -310,20 +330,27 @@ export const CapacityTimeline: React.FC<CapacityTimelineProps> = ({ workload, lo
                       );
                     })}
 
-                    {/* Barras de tareas, alineadas a las columnas de día. */}
+                    {/* Barras de tareas: posición y ancho por HORA real (duración fiel). */}
                     {u.pendingTasks.map((t, i) => {
-                      const s = Math.max(0, dayOffset(t.startDate));
-                      const e = Math.min(totalDays, dayOffset(t.dueDate) + 1);
-                      if (e <= s) return null;
-                      const dur = t.durationDays !== undefined ? ` · ${t.durationDays}d` : "";
+                      const left = Math.max(0, xOf(t.startDate));
+                      const right = Math.min(trackW, xOf(t.dueDate));
+                      if (right <= left) return null;
                       return (
                         <Tooltip
                           key={`t${i}`}
-                          content={`${t.name} · ${PRIORITY_LABEL[t.priority]}${dur} · ${fmt(new Date(t.startDate).getTime())} → ${fmt(new Date(t.dueDate).getTime())}`}
+                          content={
+                            <span className="flex flex-col gap-1">
+                              <span className="font-semibold">{t.name}</span>
+                              <span className="flex items-center gap-1.5 opacity-80">
+                                <Icon icon={PiCalendarBlank} size={12} />
+                                {rangeLabel(t.startDate, t.dueDate)}
+                              </span>
+                            </span>
+                          }
                         >
                           <div
-                            className={`absolute inset-y-1 rounded-sm ${PRIORITY_BAR[t.priority]} opacity-90 hover:opacity-100`}
-                            style={{ left: s * DAY_W + 1, width: Math.max((e - s) * DAY_W - 2, 5) }}
+                            className={`absolute inset-y-1 rounded ${PRIORITY_BAR[t.priority]}`}
+                            style={{ left, width: Math.max(right - left, 6) }}
                           />
                         </Tooltip>
                       );
@@ -331,11 +358,11 @@ export const CapacityTimeline: React.FC<CapacityTimelineProps> = ({ workload, lo
 
                     {/* Marcador de "se libera el…" (si tiene cola y cae dentro del rango). */}
                     {u.taskCount > 0 && (() => {
-                      const off = dayOffset(u.availableFrom);
-                      if (off < 0 || off > totalDays) return null;
+                      const x = xOf(u.availableFrom);
+                      if (x < 0 || x > trackW) return null;
                       return (
-                        <Tooltip content={`Frees up ${fmt(new Date(u.availableFrom).getTime())}`}>
-                          <div className="absolute inset-y-0 z-10 w-0.5 bg-(--color-text-strong)" style={{ left: off * DAY_W }} />
+                        <Tooltip content={`Se libera · ${dateTimeLabel(u.availableFrom)}`}>
+                          <div className="absolute inset-y-0 z-10 w-0.5 bg-(--color-text-strong)" style={{ left: x }} />
                         </Tooltip>
                       );
                     })()}
@@ -345,7 +372,7 @@ export const CapacityTimeline: React.FC<CapacityTimelineProps> = ({ workload, lo
             </div>
           </div>
         </div>
-      </div>
-    </Card>
+      </Card>
+    </>
   );
 };
