@@ -17,8 +17,9 @@ const HOLIDAY_NAME_BY_YMD: Record<string, string> = Object.fromEntries(
 );
 
 const DAY_MS = 24 * 60 * 60 * 1000;
-const MIN_DAYS = 14; // ventana mínima del eje
+const MIN_DAYS = 14; // ventana mínima del eje (hacia el futuro)
 const MAX_DAYS = 60; // tope para no aplastar las barras con colas larguísimas
+const PAST_DAYS = 3; // días de historia visibles ANTES de hoy (ver lo recién empezado)
 
 const PRIORITY_BAR: Record<PendingTaskBar["priority"], string> = {
   URGENT: "bg-error-500",
@@ -56,16 +57,19 @@ interface CapacityTimelineProps {
 }
 
 export const CapacityTimeline: React.FC<CapacityTimelineProps> = ({ workload, loading }) => {
-  const { windowStart, spanMs, ticks, rows, weekends, holidays } = useMemo(() => {
-    const start = startOfToday();
-    let maxEnd = start + MIN_DAYS * DAY_MS;
+  const { windowStart, spanMs, ticks, rows, weekends, holidays, todayPct } = useMemo(() => {
+    const today = startOfToday();
+    // El eje arranca PAST_DAYS antes de hoy (para ver lo recién empezado); la ventana
+    // hacia el futuro se sigue midiendo desde HOY, igual que antes.
+    const start = today - PAST_DAYS * DAY_MS;
+    let maxEnd = today + MIN_DAYS * DAY_MS;
     for (const u of workload) {
       for (const t of u.pendingTasks) maxEnd = Math.max(maxEnd, new Date(t.dueDate).getTime());
       if (u.currentVacation) maxEnd = Math.max(maxEnd, new Date(u.currentVacation.endDate).getTime());
       for (const v of u.upcomingVacations) maxEnd = Math.max(maxEnd, new Date(v.endDate).getTime());
     }
-    const end = Math.min(maxEnd, start + MAX_DAYS * DAY_MS);
-    const span = Math.max(end - start, MIN_DAYS * DAY_MS);
+    const end = Math.min(maxEnd, today + MAX_DAYS * DAY_MS);
+    const span = Math.max(end - start, (PAST_DAYS + MIN_DAYS) * DAY_MS);
 
     const totalDays = Math.ceil(span / DAY_MS);
     const step = totalDays <= 21 ? 7 : Math.ceil(totalDays / 42) * 7; // ~6 marcas semanales
@@ -110,7 +114,7 @@ export const CapacityTimeline: React.FC<CapacityTimelineProps> = ({ workload, lo
     const sorted = [...workload]
       .filter((w) => w.active !== false)
       .sort((a, b) => b.availableInDays - a.availableInDays);
-    return { windowStart: start, spanMs: span, ticks: tickList, rows: sorted, weekends: weekendList, holidays: holidayList };
+    return { windowStart: start, spanMs: span, ticks: tickList, rows: sorted, weekends: weekendList, holidays: holidayList, todayPct: ((today - start) / span) * 100 };
   }, [workload]);
 
   const clampPct = (p: number) => Math.max(0, Math.min(100, p));
@@ -209,6 +213,14 @@ export const CapacityTimeline: React.FC<CapacityTimelineProps> = ({ workload, lo
                     />
                   </Tooltip>
                 ))}
+
+                {/* Línea de "hoy": separa los días de historia (a la izquierda) del futuro. */}
+                <Tooltip content="Today">
+                  <div
+                    className="absolute inset-y-0 w-px bg-primary-500/70"
+                    style={{ left: `${todayPct}%` }}
+                  />
+                </Tooltip>
 
                 {/* Bandas de vacaciones (al fondo). */}
                 {vacations.map((v, i) => {
