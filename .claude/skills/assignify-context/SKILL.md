@@ -50,6 +50,10 @@ viven las tareas) y se despliega en **Vercel**.
 
 ## Motor de asignación (núcleo)
 
+> **Para el detalle COMPLETO del sistema de prioridades** —carriles, comparador, escalados
+> (cargo sobre nivel), especialista/generalista, empuje de Low, horario/festivos, concurrencia—
+> consulta la skill **`assignify-priority-engine`**. Aquí va el resumen.
+
 Separa dos preguntas:
 
 ### 1) ¿QUIÉN? — sugerencia de diseñador
