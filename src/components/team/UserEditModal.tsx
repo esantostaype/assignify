@@ -18,6 +18,7 @@ import { workloadKeys } from '@/hooks/queries/useWorkload'
 import {
   Alert,
   Select,
+  Switch,
   Button,
   Modal,
   DiscardChangesDialog,
@@ -400,52 +401,48 @@ export const UserEditModal: React.FC<UserEditModalProps> = ({ open, userId, user
                 Membership
               </h3>
 
-              <div className="flex items-center justify-between gap-4 py-2">
+              {/* Activo / inactivo con switch */}
+              <div className="flex items-center justify-between gap-4 rounded-lg border border-(--color-border-default) px-3.5 py-3">
                 <div>
-                  <span
-                    className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-medium ${
-                      effectiveActive
-                        ? 'bg-(--color-success-soft) text-(--color-success-strong)'
-                        : 'bg-(--color-surface-hover) text-(--color-text-subtle)'
-                    }`}
-                  >
-                    <span className={`h-1.5 w-1.5 rounded-full ${effectiveActive ? 'bg-(--color-success-solid)' : 'bg-(--color-text-subtle)'}`} />
+                  <p className="font-medium text-(--color-text-strong)">
                     {effectiveActive ? 'Active' : 'Inactive'}
-                  </span>
-                  <p className="mt-1.5 text-sm text-(--color-text-subtle)">
+                  </p>
+                  <p className="mt-0.5 text-sm text-(--color-text-subtle)">
                     Inactive members stay on the team but are skipped by auto-assignment.
                   </p>
                 </div>
-                <Button
-                  variant="outlined"
-                  color={effectiveActive ? 'warning' : 'success'}
-                  size="sm"
-                  onClick={() => setPendingActive(!effectiveActive)}
+                <Switch
+                  aria-label={effectiveActive ? 'Deactivate member' : 'Activate member'}
+                  checked={effectiveActive}
+                  // Si el switch vuelve al valor del servidor, deja de contar como cambio.
+                  onChange={(e) => setPendingActive(e.target.checked === user?.active ? null : e.target.checked)}
                   disabled={loadingUser}
-                >
-                  {effectiveActive ? 'Deactivate' : 'Activate'}
-                </Button>
+                />
               </div>
 
-              <div className="mt-3 flex items-center justify-between gap-4 rounded-lg border border-(--color-error-border) bg-(--color-error-soft) px-3 py-2.5">
-                <div>
-                  <p className="text-sm font-medium text-(--color-text-strong)">Remove from team</p>
-                  <p className="mt-0.5 text-sm text-(--color-text-subtle)">
-                    Desyncs from this workspace (roles &amp; vacations included). Re-sync from ClickUp anytime.
-                  </p>
+              {/* Quitar del equipo (destructivo) como alerta */}
+              <Alert tone="error" variant="soft" align="center" className="mt-3">
+                <div className="flex items-center justify-between gap-4">
+                  <div>
+                    <p className="font-semibold">Remove from team</p>
+                    <p className="mt-0.5">
+                      Desyncs from this workspace (roles &amp; vacations included). Re-sync from ClickUp anytime.
+                    </p>
+                  </div>
+                  <Button
+                    variant="soft"
+                    color="error"
+                    size="sm"
+                    className="shrink-0"
+                    startIcon={<Icon icon={PiTrash} size={16} />}
+                    onClick={() => setConfirmingRemove(true)}
+                    disabled={loadingUser || removing}
+                    loading={removing}
+                  >
+                    Remove
+                  </Button>
                 </div>
-                <Button
-                  variant="soft"
-                  color="error"
-                  size="sm"
-                  startIcon={<Icon icon={PiTrash} size={16} />}
-                  onClick={() => setConfirmingRemove(true)}
-                  disabled={loadingUser || removing}
-                  loading={removing}
-                >
-                  Remove
-                </Button>
-              </div>
+              </Alert>
             </div>
           </div>
         )}
