@@ -7,6 +7,7 @@ import { user } from '@/db/schema';
 import { and, eq, inArray } from 'drizzle-orm';
 import { API_CONFIG } from '@/config';
 import { getCurrentClickUpContext } from '@/lib/workspace';
+import { publishMembersUpdate } from '@/lib/pusher';
 
 // Lee/escribe DB y consulta ClickUp en vivo: nunca pre-renderizar/cachear en build.
 export const dynamic = 'force-dynamic';
@@ -370,6 +371,12 @@ export async function POST(req: Request) {
 
     if (notFoundUsers.length > 0) {
       console.warn(`⚠️ Usuarios no encontrados en teams: ${notFoundUsers.join(', ')}`);
+    }
+
+    // Realtime: si se crearon miembros, avisar a los demás usuarios del workspace
+    // para que su lista de equipo / carga se refresque en vivo.
+    if (createdUsers.length > 0) {
+      await publishMembersUpdate(wsId);
     }
 
     return NextResponse.json({

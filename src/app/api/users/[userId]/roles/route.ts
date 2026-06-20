@@ -4,6 +4,7 @@ import { db } from '@/db';
 import { user, taskType, brand, userRole } from '@/db/schema';
 import { eq, and, isNull } from 'drizzle-orm';
 import { getCurrentWorkspaceId } from '@/lib/workspace';
+import { publishMembersUpdate } from '@/lib/pusher';
 
 // Lee/escribe datos en vivo de la DB: nunca pre-renderizar/cachear en build.
 export const dynamic = 'force-dynamic';
@@ -113,6 +114,9 @@ export async function POST(req: Request, { params }: RouteParams) {
         workspaceId: wsId
       })
       .returning();
+
+    // Realtime: el equipo cambió (rol nuevo afecta la afinidad que ve el motor).
+    await publishMembersUpdate(wsId);
 
     // Releer con sus relaciones (type/brand) para mantener la forma de la respuesta
     const newRole = await db.query.userRole.findFirst({

@@ -3,6 +3,8 @@ import { NextResponse } from 'next/server';
 import { db } from '@/db';
 import { userRole } from '@/db/schema';
 import { eq } from 'drizzle-orm';
+import { getCurrentWorkspaceId } from '@/lib/workspace';
+import { publishMembersUpdate } from '@/lib/pusher';
 
 interface UpdateRoleRequest {
   // Marca/desmarca el rol como cargo primario.
@@ -77,6 +79,9 @@ export async function DELETE(req: Request, { params }: RouteParams) {
     // Eliminar el rol
     await db.delete(userRole).where(eq(userRole.id, roleIdInt));
 
+    // Realtime: el equipo cambió (rol eliminado afecta la afinidad del motor).
+    await publishMembersUpdate(await getCurrentWorkspaceId());
+
     console.log(`✅ Role deleted successfully: ${existingRole.type.name} ${existingRole.brand ? `for ${existingRole.brand.name}` : '(Global)'} from user ${existingRole.user?.name ?? 'unknown'}`);
 
     return NextResponse.json({
@@ -150,6 +155,9 @@ export async function PATCH(req: Request, { params }: RouteParams) {
       .update(userRole)
       .set({ isPrimary: nextIsPrimary })
       .where(eq(userRole.id, roleIdInt));
+
+    // Realtime: cambiar el cargo primario afecta lo que ve el motor y la tarjeta.
+    await publishMembersUpdate(await getCurrentWorkspaceId());
 
     // Releer con relaciones para mantener la misma forma que el POST.
     const updatedRole = await db.query.userRole.findFirst({

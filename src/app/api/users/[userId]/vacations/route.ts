@@ -4,6 +4,7 @@ import { db } from '@/db';
 import { user, userVacation } from '@/db/schema';
 import { eq, and, or, lte, gte } from 'drizzle-orm';
 import { getCurrentWorkspaceId } from '@/lib/workspace';
+import { publishMembersUpdate } from '@/lib/pusher';
 
 // Lee/escribe datos en vivo de la DB: nunca pre-renderizar/cachear en build.
 export const dynamic = 'force-dynamic';
@@ -124,6 +125,9 @@ export async function POST(req: Request, { params }: RouteParams) {
         workspaceId: wsId
       })
       .returning();
+
+    // Realtime: la vacación afecta disponibilidad/capacidad que ven los demás.
+    await publishMembersUpdate(wsId);
 
     const durationDays = Math.ceil((endDateObj.getTime() - startDateObj.getTime()) / (1000 * 60 * 60 * 24));
 

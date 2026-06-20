@@ -8,6 +8,7 @@ import PusherClient from 'pusher-js'
 import { useQueryClient } from '@tanstack/react-query'
 import { taskKeys } from '@/hooks/queries/useTasks'
 import { workloadKeys } from '@/hooks/queries/useWorkload'
+import { userKeys } from '@/hooks/queries/useUsers'
 import { requestNotificationPermission, notifyTaskChange } from '@/utils/notifications'
 import { useWorkspaces } from '@/hooks/queries/useWorkspaces'
 
@@ -107,12 +108,27 @@ export const usePusherTaskSync = () => {
       queryClient.invalidateQueries({ queryKey: ['clickup-lists'] })
     }
 
+    // Cambios en los MIEMBROS del workspace (otro usuario sincronizó/editó el equipo:
+    // nivel, roles, vacaciones, activar/desactivar, quitar) → refrescar la lista de
+    // equipo y la carga, y recalcular la sugerencia abierta (afecta al motor). No
+    // notifica al navegador: es config del equipo, no actividad de tareas.
+    const membersHandler = () => {
+      queryClient.invalidateQueries({ queryKey: userKeys.clickup() })
+      queryClient.invalidateQueries({ queryKey: workloadKeys.all })
+      queryClient.invalidateQueries({ queryKey: ['task-data'] })
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent('assignify:tasks-changed'))
+      }
+    }
+
     // Rebind defensivo: quita cualquier handler previo del evento antes de
     // añadir el nuevo, para que un re-montaje (StrictMode) no acumule listeners.
     channel.unbind('task-updated')
     channel.bind('task-updated', handler)
     channel.unbind('lists-updated')
     channel.bind('lists-updated', listsHandler)
+    channel.unbind('members-updated')
+    channel.bind('members-updated', membersHandler)
 
     return () => {
       // Quitamos NUESTROS handlers y nos desuscribimos del canal del workspace; la
@@ -120,6 +136,7 @@ export const usePusherTaskSync = () => {
       // se re-ejecuta y deja el canal previo antes de suscribir el nuevo.
       channel.unbind('task-updated', handler)
       channel.unbind('lists-updated', listsHandler)
+      channel.unbind('members-updated', membersHandler)
       client.unsubscribe(channelName)
     }
   }, [queryClient, activeId])

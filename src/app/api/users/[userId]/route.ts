@@ -10,6 +10,7 @@ import { eq, and, asc } from 'drizzle-orm'
 import { Level } from '@/db/enums'
 import { invalidateAllCache } from '@/utils/cache'
 import { getCurrentWorkspaceId } from '@/lib/workspace'
+import { publishMembersUpdate } from '@/lib/pusher'
 
 // Lee/escribe datos en vivo de la DB: nunca pre-renderizar/cachear en build.
 export const dynamic = 'force-dynamic'
@@ -119,6 +120,8 @@ export async function PATCH(req: Request, { params }: RouteParams) {
 
     // El nivel afecta la asignación automática: limpiar el cache del motor.
     invalidateAllCache()
+    // Realtime: avisar a los demás usuarios del workspace (cambió nivel/estado).
+    await publishMembersUpdate(wsId)
 
     console.log(`✅ Nivel actualizado para ${updated.name} (${updated.id}): ${updated.level}`)
 
@@ -160,6 +163,8 @@ export async function DELETE(req: Request, { params }: RouteParams) {
     }
 
     invalidateAllCache()
+    // Realtime: avisar a los demás usuarios del workspace (miembro quitado).
+    await publishMembersUpdate(wsId)
     return NextResponse.json({ removed: true })
   } catch (error) {
     console.error('❌ Error removing user:', error)

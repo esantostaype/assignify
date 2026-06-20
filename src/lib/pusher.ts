@@ -15,6 +15,10 @@ export const TASKS_CHANNEL = 'tasks'
 export const TASK_UPDATED_EVENT = 'task-updated'
 // Cambios en las LISTAS de ClickUp (crear/editar/borrar lista del workspace).
 export const LISTS_UPDATED_EVENT = 'lists-updated'
+// Cambios en los MIEMBROS del workspace hechos DENTRO de la app (sincronizar,
+// activar/desactivar, quitar, nivel, roles, vacaciones). ClickUp NO emite webhook
+// de altas/bajas de team, así que esto cubre solo lo que cambia la propia app.
+export const MEMBERS_UPDATED_EVENT = 'members-updated'
 
 export interface TaskUpdatePayload {
   taskId?: string
@@ -58,5 +62,18 @@ export async function publishListsUpdate(workspaceId?: string | null): Promise<v
     await pusherServer.trigger(taskChannelForWorkspace(workspaceId), LISTS_UPDATED_EVENT, { at: Date.now() })
   } catch (err) {
     console.error('[pusher] Failed to emit lists-updated:', err instanceof Error ? err.message : err)
+  }
+}
+
+/**
+ * Notifica que los MIEMBROS del workspace cambiaron dentro de la app (sync, nivel,
+ * roles, vacaciones, activar/desactivar, quitar) para que los demás usuarios del
+ * mismo workspace refresquen su lista de equipo / carga en vivo. No lanza si Pusher falla.
+ */
+export async function publishMembersUpdate(workspaceId?: string | null): Promise<void> {
+  try {
+    await pusherServer.trigger(taskChannelForWorkspace(workspaceId), MEMBERS_UPDATED_EVENT, { at: Date.now() })
+  } catch (err) {
+    console.error('[pusher] Failed to emit members-updated:', err instanceof Error ? err.message : err)
   }
 }

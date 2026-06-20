@@ -3,6 +3,8 @@ import { NextResponse } from 'next/server';
 import { db } from '@/db';
 import { userVacation } from '@/db/schema';
 import { eq } from 'drizzle-orm';
+import { getCurrentWorkspaceId } from '@/lib/workspace';
+import { publishMembersUpdate } from '@/lib/pusher';
 
 // Escribe datos en vivo de la DB: nunca pre-renderizar/cachear en build.
 export const dynamic = 'force-dynamic';
@@ -67,6 +69,9 @@ export async function DELETE(req: Request, { params }: RouteParams) {
 
     // Eliminar la vacación
     await db.delete(userVacation).where(eq(userVacation.id, vacationIdInt));
+
+    // Realtime: la vacación afecta disponibilidad/capacidad que ven los demás.
+    await publishMembersUpdate(await getCurrentWorkspaceId());
 
     const durationDays = Math.ceil(
       (existingVacation.endDate.getTime() - existingVacation.startDate.getTime()) / (1000 * 60 * 60 * 24)
