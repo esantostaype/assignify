@@ -292,10 +292,11 @@ export const CapacityTimeline: React.FC<CapacityTimelineProps> = ({ workload, lo
 
   if (rows.length === 0) return null;
 
-  // Grid lines: dashed + faint for days, SOLID for week dividers (Sunday).
-  const dayLine = "border-l border-dashed border-(--color-border-default)";
+  // Vertical lines. HEADER (under the dates) = SOLID, full color. BODY (where the bars
+  // are) = DASHED at half opacity. Week dividers (Sunday) = SOLID, full color (both).
   const weekLine = "border-l border-(--color-border-default)";
-  const lineOf = (d: DayCell) => (d.isWeekStart ? weekLine : dayLine);
+  const bodyDayLine = "border-l border-dashed border-(--color-border-default)/50";
+  const bodyLineOf = (d: DayCell) => (d.isWeekStart ? weekLine : bodyDayLine);
   const tracksH = rows.length * ROW_H;
 
   return (
@@ -307,7 +308,7 @@ export const CapacityTimeline: React.FC<CapacityTimelineProps> = ({ workload, lo
         <div className="shrink-0 z-20 border-r border-(--color-border-default) px-4" style={{ width: NAME_W }}>
           {/* full-header spacer; the only horizontal line here sits ABOVE the rows
               (not above the names). */}
-          <div style={{ height: WEEK_H + HEADER_H }} className="border-b border-(--color-border-default)" />
+          <div style={{ height: WEEK_H + HEADER_H }} />
           {rows.map((u) => (
             <div key={u.id} className="flex items-center justify-between gap-2" style={{ height: ROW_H }}>
               <span className="truncate text-sm text-(--color-text-default)" title={u.name}>
@@ -330,7 +331,11 @@ export const CapacityTimeline: React.FC<CapacityTimelineProps> = ({ workload, lo
         </div>
 
         {/* Scrollable area: week row + day header + tracks. */}
-        <div ref={scrollRef} onMouseDown={onMouseDown} className="flex-1 cursor-grab select-none overflow-x-auto">
+        <div
+          ref={scrollRef}
+          onMouseDown={onMouseDown}
+          className="flex-1 cursor-grab select-none overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+        >
           <div className="relative" style={{ width: trackW }}>
             {/* Week-number row (line below = card border). */}
             <div className="flex border-b border-(--color-border-default)" style={{ height: WEEK_H }}>
@@ -350,7 +355,7 @@ export const CapacityTimeline: React.FC<CapacityTimelineProps> = ({ workload, lo
               {days.map((d, i) => {
                 const cell = (
                   <div
-                    className={`flex h-full flex-col items-center justify-center text-[10px] leading-tight ${lineOf(d)} ${
+                    className={`flex h-full flex-col items-center justify-center text-[10px] leading-tight ${weekLine} ${
                       d.isWeekend ? "bg-(--color-text-muted)/[0.07] text-(--color-text-muted)/50" : "text-(--color-text-muted)"
                     }`}
                     style={{ width: DAY_W }}
@@ -395,7 +400,7 @@ export const CapacityTimeline: React.FC<CapacityTimelineProps> = ({ workload, lo
               {/* Grid lines (above shading, below bars). */}
               <div className="pointer-events-none absolute inset-0 flex">
                 {days.map((d, i) => (
-                  <div key={i} className={`h-full ${lineOf(d)}`} style={{ width: DAY_W }} />
+                  <div key={i} className={`h-full ${bodyLineOf(d)}`} style={{ width: DAY_W }} />
                 ))}
               </div>
 
