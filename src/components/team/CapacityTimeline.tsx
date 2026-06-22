@@ -269,49 +269,19 @@ export const CapacityTimeline: React.FC<CapacityTimelineProps> = ({ workload, lo
     </div>
   );
 
-  if (loading) {
-    // Skeleton con la MISMA estructura que el timeline real (columna de nombres fija +
-    // área de pistas) y 3 usuarios, para que no "salte" al cargar.
-    const pulse = "animate-pulse rounded bg-(--color-surface-subtle)";
-    const nameW = [120, 96, 110];
-    const barLeft = [40, 96, 16];
-    const barW = [180, 120, 220];
-    return (
-      <div className="space-y-3">
-        {header}
-        <Card variant="outlined" padding="none" className="mt-3 flex overflow-hidden">
-          {/* Columna de nombres (fija) */}
-          <div className="shrink-0 border-r border-(--color-border-default) px-4" style={{ width: NAME_W }}>
-            <div style={{ height: WEEK_H + HEADER_H }} className="border-b border-(--color-border-default)" />
-            {Array.from({ length: 3 }).map((_, i) => (
-              <div key={i} className="flex items-center justify-between gap-2" style={{ height: ROW_H }}>
-                <div className={`h-3.5 ${pulse}`} style={{ width: nameW[i] }} />
-                <div className={`h-3 w-5 ${pulse}`} />
-              </div>
-            ))}
-          </div>
-          {/* Área de pistas: cabecera + 3 filas con una barra cada una */}
-          <div className="flex-1 overflow-hidden">
-            <div style={{ height: WEEK_H + HEADER_H }} className="border-b border-(--color-border-default)" />
-            {Array.from({ length: 3 }).map((_, i) => (
-              <div key={i} className="flex items-center" style={{ height: ROW_H, paddingLeft: barLeft[i] }}>
-                <div className={`h-5 ${pulse}`} style={{ width: barW[i] }} />
-              </div>
-            ))}
-          </div>
-        </Card>
-      </div>
-    );
-  }
+  if (!loading && rows.length === 0) return null;
 
-  if (rows.length === 0) return null;
+  // Durante la carga: 3 filas en skeleton (null = placeholder). El RESTO del armazón
+  // (semanas, días, findes, "hoy", líneas) se pinta IGUAL porque no depende del workload;
+  // solo los nombres van en skeleton y todavía NO se dibujan barras.
+  const displayRows: Array<(typeof rows)[number] | null> = loading ? [null, null, null] : rows;
 
   // Vertical lines. HEADER (under the dates) = SOLID, full color. BODY (where the bars
   // are) = DASHED at half opacity. Week dividers (Sunday) = SOLID, full color (both).
   const weekLine = "border-l border-(--color-border-default)";
   const bodyDayLine = "border-l border-dashed border-(--color-border-default)/50";
   const bodyLineOf = (d: DayCell) => (d.isWeekStart ? weekLine : bodyDayLine);
-  const tracksH = rows.length * ROW_H;
+  const tracksH = displayRows.length * ROW_H;
 
   return (
     <div className="space-y-3">
@@ -323,23 +293,32 @@ export const CapacityTimeline: React.FC<CapacityTimelineProps> = ({ workload, lo
           {/* full-header spacer; the only horizontal line here sits ABOVE the rows
               (not above the names). */}
           <div style={{ height: WEEK_H + HEADER_H }} />
-          {rows.map((u) => (
-            <div key={u.id} className="flex items-center justify-between gap-2" style={{ height: ROW_H }}>
-              <span className="truncate text-sm text-(--color-text-default)" title={u.name}>
-                {u.name}
-              </span>
-              <span className="shrink-0 text-[11px] text-(--color-text-muted)">
-                {u.status === "on_vacation" ? (
-                  <span className="flex items-center gap-1">
-                    <Icon icon={PiCalendarBlank} size={12} className="text-warning-500" />
-                    Off
+          {displayRows.map((u, i) => (
+            <div key={u?.id ?? `s${i}`} className="flex items-center justify-between gap-2" style={{ height: ROW_H }}>
+              {u ? (
+                <>
+                  <span className="truncate text-sm text-(--color-text-default)" title={u.name}>
+                    {u.name}
                   </span>
-                ) : u.taskCount === 0 ? (
-                  <span className="text-success-600">Free</span>
-                ) : (
-                  `${u.taskCount}t`
-                )}
-              </span>
+                  <span className="shrink-0 text-[11px] text-(--color-text-muted)">
+                    {u.status === "on_vacation" ? (
+                      <span className="flex items-center gap-1">
+                        <Icon icon={PiCalendarBlank} size={12} className="text-warning-500" />
+                        Off
+                      </span>
+                    ) : u.taskCount === 0 ? (
+                      <span className="text-success-600">Free</span>
+                    ) : (
+                      `${u.taskCount}t`
+                    )}
+                  </span>
+                </>
+              ) : (
+                <>
+                  <div className="h-3.5 w-24 animate-pulse rounded bg-(--color-surface-subtle)" />
+                  <div className="h-3 w-5 animate-pulse rounded bg-(--color-surface-subtle)" />
+                </>
+              )}
             </div>
           ))}
         </div>
@@ -424,8 +403,9 @@ export const CapacityTimeline: React.FC<CapacityTimelineProps> = ({ workload, lo
                 style={{ left: todayOffset * DAY_W + DAY_W / 2 }}
               />
 
-              {/* Rows: one per designer. */}
-              {rows.map((u) => {
+              {/* Rows: one per designer (en carga: filas vacías, sin barras). */}
+              {displayRows.map((u, i) => {
+                if (!u) return <div key={`s${i}`} className="relative" style={{ height: ROW_H }} />;
                 const vacs = [...(u.currentVacation ? [u.currentVacation] : []), ...u.upcomingVacations];
                 const vBlocks = vacationBlocks(vacs);
                 return (
