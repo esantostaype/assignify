@@ -16,7 +16,7 @@ export const Header = () => {
   const [listsOpen, setListsOpen] = useState(false)
 
   const navItems = [
-    { href: '/tasks', label: 'Tasks', icon: Queue01Icon },
+    { href: '/', label: 'Tasks', icon: Queue01Icon },
     { href: '/team', label: 'Team', icon: UserGroup03Icon },
     { onClick: () => setTypesOpen(true), label: 'Types', icon: SwatchIcon },
     { onClick: () => setListsOpen(true), label: 'Lists', icon: Folder01Icon },

@@ -28,7 +28,7 @@ export default function LoginPage() {
         setError("Invalid email or password");
       } else {
         // Sesión creada: vamos al tablero (full reload para tomar la cookie).
-        window.location.href = "/tasks";
+        window.location.href = "/";
       }
     } catch (error) {
       console.error("❌ Login error:", error);
@@ -106,7 +106,7 @@ export default function LoginPage() {
             color="neutral"
             fullWidth
             disabled={loading}
-            onClick={() => signIn("clickup", { callbackUrl: "/tasks" })}
+            onClick={() => signIn("clickup", { callbackUrl: "/" })}
           >
             Continue with ClickUp
           </Button>
