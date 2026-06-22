@@ -339,10 +339,6 @@
   }
 }
 
-.dark body {
-  background: var(--color-neutral-200);
-}
-
 /* ─── Global scrollbar styling ───────────────────────────────────────────
    One look for every scrollable element in the project — applied via the
    universal selector so the rule reaches modals/drawers/popovers that
