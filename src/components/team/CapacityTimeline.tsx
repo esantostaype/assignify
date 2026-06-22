@@ -300,7 +300,7 @@ export const CapacityTimeline: React.FC<CapacityTimelineProps> = ({ workload, lo
   const tracksH = rows.length * ROW_H;
 
   return (
-    <>
+    <div className="space-y-3">
       {header}
 
       <Card variant="outlined" padding="none" className="mt-3 flex overflow-hidden">
@@ -469,6 +469,6 @@ export const CapacityTimeline: React.FC<CapacityTimelineProps> = ({ workload, lo
           </div>
         </div>
       </Card>
-    </>
+    </div>
   );
 };
