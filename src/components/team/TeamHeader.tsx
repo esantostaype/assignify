@@ -11,7 +11,7 @@ interface TeamHeaderProps {
 // "Available to sync" (ver UsersList).
 export const TeamHeader: React.FC<TeamHeaderProps> = ({ searchValue, onSearchChange }) => {
   return (
-    <div className="sticky top-16 p-4 bg-(--color-surface-app)/70 backdrop-blur-lg z-50 border-b border-b-(--color-border-default)">
+    <div className="sticky top-16 p-4 bg-(--color-surface-header) z-50 border-b border-b-(--color-border-default)">
       <div className="flex items-center justify-between gap-4">
         <h1 className="flex items-center gap-2 text-xl">Team</h1>
         <SearchBar value={searchValue} onChange={onSearchChange} className="w-full max-w-sm" />

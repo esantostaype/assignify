@@ -2,10 +2,10 @@
 // UN único skeleton que refleja SyncedMemberCard: cabecera (avatar + nombre /
 // puesto + botón editar), barra de carga (label + valor + barra) y línea de
 // disponibilidad con el chip de estado. Sin email (la tarjeta ya no lo muestra).
-import { Card, Skeleton } from '@/components/ui'
+import { Skeleton } from '@/components/ui'
 
 export const MemberCardSkeleton = () => (
-  <Card variant="outlined" padding="md" className="flex flex-col gap-3">
+  <div className="p-4 rounded-lg relative flex flex-col gap-3 justify-between bg-(--color-surface-header)">
     {/* Cabecera: avatar + nombre/puesto + botón editar */}
     <div className="flex items-start gap-3">
       <Skeleton variant="circle" width={44} height={44} />
@@ -30,5 +30,5 @@ export const MemberCardSkeleton = () => (
       <Skeleton variant="text" width="45%" />
       <Skeleton variant="rect" width={56} height={22} className="rounded-full" />
     </div>
-  </Card>
+  </div>
 )

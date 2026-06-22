@@ -81,7 +81,7 @@ export const TasksList: React.FC<TasksListProps> = ({ tasks, loading = false }) 
       <div className="flex align-baseline gap-4 h-[calc(100dvh-11.375rem)]">
         {columnOrder.map((column, index) => (
           <div key={column} className="flex flex-[0_0_280px] flex-col overflow-y-auto relative pr-2">
-            <div className="sticky top-0 pb-2 bg-(--color-surface-app) flex items-center justify-between z-20">
+            <div className="sticky top-0 pb-2 flex items-center justify-between z-20">
               {/* Mismo tamaño/estructura que con datos (text-sm + badge) para que el
                   header no "salte" al cargar. */}
               <h2 className="font-semibold text-sm">{column}</h2>
@@ -129,7 +129,7 @@ export const TasksList: React.FC<TasksListProps> = ({ tasks, loading = false }) 
         const list = sortTasks(grouped[column] || [], dir);
         return (
           <div key={column} className="flex flex-[0_0_280px] flex-col overflow-y-auto relative pr-2">
-            <div className="sticky top-0 pb-2 bg-(--color-surface-app) flex items-center justify-between z-20">
+            <div className="sticky top-0 pb-2 flex items-center justify-between z-20">
               <div className="flex items-center gap-1.5">
                 <h2 className="font-semibold text-sm">{column}</h2>
                 {/* Sort por fecha de entrega (alterna asc/desc), como en un DataTable. */}
@@ -143,7 +143,7 @@ export const TasksList: React.FC<TasksListProps> = ({ tasks, loading = false }) 
                   <Icon icon={dir === "asc" ? PiArrowUp : PiArrowDown} size={14} />
                 </button>
               </div>
-              <span className="bg-primary-500/20 text-primary-600 text-xs px-2 py-1 rounded-full">
+              <span className="bg-(--color-surface-header) text-primary-600 text-xs px-2 py-1 rounded-full">
                 {list.length}
               </span>
             </div>

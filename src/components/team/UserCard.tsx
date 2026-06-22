@@ -34,8 +34,8 @@ export const UserCard: React.FC<UserCardProps> = ({
       transition-all border-2
       ${
         isSelected
-          ? "bg-primary-500/10 border-primary-500/30"
-          : "bg-primary-500/10 border-transparent hover:bg-primary-500/20"
+          ? "bg-(--color-surface-header) border-primary-500/30"
+          : "bg-(--color-surface-header) border-transparent hover:bg-primary-500/20"
       }
     `}
     >

@@ -110,7 +110,7 @@ export const TaskCard: React.FC<TaskCardProps> = ({ task }) => {
   })();
 
   return (
-    <div className="p-4 rounded-lg relative border border-(--color-border-default) flex flex-col justify-between bg-(--color-surface-card)">
+    <div className="p-4 rounded-lg relative flex flex-col justify-between bg-(--color-surface-header)">
       {/* Task Info */}
       <h3 className="font-semibold leading-tight line-clamp-2 mb-1 text-sm">{task.name}</h3>
 
@@ -121,7 +121,7 @@ export const TaskCard: React.FC<TaskCardProps> = ({ task }) => {
 
       {/* Assignees */}
       {task.assignees.length > 0 && (
-        <div className="flex items-center gap-2 my-4">
+        <div className="flex items-center gap-2 my-3">
           <Icon icon={PiUser} size={16} className="text-(--color-text-muted)" />
           <div className="flex -space-x-2">
             {task.assignees.slice(0, 3).map((assignee, index) => (
@@ -173,7 +173,7 @@ export const TaskCard: React.FC<TaskCardProps> = ({ task }) => {
       </div>
 
       {/* Status and Priority Header */}
-      <div className="flex items-center justify-between mt-6 capitalize">
+      <div className="flex items-center justify-between mt-3 capitalize">
         <div className={`flex items-center gap-1 text-sm font-medium ${priorityClass}`}>
           <span>
             <Icon

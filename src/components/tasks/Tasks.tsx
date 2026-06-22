@@ -46,7 +46,7 @@ export const TasksSync: React.FC = () => {
 
   return (
     <div className="flex flex-col h-full">
-      <div className="sticky top-16 z-50 bg-(--color-surface-app)/70 backdrop-blur-lg">
+      <div className="sticky top-16 z-50 bg-(--color-surface-header)">
         <div className="flex items-center justify-between gap-4 border-b border-(--color-border-default) p-4">
           <h1 className="flex items-center gap-2 text-xl text-(--color-text-strong)">
             Tasks
