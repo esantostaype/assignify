@@ -129,7 +129,7 @@ export const TasksList: React.FC<TasksListProps> = ({ tasks, loading = false }) 
         const list = sortTasks(grouped[column] || [], dir);
         return (
           <div key={column} className="flex flex-[0_0_280px] flex-col overflow-y-auto relative pr-2">
-            <div className="sticky top-0 pb-2 bg-(--color-surface-header) flex items-center justify-between z-20">
+            <div className="sticky top-0 pb-2 var(--color-neutral-100) dark:var(--color-neutral-200) flex items-center justify-between z-20">
               <div className="flex items-center gap-1.5">
                 <h2 className="font-semibold text-sm">{column}</h2>
                 {/* Sort por fecha de entrega (alterna asc/desc), como en un DataTable. */}
