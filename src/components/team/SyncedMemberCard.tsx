@@ -143,7 +143,7 @@ export const SyncedMemberCard: React.FC<SyncedMemberCardProps> = ({
           : "success";
 
   return (
-    <div className="p-4 rounded-lg relative flex flex-col justify-between bg-(--color-surface-header)">
+    <div className="p-4 rounded-lg relative flex flex-col gap-3 justify-between bg-(--color-surface-header)">
       {headerRow}
 
       {/* Barra de carga (tareas pendientes: TO_DO / In progress) */}
