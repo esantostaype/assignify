@@ -81,7 +81,7 @@ export const TasksList: React.FC<TasksListProps> = ({ tasks, loading = false }) 
       <div className="flex align-baseline gap-4 h-[calc(100dvh-11.375rem)]">
         {columnOrder.map((column, index) => (
           <div key={column} className="flex flex-[0_0_280px] flex-col overflow-y-auto relative pr-2">
-            <div className="sticky top-0 pb-2 flex items-center justify-between z-20 bg-(--color-surface-header)">
+            <div className="sticky top-0 pb-2 flex items-center justify-between z-20 var(--color-neutral-100) dark:var(--color-neutral-200)">
               {/* Mismo tamaño/estructura que con datos (text-sm + badge) para que el
                   header no "salte" al cargar. */}
               <h2 className="font-semibold text-sm">{column}</h2>
