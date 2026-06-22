@@ -7,6 +7,7 @@ import {
 } from "@/lib/icons";
 import { Avatar } from "@/components/ui";
 import { avatarColor } from "@/lib/avatarColor";
+import { mapClickUpStatusToLocal } from "@/utils/clickup-status-mapping-utils";
 
 interface TaskCardProps {
   task: {
@@ -80,18 +81,17 @@ export const TaskCard: React.FC<TaskCardProps> = ({ task }) => {
   const getDateColor = () => {
     if (!task.dueDate) return "text-(--color-text-muted)";
 
-    const dueDate = new Date(task.dueDate);
-    const now = new Date();
-    const diffTime = dueDate.getTime() - now.getTime();
-    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+    const local = mapClickUpStatusToLocal(task.status);
+    // On Approval = ya entregada/enviada: su fecha NO es "vencida" → color normal
+    // (como una TO_DO al día), nunca rojo ni warning.
+    if (local === "ON_APPROVAL") return "text-(--color-text-subtle)";
 
-    if (diffDays < 0 && task.status !== 'in_progress') {
-      return "text-error-600"; // Overdue
-    } else if (diffDays <= 1) {
-      return "text-warning-600"; // Due today / soon
-    } else {
-      return "text-(--color-text-subtle)"; // Normal
-    }
+    const diffDays = Math.ceil((new Date(task.dueDate).getTime() - Date.now()) / (1000 * 60 * 60 * 24));
+
+    // In Progress vencida tampoco se marca en rojo (se está trabajando).
+    if (diffDays < 0 && local !== "IN_PROGRESS") return "text-error-600"; // Overdue
+    if (diffDays <= 1) return "text-warning-600"; // Due today / soon
+    return "text-(--color-text-subtle)"; // Normal
   };
 
   const dateRange = formatDateRange();
