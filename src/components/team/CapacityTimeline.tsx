@@ -10,7 +10,7 @@
 // day) and a full work day fills the column (minus a small padding).
 import React, { useMemo, useRef, useEffect } from "react";
 import { Card, Tooltip } from "@/components/ui";
-import { Icon, PiChartBar, PiCalendarBlank } from "@/lib/icons";
+import { Icon, PiCalendarBlank } from "@/lib/icons";
 import type { UserWorkload, PendingTaskBar } from "@/hooks/queries/useWorkload";
 import usHolidays from "@/data/usHolidays.json";
 
@@ -256,11 +256,8 @@ export const CapacityTimeline: React.FC<CapacityTimelineProps> = ({ workload, lo
 
   const header = (
     <div className="flex flex-wrap items-center justify-between gap-2">
-      <div className="flex items-center gap-2">
-        <Icon icon={PiChartBar} size={18} className="text-primary-500" />
-        <h3 className="font-semibold text-(--color-text-strong)">Team capacity</h3>
-        <span className="text-xs text-(--color-text-muted)">· drag to navigate (±2 months)</span>
-      </div>
+      {/* Mismo estilo que el título "Synced" de la lista de miembros (text-lg semibold). */}
+      <h2 className="text-lg font-semibold text-(--color-text-strong)">Team capacity</h2>
       <div className="flex items-center gap-3 text-[11px] text-(--color-text-muted)">
         {(Object.keys(PRIORITY_LABEL) as PendingTaskBar["priority"][]).map((p) => (
           <span key={p} className="flex items-center gap-1">
@@ -273,15 +270,32 @@ export const CapacityTimeline: React.FC<CapacityTimelineProps> = ({ workload, lo
   );
 
   if (loading) {
+    // Skeleton con la MISMA estructura que el timeline real (columna de nombres fija +
+    // área de pistas) y 3 usuarios, para que no "salte" al cargar.
+    const pulse = "animate-pulse rounded bg-(--color-surface-subtle)";
+    const nameW = [120, 96, 110];
+    const barLeft = [40, 96, 16];
+    const barW = [180, 120, 220];
     return (
       <div className="space-y-3">
         {header}
-        <Card variant="outlined" padding="md" className="mt-3">
-          <div className="space-y-2">
-            {Array.from({ length: 4 }).map((_, i) => (
-              <div key={i} className="flex items-center gap-3">
-                <div className="h-7 shrink-0 animate-pulse rounded bg-(--color-surface-subtle)" style={{ width: NAME_W }} />
-                <div className="h-7 flex-1 animate-pulse rounded bg-(--color-surface-subtle)" />
+        <Card variant="outlined" padding="none" className="mt-3 flex overflow-hidden">
+          {/* Columna de nombres (fija) */}
+          <div className="shrink-0 border-r border-(--color-border-default) px-4" style={{ width: NAME_W }}>
+            <div style={{ height: WEEK_H + HEADER_H }} className="border-b border-(--color-border-default)" />
+            {Array.from({ length: 3 }).map((_, i) => (
+              <div key={i} className="flex items-center justify-between gap-2" style={{ height: ROW_H }}>
+                <div className={`h-3.5 ${pulse}`} style={{ width: nameW[i] }} />
+                <div className={`h-3 w-5 ${pulse}`} />
+              </div>
+            ))}
+          </div>
+          {/* Área de pistas: cabecera + 3 filas con una barra cada una */}
+          <div className="flex-1 overflow-hidden">
+            <div style={{ height: WEEK_H + HEADER_H }} className="border-b border-(--color-border-default)" />
+            {Array.from({ length: 3 }).map((_, i) => (
+              <div key={i} className="flex items-center" style={{ height: ROW_H, paddingLeft: barLeft[i] }}>
+                <div className={`h-5 ${pulse}`} style={{ width: barW[i] }} />
               </div>
             ))}
           </div>
