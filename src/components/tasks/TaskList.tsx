@@ -1,6 +1,7 @@
-import React from "react";
+"use client";
+import React, { useState } from "react";
 import { TaskCard } from "./TaskCard";
-import { Icon, PiListChecks } from "@/lib/icons";
+import { Icon, PiListChecks, PiArrowUp, PiArrowDown } from "@/lib/icons";
 import { TaskCardSkeleton } from "./TaskCardSkeleton";
 import {
   mapClickUpStatusToLocal,
@@ -40,26 +41,44 @@ interface TasksListProps {
   loading?: boolean;
 }
 
+type SortDir = "asc" | "desc";
+
 export const TasksList: React.FC<TasksListProps> = ({ tasks, loading = false }) => {
+  // Orden por columna (por fecha de entrega). Default: ON APPROVAL muestra las más
+  // NUEVAS arriba (desc); las demás, las que vencen ANTES arriba (asc). El icono del
+  // título lo alterna, al estilo de las columnas ordenables de un DataTable.
+  const [order, setOrder] = useState<Record<string, SortDir>>(() => {
+    const init: Record<string, SortDir> = {};
+    getColumnOrder().forEach((c) => {
+      init[c] = c === "ON APPROVAL" ? "desc" : "asc";
+    });
+    return init;
+  });
+
   const mapStatusToColumn = (status: string): string | null => {
     const localStatus = mapClickUpStatusToLocal(status);
     if (localStatus === null) return null; // completada → excluir
     return mapLocalStatusToColumn(localStatus);
   };
 
-  const sortByDueDate = (list: Task[]): Task[] =>
+  // Ordena por dueDate; las tareas sin fecha siempre al final. `dir` invierte el orden.
+  const sortTasks = (list: Task[], dir: SortDir): Task[] =>
     [...list].sort((a, b) => {
       if (!a.dueDate && !b.dueDate) return 0;
       if (!a.dueDate) return 1;
       if (!b.dueDate) return -1;
-      return new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime();
+      const diff = new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime();
+      return dir === "asc" ? diff : -diff;
     });
+
+  const toggleOrder = (col: string) =>
+    setOrder((o) => ({ ...o, [col]: (o[col] ?? "asc") === "asc" ? "desc" : "asc" }));
 
   const columnOrder = getColumnOrder();
 
   if (loading) {
     return (
-      <div className="flex align-baseline gap-6 h-[calc(100dvh-11.375rem)]">
+      <div className="flex align-baseline gap-4 h-[calc(100dvh-11.375rem)]">
         {columnOrder.map((column, index) => (
           <div key={column} className="flex flex-[0_0_280px] flex-col overflow-y-auto relative pr-2">
             <div className="sticky top-0 pb-2 bg-(--color-surface-app) flex items-center justify-between z-20">
@@ -68,7 +87,7 @@ export const TasksList: React.FC<TasksListProps> = ({ tasks, loading = false }) 
               <h2 className="font-semibold text-sm">{column}</h2>
               <span className="h-6 w-7 rounded-full bg-(--color-surface-hover) animate-pulse" />
             </div>
-            <div className="flex-1 space-y-4">
+            <div className="flex-1 space-y-2">
               <TaskCardSkeleton />
               <TaskCardSkeleton />
               {index === 0 && <TaskCardSkeleton />}
@@ -79,7 +98,7 @@ export const TasksList: React.FC<TasksListProps> = ({ tasks, loading = false }) 
     );
   }
 
-  // Excluir completadas y agrupar por columna
+  // Excluir completadas y agrupar por columna (el ORDEN se aplica al renderizar).
   const grouped = tasks.reduce((acc, task) => {
     const column = mapStatusToColumn(task.status);
     if (column) {
@@ -88,10 +107,6 @@ export const TasksList: React.FC<TasksListProps> = ({ tasks, loading = false }) 
     }
     return acc;
   }, {} as Record<string, Task[]>);
-
-  Object.keys(grouped).forEach((c) => {
-    grouped[c] = sortByDueDate(grouped[c]);
-  });
 
   const activeCount = Object.values(grouped).reduce((n, l) => n + l.length, 0);
 
@@ -108,28 +123,42 @@ export const TasksList: React.FC<TasksListProps> = ({ tasks, loading = false }) 
   }
 
   return (
-    <div className="flex align-baseline gap-6 h-[calc(100dvh-11.375rem)]">
-      {columnOrder.map((column) => (
-        <div key={column} className="flex flex-[0_0_280px] flex-col overflow-y-auto relative pr-2">
-          <div className="sticky top-0 pb-2 bg-(--color-surface-app) flex items-center justify-between z-20">
-            <h2 className="font-semibold text-sm">{column}</h2>
-            <span className="bg-primary-500/20 text-primary-600 text-xs px-2 py-1 rounded-full">
-              {grouped[column]?.length || 0}
-            </span>
-          </div>
-          <div className="flex-1 space-y-4">
-            {grouped[column]?.length ? (
-              grouped[column].map((task) => (
-                <TaskCard key={task.clickupId} task={task} />
-              ))
-            ) : (
-              <div className="text-center text-(--color-text-muted) text-sm py-8">
-                No {column.toLowerCase()} tasks
+    <div className="flex align-baseline gap-4 h-[calc(100dvh-11.375rem)]">
+      {columnOrder.map((column) => {
+        const dir = order[column] ?? "asc";
+        const list = sortTasks(grouped[column] || [], dir);
+        return (
+          <div key={column} className="flex flex-[0_0_280px] flex-col overflow-y-auto relative pr-2">
+            <div className="sticky top-0 pb-2 bg-(--color-surface-app) flex items-center justify-between z-20">
+              <div className="flex items-center gap-1.5">
+                <h2 className="font-semibold text-sm">{column}</h2>
+                {/* Sort por fecha de entrega (alterna asc/desc), como en un DataTable. */}
+                <button
+                  type="button"
+                  onClick={() => toggleOrder(column)}
+                  title={dir === "asc" ? "Earliest due first — click for latest" : "Latest due first — click for earliest"}
+                  aria-label="Sort by due date"
+                  className="rounded p-0.5 text-(--color-text-muted) transition-colors hover:bg-(--color-surface-hover) hover:text-(--color-text-strong)"
+                >
+                  <Icon icon={dir === "asc" ? PiArrowUp : PiArrowDown} size={14} />
+                </button>
               </div>
-            )}
+              <span className="bg-primary-500/20 text-primary-600 text-xs px-2 py-1 rounded-full">
+                {list.length}
+              </span>
+            </div>
+            <div className="flex-1 space-y-2">
+              {list.length ? (
+                list.map((task) => <TaskCard key={task.clickupId} task={task} />)
+              ) : (
+                <div className="text-center text-(--color-text-muted) text-sm py-8">
+                  No {column.toLowerCase()} tasks
+                </div>
+              )}
+            </div>
           </div>
-        </div>
-      ))}
+        );
+      })}
     </div>
   );
 };
