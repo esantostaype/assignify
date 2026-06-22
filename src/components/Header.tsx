@@ -1,6 +1,6 @@
 'use client'
 import { useState } from 'react'
-import { Queue01Icon, Settings01Icon, SwatchIcon, UserGroup03Icon, Folder01Icon } from '@hugeicons/core-free-icons'
+import { Queue01Icon, SwatchIcon, UserGroup03Icon, Folder01Icon } from '@hugeicons/core-free-icons'
 import { NavItem, TaskTypesForm } from '@/components'
 import { ListsSyncForm } from '@/components/ListsSyncForm'
 import { WorkspaceSwitcher } from '@/components/WorkspaceSwitcher'
@@ -20,7 +20,7 @@ export const Header = () => {
     { href: '/team', label: 'Team', icon: UserGroup03Icon },
     { onClick: () => setTypesOpen(true), label: 'Types', icon: SwatchIcon },
     { onClick: () => setListsOpen(true), label: 'Lists', icon: Folder01Icon },
-    { href: '/settings', label: 'Settings', icon: Settings01Icon }
+    // Settings se movió al menú del avatar (UserMenu); ya no vive en el nav principal.
   ]
 
   return (

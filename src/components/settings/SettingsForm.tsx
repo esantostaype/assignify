@@ -8,20 +8,20 @@ import {
   Input,
   Switch,
   IconButton,
-  Tooltip,
   Progress,
   Alert,
   Spinner,
-  FormSeparator,
   AlertDialog,
   Select,
+  Card,
+  FormField,
 } from "@/components/ui";
+import { cn } from "@/lib/cn";
 import {
   Icon,
   PiGear,
   PiDownloadSimple,
   PiWarning,
-  PiInfo,
   PiArrowsClockwise,
 } from "@/lib/icons";
 import {
@@ -70,6 +70,8 @@ export const SettingsForm: React.FC = () => {
   const [unit, setUnit] = useState<DurationUnit>("days");
   const [savingUnit, setSavingUnit] = useState(false);
   const [showResetDialog, setShowResetDialog] = useState(false);
+  // Pestaña activa: 3 grupos de settings + "tiers".
+  const [activeTab, setActiveTab] = useState<string>("work_schedule");
 
   // Duración (días base) → valor mostrado en la unidad activa (redondeado).
   const toUnit = (days: number) => Math.round(daysToUnit(days, unit) * 100) / 100;
@@ -407,153 +409,153 @@ export const SettingsForm: React.FC = () => {
     ([groupName]) => ALLOWED_GROUPS.includes(groupName)
   );
 
+  // Pestañas: los 3 grupos de settings + "Tier durations". Lista vertical a la izquierda
+  // (~30%) y los campos de la sección activa a la derecha.
+  const TABS = [
+    { id: "work_schedule", label: "Work schedule", desc: "Working hours, lunch & timezone" },
+    { id: "task_assignment", label: "Task assignment", desc: "Assignment engine thresholds" },
+    { id: "approvals", label: "Approvals", desc: "Auto-complete delivered tasks" },
+    { id: "tiers", label: "Tier durations", desc: "Default duration per tier" },
+  ] as const;
+  const activeInfo = TABS.find((t) => t.id === activeTab) ?? TABS[0];
+  const activeGroup = filteredSettings.find(([g]) => g === activeTab);
+  const fieldRange = (s: any) =>
+    s.minValue != null && s.maxValue != null ? `Range: ${s.minValue}–${s.maxValue}.` : "";
+
   return (
     <>
-
-      {/* Settings Groups */}
-      <div className="space-y-8">
-        {filteredSettings.map(([groupName, settings]) => {
-          // Excluir tier_info de los settings a mostrar
-          const settingsToShow = settings.filter(s => s.key !== 'tier_info');
-
-          if (settingsToShow.length === 0 && groupName !== 'tier_settings') {
-            return null;
-          }
-
-          return (
-            <section key={groupName} className="space-y-4">
-              <FormSeparator>{getGroupDisplayName(groupName)}</FormSeparator>
-
-              {settingsToShow.length > 0 && (
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-x-6 gap-y-4">
-                  {settingsToShow.map((setting) => {
-                    const { label, tooltip } = getSettingDisplayInfo(setting);
-                    const settingKey = `${setting.category}.${setting.key}`;
-                    const hasChanged = settingValues[settingKey]?.hasChanged ?? false;
-
-                    return (
-                      <div key={settingKey} className="flex flex-col gap-1.5 min-w-0">
-                        <div className="flex items-center gap-2 text-sm font-medium text-(--color-text-muted)">
-                          <span className="truncate">{label}</span>
-                          {hasChanged && (
-                            <div
-                              className="w-2 h-2 bg-orange-500 rounded-full shrink-0"
-                              title="Changed"
-                            />
-                          )}
-                          <Tooltip content={tooltip}>
-                            <span className="inline-flex cursor-help text-(--color-text-subtle) shrink-0">
-                              <Icon icon={PiInfo} size={14} />
-                            </span>
-                          </Tooltip>
-                        </div>
-                        {renderSettingInput(setting)}
-                      </div>
-                    );
-                  })}
+      <div className="flex flex-col gap-6 md:flex-row md:items-start">
+        {/* Tabs (vertical en desktop; fila horizontal scrollable en mobile) */}
+        <nav className="flex gap-1.5 overflow-x-auto pb-1 md:w-1/3 md:max-w-[260px] md:shrink-0 md:flex-col md:overflow-visible md:pb-0">
+          {TABS.map((t) => {
+            const active = t.id === activeTab;
+            return (
+              <button
+                key={t.id}
+                type="button"
+                onClick={() => setActiveTab(t.id)}
+                className={cn(
+                  "shrink-0 rounded-lg border px-3 py-2.5 text-left transition-colors md:w-full",
+                  active
+                    ? "border-primary-500/40 bg-primary-500/10"
+                    : "border-transparent hover:bg-(--color-surface-hover)",
+                )}
+              >
+                <div className={cn("text-sm font-semibold", active ? "text-(--color-text-strong)" : "text-(--color-text-default)")}>
+                  {t.label}
                 </div>
-              )}
-            </section>
-          );
-        })}
+                <div className="hidden text-xs text-(--color-text-muted) md:block">{t.desc}</div>
+              </button>
+            );
+          })}
+        </nav>
 
-        {/* Tier Settings */}
-        <section className="space-y-4">
-          <div className="flex items-center justify-between gap-3">
-            <FormSeparator>Tier Durations</FormSeparator>
-            <div className="w-36 shrink-0">
-              <Select
-                size="sm"
-                value={unit}
-                onChange={(val) => handleUnitChange(val as DurationUnit)}
-                disabled={loadingTiers || savingUnit}
-                options={DURATION_UNITS.map((u) => ({ value: u, label: u[0].toUpperCase() + u.slice(1) }))}
-              />
+        {/* Panel de la sección activa */}
+        <div className="min-w-0 flex-1">
+          <Card variant="outlined" padding="lg" className="flex flex-col gap-5">
+            <div>
+              <h3 className="text-base font-semibold text-(--color-text-strong)">{activeInfo.label}</h3>
+              <p className="text-sm text-(--color-text-muted)">{activeInfo.desc}</p>
             </div>
-          </div>
 
-          {loadingTiers ? (
-            <Progress />
-          ) : (
-            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
-              {tiers.map((tier) => {
-                const hasChanged = tierChanges[tier.id] !== undefined;
-                const currentDuration = tierChanges[tier.id] ?? toUnit(tier.duration);
-
-                return (
-                  <div key={tier.id} className="flex flex-col gap-1.5 min-w-0">
-                    <div className="flex items-center gap-2 text-sm font-medium text-(--color-text-muted)">
-                      <span className="truncate">Tier {tier.name}</span>
-                      {hasChanged && (
-                        <div
-                          className="w-2 h-2 bg-orange-500 rounded-full shrink-0"
-                          title="Changed"
-                        />
-                      )}
-                      <span className="text-xs text-(--color-text-subtle)">({unit})</span>
-                    </div>
-                    <Input
-                      type="number"
-                      value={currentDuration.toString()}
-                      onChange={(e) => {
-                        const value = parseFloat(e.target.value);
-                        if (!isNaN(value) && value > 0) {
-                          handleTierDurationChange(tier.id, value);
-                        }
-                      }}
-                      min={unit === "minutes" ? 1 : 0.1}
-                      step={unit === "days" ? 0.1 : 1}
+            {activeTab === "tiers" ? (
+              <>
+                <div className="flex items-center justify-between gap-3">
+                  <span className="text-sm text-(--color-text-muted)">Duration unit</span>
+                  <div className="w-40">
+                    <Select
                       size="sm"
-                      className={`w-full${hasChanged ? " border-warning-500" : ""}`}
+                      value={unit}
+                      onChange={(val) => handleUnitChange(val as DurationUnit)}
+                      disabled={loadingTiers || savingUnit}
+                      options={DURATION_UNITS.map((u) => ({ value: u, label: u[0].toUpperCase() + u.slice(1) }))}
                     />
                   </div>
-                );
-              })}
-            </div>
+                </div>
+                {loadingTiers ? (
+                  <Progress />
+                ) : (
+                  <div className="grid grid-cols-2 gap-x-6 gap-y-5 sm:grid-cols-3">
+                    {tiers.map((tier) => {
+                      const hasChanged = tierChanges[tier.id] !== undefined;
+                      const currentDuration = tierChanges[tier.id] ?? toUnit(tier.duration);
+                      return (
+                        <FormField key={tier.id} label={`Tier ${tier.name}`} helper={`In ${unit}`}>
+                          <Input
+                            type="number"
+                            value={currentDuration.toString()}
+                            onChange={(e) => {
+                              const value = parseFloat(e.target.value);
+                              if (!isNaN(value) && value > 0) handleTierDurationChange(tier.id, value);
+                            }}
+                            min={unit === "minutes" ? 1 : 0.1}
+                            step={unit === "days" ? 0.1 : 1}
+                            size="md"
+                            className={hasChanged ? "border-warning-500" : ""}
+                          />
+                        </FormField>
+                      );
+                    })}
+                  </div>
+                )}
+              </>
+            ) : activeGroup ? (
+              <div className="grid grid-cols-1 gap-x-6 gap-y-5 sm:grid-cols-2">
+                {activeGroup[1]
+                  .filter((s) => s.key !== "tier_info")
+                  .map((setting) => {
+                    const { label } = getSettingDisplayInfo(setting);
+                    const helper = `${setting.description ?? ""} ${fieldRange(setting)}`.trim();
+                    return (
+                      <FormField
+                        key={`${setting.category}.${setting.key}`}
+                        label={label}
+                        helper={helper || undefined}
+                      >
+                        {renderSettingInput(setting, "md")}
+                      </FormField>
+                    );
+                  })}
+              </div>
+            ) : null}
+          </Card>
+
+          {/* Acciones */}
+          <div className="mt-4 flex items-center justify-between gap-3">
+            <IconButton
+              aria-label="Reset settings to defaults"
+              variant="outlined"
+              color="error"
+              onClick={() => setShowResetDialog(true)}
+              disabled={resetSettingsMutation.isPending}
+            >
+              {resetSettingsMutation.isPending ? (
+                <Spinner colorClassName="" />
+              ) : (
+                <Icon icon={PiArrowsClockwise} size={16} />
+              )}
+            </IconButton>
+            <Button
+              startIcon={<Icon icon={PiDownloadSimple} size={16} />}
+              onClick={handleSave}
+              disabled={!hasChanges}
+              loading={updateSettingsMutation.isPending || savingTiers}
+              color={hasChanges ? "warning" : "primary"}
+            >
+              {hasChanges ? "Save Changes" : "No Changes"}
+            </Button>
+          </div>
+
+          {hasChanges && (
+            <Alert tone="warning" variant="soft" icon={null} className="mt-4">
+              <div className="flex items-center gap-2">
+                <Icon icon={PiWarning} size={16} />
+                <span className="text-sm">You have unsaved changes. Don&apos;t forget to save.</span>
+              </div>
+            </Alert>
           )}
-        </section>
-      </div>
-
-      {/* Header */}
-      <div className="flex items-center justify-between mt-8 mb-4">
-        <div className="flex justify-end items-center gap-2">
-          <IconButton
-            aria-label="Reset settings to defaults"
-            variant="outlined"
-            color="error"
-            onClick={() => setShowResetDialog(true)}
-            disabled={resetSettingsMutation.isPending}
-          >
-            {resetSettingsMutation.isPending ? (
-              <Spinner colorClassName="" />
-            ) : (
-              <Icon icon={PiArrowsClockwise} size={16} />
-            )}
-          </IconButton>
-
-          <Button
-            startIcon={<Icon icon={PiDownloadSimple} size={16} />}
-            onClick={handleSave}
-            disabled={!hasChanges}
-            loading={updateSettingsMutation.isPending || savingTiers}
-            color={hasChanges ? "warning" : "primary"}
-          >
-            {hasChanges ? "Save Changes" : "No Changes"}
-          </Button>
         </div>
       </div>
-
-      {/* Warning for changes */}
-      {hasChanges && (
-        <Alert tone="warning" variant="soft" icon={null} className="mb-6">
-          <div className="flex items-center gap-2">
-            <Icon icon={PiWarning} size={16} />
-            <span className="text-sm">
-              You have unsaved changes. Don't forget to save your settings.
-            </span>
-          </div>
-        </Alert>
-      )}
 
       {/* Confirmación del reset a valores por defecto */}
       <AlertDialog
