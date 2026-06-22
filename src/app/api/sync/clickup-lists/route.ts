@@ -7,7 +7,7 @@ import { NextResponse } from 'next/server'
 import axios from 'axios'
 import { db } from '@/db'
 import { brand } from '@/db/schema'
-import { and, eq, inArray } from 'drizzle-orm'
+import { and, eq, inArray, ne } from 'drizzle-orm'
 import { API_CONFIG } from '@/config'
 import { getCurrentClickUpContext } from '@/lib/workspace'
 
@@ -92,6 +92,17 @@ export async function POST(req: Request) {
       const l = byId.get(id)
       if (!l) { errors.push(`Lista ${id} no encontrada en el workspace`); continue }
       try {
+        // Reconciliar STALE: si quedó un brand con el MISMO nombre pero OTRO id (p.ej. la
+        // lista se recreó o el workspace migró de id y el brand viejo nunca se limpió),
+        // bórralo primero. Si no, el INSERT de la lista real chocaría con el unique
+        // (workspaceId, name) y fallaría —era la causa de "solo deja sincronizar una".
+        await db.delete(brand).where(
+          and(
+            eq(brand.workspaceId, teamId ?? '__none__'),
+            eq(brand.name, l.name),
+            ne(brand.id, l.id),
+          )
+        )
         await db
           .insert(brand)
           .values({
