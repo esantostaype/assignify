@@ -107,7 +107,7 @@ export const UsersList: React.FC<UsersListProps> = ({
     <div className="flex flex-col gap-8">
       {/* ── Diseñadores sincronizados (tarjeta completa con carga) ── */}
       <section>
-        <h2 className="mb-4 text-lg font-semibold text-(--color-text-strong)">
+        <h2 className="mb-3 text-lg font-semibold text-(--color-text-strong)">
           Synced
           <span className="ml-2 text-sm font-normal text-(--color-text-muted)">
             {syncedUsers.length}
@@ -135,7 +135,7 @@ export const UsersList: React.FC<UsersListProps> = ({
       {/* ── Disponibles para sincronizar (tarjeta compacta) ── */}
       {availableUsers.length > 0 && (
         <section>
-          <div className="mb-4 flex items-center justify-between gap-4">
+          <div className="mb-3 flex items-center justify-between gap-4">
             <h2 className="text-lg font-semibold text-(--color-text-strong)">
               Available to sync
               <span className="ml-2 text-sm font-normal text-(--color-text-muted)">

@@ -274,7 +274,7 @@ export const CapacityTimeline: React.FC<CapacityTimelineProps> = ({ workload, lo
 
   if (loading) {
     return (
-      <>
+      <div className="space-y-3">
         {header}
         <Card variant="outlined" padding="md" className="mt-3">
           <div className="space-y-2">
@@ -286,7 +286,7 @@ export const CapacityTimeline: React.FC<CapacityTimelineProps> = ({ workload, lo
             ))}
           </div>
         </Card>
-      </>
+      </div>
     );
   }
 
