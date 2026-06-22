@@ -94,7 +94,8 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(function Input(
   const bgCls = disabled ? 'bg-(--color-surface-subtle)' : SURFACE_REST;
 
   const wrapperCls = cn(
-    'flex items-center gap-2 rounded-md border transition-colors min-w-0',
+    // overflow-hidden: recorta el fondo del autofill del navegador a las esquinas redondeadas.
+    'flex items-center gap-2 rounded-md border transition-colors min-w-0 overflow-hidden',
     sz.wrap,
     fullWidth && 'w-full',
     bgCls,
@@ -108,7 +109,9 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(function Input(
   );
 
   const inputCls = cn(
-    'min-w-0 flex-1 bg-transparent text-(--color-text-strong) placeholder:text-(--color-text-subtle) outline-none border-0',
+    // self-stretch: el input ocupa TODA la altura del wrapper para que el fondo del
+    // autofill (box-shadow inset, ver globals.css) cubra el control entero y no una franja.
+    'min-w-0 flex-1 self-stretch bg-transparent text-(--color-text-strong) placeholder:text-(--color-text-subtle) outline-none border-0',
     sz.input,
     startAdornment ? 'pl-0' : '',
     endAdornment   ? 'pr-0' : '',

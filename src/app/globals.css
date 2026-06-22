@@ -382,6 +382,24 @@
 .no-scrollbar { scrollbar-width: none; }
 .no-scrollbar::-webkit-scrollbar { display: none; width: 0; height: 0; }
 
+/* ─── Autofill de inputs ─────────────────────────────────────────────────────
+   El autofill del navegador pinta su propio fondo (amarillo/azul) SOLO en el área
+   del <input>, dejando una "franja" dentro del control. Lo reemplazamos por un fondo
+   que cubre todo el input (box-shadow inset gigante) = primary-500 al 20% sobre la
+   superficie del campo, con el texto en el color normal. Funciona en light y dark
+   porque color-mix usa los tokens de tema. Pareja: Input usa self-stretch + el wrapper
+   overflow-hidden para que esto llene el control y respete las esquinas redondeadas. */
+input:-webkit-autofill,
+input:-webkit-autofill:hover,
+input:-webkit-autofill:focus,
+input:-webkit-autofill:active {
+  -webkit-box-shadow: 0 0 0 1000px color-mix(in srgb, var(--color-primary-500) 20%, var(--color-surface-card)) inset;
+  -webkit-text-fill-color: var(--color-text-strong);
+  caret-color: var(--color-text-strong);
+  border-radius: inherit;
+  transition: background-color 9999s ease-in-out 0s; /* evita el flash amarillo inicial */
+}
+
 /* ─── Body scroll lock (Modal / Drawer) ─────────────────────────────────────
    When a modal or drawer opens it sets `data-scroll-locked` on <html> and
    exposes the missing scrollbar width as `--scrollbar-width`.  Elements
