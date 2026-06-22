@@ -9,7 +9,7 @@
 // DAY (10:00–19:00) to the column width, so a 4h task fills ~half a column (not a full
 // day) and a full work day fills the column (minus a small padding).
 import React, { useMemo, useRef, useEffect } from "react";
-import { Card, Tooltip } from "@/components/ui";
+import { Card, Tooltip, Skeleton } from "@/components/ui";
 import { Icon, PiCalendarBlank } from "@/lib/icons";
 import type { UserWorkload, PendingTaskBar } from "@/hooks/queries/useWorkload";
 import usHolidays from "@/data/usHolidays.json";
@@ -315,8 +315,8 @@ export const CapacityTimeline: React.FC<CapacityTimelineProps> = ({ workload, lo
                 </>
               ) : (
                 <>
-                  <div className="h-3.5 w-24 animate-pulse rounded bg-(--color-surface-subtle)" />
-                  <div className="h-3 w-5 animate-pulse rounded bg-(--color-surface-subtle)" />
+                  <Skeleton variant="text" width="55%" />
+                  <Skeleton variant="text" width={18} />
                 </>
               )}
             </div>
