@@ -11,7 +11,7 @@ import {
   Progress,
   Alert,
   Spinner,
-  BrandSpinner,
+  BrandLoader,
   AlertDialog,
   Select,
   FormField,
@@ -393,9 +393,8 @@ export const SettingsForm: React.FC = () => {
 
   if (isLoading) {
     return (
-      <div className="flex flex-1 flex-col items-center justify-center gap-4">
-        <BrandSpinner size={48} colorClassName="text-primary-500" />
-        <span className="text-sm font-medium text-(--color-text-muted)">Loading settings…</span>
+      <div className="flex flex-1 items-center justify-center">
+        <BrandLoader label="Loading settings…" />
       </div>
     );
   }

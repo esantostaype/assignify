@@ -16,6 +16,8 @@ export { Spinner } from './Spinner';
 export type { SpinnerProps } from './Spinner';
 export { BrandSpinner } from './BrandSpinner';
 export type { BrandSpinnerProps } from './BrandSpinner';
+export { BrandLoader } from './BrandLoader';
+export type { BrandLoaderProps } from './BrandLoader';
 export { LoadingOverlay } from './LoadingOverlay';
 export type { LoadingOverlayProps } from './LoadingOverlay';
 export { Skeleton } from './Skeleton';

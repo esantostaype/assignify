@@ -12,7 +12,7 @@ import React, {
 } from "react";
 import axios from "axios";
 import { Formik, Form, useFormikContext } from "formik";
-import { Button, Typography, BrandSpinner } from "@/components/ui";
+import { Button, Typography, BrandLoader } from "@/components/ui";
 import { hotToast as toast } from "@/lib/hotToast";
 import { useQueryClient } from "@tanstack/react-query";
 
@@ -73,7 +73,8 @@ const FormikSuggestionLogic: FC<FormikSuggestionLogicProps> = ({
   const { suggestedAssignment, candidates, fetchingSuggestion } = useTaskSuggestion(
     isSubmitting ? undefined : currentTypeId,
     isSubmitting ? "" : durationDaysBase,
-    isSubmitting ? undefined : values.brandId || undefined,
+    // La lista (brand) NO influye en quién se sugiere: se pasa undefined siempre.
+    undefined,
     isSubmitting ? undefined : values.priority,
     isSubmitting ? 0 : triggerSuggestion,
     isSubmitting ? undefined : values.level
@@ -150,15 +151,12 @@ const FormikInactivityReset: FC<FormikInactivityResetProps> = ({
   return null;
 };
 
-// Overlay de "ocupado" del formulario: cubre el form con su MISMO color de fondo al 50%
-// (no negro), con el BrandSpinner + texto al centro. Se usa tanto al buscar candidato
-// como al crear la tarea.
+// Overlay de "ocupado" del formulario: cubre el form con su MISMO color de fondo al 75%
+// (no negro) + blur leve, con el BrandLoader (spinner + texto) al centro. Se usa tanto al
+// buscar candidato como al crear la tarea.
 const FormBusyOverlay: FC<{ label: string }> = ({ label }) => (
-  <div className="absolute inset-0 z-20 flex flex-col items-center justify-center gap-4 bg-(--color-surface-card)/50 backdrop-blur-[2px]">
-    <BrandSpinner size={52} colorClassName="text-primary-500" />
-    <Typography variant="bodySm" className="font-medium">
-      {label}
-    </Typography>
+  <div className="absolute inset-0 z-20 flex items-center justify-center bg-(--color-surface-card)/75 backdrop-blur-[2px]">
+    <BrandLoader label={label} />
   </div>
 );
 
@@ -305,8 +303,8 @@ export const CreateTaskForm: FC<{ onCreated?: () => void }> = ({ onCreated }) =>
     // así el overlay de "ocupado" cubre TODO el ancho del panel + el padding. `relative`
     // lo ancla. Padding p-6 en mobile (/create) y p-10 en el panel fijo de desktop (aside).
     <div className="relative">
-      {/* Bloqueo del formulario: mismo color de fondo del form al 50% + blur leve, con el
-          BrandSpinner y el mensaje al centro. Crear tiene prioridad sobre buscar. */}
+      {/* Bloqueo del formulario: mismo color de fondo del form al 75% + blur leve, con el
+          BrandLoader (spinner + texto) al centro. Crear tiene prioridad sobre buscar. */}
       {loading ? (
         <FormBusyOverlay label="Creating Task..." />
       ) : (
@@ -386,8 +384,9 @@ export const CreateTaskForm: FC<{ onCreated?: () => void }> = ({ onCreated }) =>
                 brands={brands}
                 value={values.brandId}
                 onChange={(value) => {
+                  // La lista solo define DÓNDE se archiva la tarea (lista de ClickUp): no
+                  // resetea ni recalcula la sugerencia/diseñador.
                   setFieldValue("brandId", value);
-                  setTimeout(resetDependentFields, 0);
                 }}
                 touched={touched.brandId}
                 error={errors.brandId}

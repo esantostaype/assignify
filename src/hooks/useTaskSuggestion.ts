@@ -23,11 +23,11 @@ export const useTaskSuggestion = (
   const debounceTimeout = useRef<NodeJS.Timeout | null>(null)
   const lastParams = useRef<string>('')
 
-  // Solo se sugiere cuando TODOS los campos requeridos del formulario están puestos:
-  // tipo, lista (brand), tier/duración, nivel y prioridad. Antes bastaban tipo +
-  // duración, así que sugería con el formulario a medio llenar.
+  // Solo se sugiere cuando están puestos los campos que SÍ influyen en el diseñador:
+  // tipo, tier/duración, nivel y prioridad. La lista (brand) NO influye —solo define en
+  // qué lista de ClickUp se archiva la tarea— así que no se exige para sugerir.
   const areParamsValid = (typeId: number | undefined, durationDays: string) => {
-    if (!typeId || !durationDays || !brandId || !priority || !level) return false
+    if (!typeId || !durationDays || !priority || !level) return false
     const duration = parseFloat(durationDays)
     return !isNaN(duration) && duration > 0
   }
