@@ -393,8 +393,8 @@ export const SettingsForm: React.FC = () => {
 
   if (isLoading) {
     return (
-      <div className="flex min-h-[60vh] flex-col items-center justify-center gap-4">
-        <BrandSpinner size={64} colorClassName="text-primary-500" />
+      <div className="flex flex-1 flex-col items-center justify-center gap-4">
+        <BrandSpinner size={48} colorClassName="text-primary-500" />
         <span className="text-sm font-medium text-(--color-text-muted)">Loading settings…</span>
       </div>
     );

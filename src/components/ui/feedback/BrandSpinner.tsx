@@ -40,7 +40,7 @@ export interface BrandSpinnerProps {
  * breaks `pathLength` dashing and made the worm split into several segments.
  */
 export function BrandSpinner({ size = 56, colorClassName = 'text-white', className }: BrandSpinnerProps) {
-  const strokeWidth = (2 * VIEWBOX_UNITS) / size; // = 2 screen px in user units
+  const strokeWidth = (1 * VIEWBOX_UNITS) / size; // = 1 screen px in user units
 
   return (
     <span
@@ -56,7 +56,7 @@ export function BrandSpinner({ size = 56, colorClassName = 'text-white', classNa
           d={ISO_OUTLINE}
           fill="none"
           stroke="currentColor"
-          strokeOpacity={0.18}
+          strokeOpacity={0.16}
           strokeWidth={strokeWidth}
           strokeLinejoin="round"
           strokeLinecap="round"

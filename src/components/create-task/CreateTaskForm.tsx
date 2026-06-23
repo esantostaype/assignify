@@ -12,8 +12,7 @@ import React, {
 } from "react";
 import axios from "axios";
 import { Formik, Form, useFormikContext } from "formik";
-import { Button, Typography, LoadingOverlay, Spinner } from "@/components/ui";
-import { Icon, PiSparkle } from "@/lib/icons";
+import { Button, Typography, BrandSpinner } from "@/components/ui";
 import { hotToast as toast } from "@/lib/hotToast";
 import { useQueryClient } from "@tanstack/react-query";
 
@@ -151,8 +150,20 @@ const FormikInactivityReset: FC<FormikInactivityResetProps> = ({
   return null;
 };
 
-// Se monta en la página /create o en el modal interceptado (desktop). `onCreated` lo
-// usa el modal para cerrarse (router.back) tras crear con éxito.
+// Overlay de "ocupado" del formulario: cubre el form con su MISMO color de fondo al 50%
+// (no negro), con el BrandSpinner + texto al centro. Se usa tanto al buscar candidato
+// como al crear la tarea.
+const FormBusyOverlay: FC<{ label: string }> = ({ label }) => (
+  <div className="absolute inset-0 z-20 flex flex-col items-center justify-center gap-4 bg-(--color-surface-card)/50 backdrop-blur-sm">
+    <BrandSpinner size={52} colorClassName="text-primary-500" />
+    <Typography variant="bodySm" className="font-medium">
+      {label}
+    </Typography>
+  </div>
+);
+
+// Se monta en la página /create (desktop: panel fijo de la derecha; mobile: ruta /create).
+// `onCreated` permite avisar al contenedor tras crear con éxito.
 export const CreateTaskForm: FC<{ onCreated?: () => void }> = ({ onCreated }) => {
   const queryClient = useQueryClient();
 
@@ -293,24 +304,12 @@ export const CreateTaskForm: FC<{ onCreated?: () => void }> = ({ onCreated }) =>
     // Contenedor flexible (sin ancho/posición fijos): el ancho/padding los da la página
     // (/create) o el modal interceptado. `relative` para anclar el overlay de búsqueda.
     <div className="relative">
-      <LoadingOverlay open={loading} label="Creating Task..." />
-
-      {/* Bloqueo del formulario mientras el motor busca diseñador: fondo oscuro
-          al 70% + blur, con icono y mensaje al centro. */}
-      {fetchingSuggestion && (
-        <div className="absolute inset-0 z-20 flex flex-col items-center justify-center gap-4 bg-black/70 backdrop-blur-sm">
-          <div className="relative flex items-center justify-center">
-            <Spinner size={48} colorClassName="text-white" />
-            <Icon
-              icon={PiSparkle}
-              size={20}
-              className="absolute text-white"
-            />
-          </div>
-          <Typography variant="bodySm" color="white" className="font-medium">
-            Finding the best match...
-          </Typography>
-        </div>
+      {/* Bloqueo del formulario: mismo color de fondo del form al 50% + blur, con el
+          BrandSpinner y el mensaje al centro. Crear tiene prioridad sobre buscar. */}
+      {loading ? (
+        <FormBusyOverlay label="Creating Task..." />
+      ) : (
+        fetchingSuggestion && <FormBusyOverlay label="Finding the best match..." />
       )}
       <Formik
         initialValues={initialValues}
