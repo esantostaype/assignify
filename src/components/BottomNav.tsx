@@ -12,30 +12,38 @@ interface Item {
   href: string
   label: string
   icon: IconSvgElement
+  /** Hard navigation (<a>) en vez de <Link>: para Types/Lists fuerza una recarga real y así
+   *  EVITA la intercepting route (que en soft-nav abriría el modal). En mobile queremos la
+   *  página, no el modal. */
+  hard?: boolean
 }
 
 const ITEMS: Item[] = [
   { href: '/', label: 'Tasks', icon: Queue01Icon },
   { href: '/team', label: 'Team', icon: UserGroup03Icon },
-  { href: '/types', label: 'Types', icon: SwatchIcon },
-  { href: '/lists', label: 'Lists', icon: Folder01Icon },
+  { href: '/types', label: 'Types', icon: SwatchIcon, hard: true },
+  { href: '/lists', label: 'Lists', icon: Folder01Icon, hard: true },
 ]
 
 const isActive = (pathname: string, href: string) =>
   href === '/' ? pathname === '/' : pathname.startsWith(href)
 
 function NavLink({ item, active }: { item: Item; active: boolean }) {
-  return (
-    <Link
-      href={item.href}
-      className={cn(
-        'flex flex-1 flex-col items-center justify-center gap-1 py-2 text-[11px] font-medium transition-colors',
-        active ? 'text-primary-600' : 'text-(--color-text-muted)',
-      )}
-    >
-      <HugeiconsIcon icon={item.icon} size={22} strokeWidth={active ? 2 : 1.5} />
+  const className = cn(
+    'flex flex-1 flex-col items-center justify-center gap-0.5 py-3 text-xs font-medium transition-colors',
+    active ? 'text-primary-600' : 'text-(--color-text-muted)',
+  )
+  const content = (
+    <>
+      <HugeiconsIcon icon={item.icon} size={20} strokeWidth={1} />
       {item.label}
-    </Link>
+    </>
+  )
+  // Types/Lists usan <a> (recarga real) para ir a la PÁGINA sin disparar el modal interceptado.
+  return item.hard ? (
+    <a href={item.href} className={className}>{content}</a>
+  ) : (
+    <Link href={item.href} className={className}>{content}</Link>
   )
 }
 
@@ -47,16 +55,16 @@ export function BottomNav() {
       <NavLink item={ITEMS[1]} active={isActive(pathname, ITEMS[1].href)} />
 
       {/* Create — acción principal: círculo elevado al centro. */}
-      <div className="relative w-16 shrink-0">
+      <div className="relative w-12 shrink-0">
         <Link
           href="/create"
           aria-label="Create Task"
           className={cn(
-            'absolute -top-5 left-1/2 flex size-14 -translate-x-1/2 items-center justify-center rounded-full bg-primary-600 text-white shadow-lg ring-4 ring-(--color-surface-header) transition-colors hover:bg-primary-700',
+            'absolute -top-5 left-1/2 flex size-10 -translate-x-1/2 items-center justify-center rounded-full bg-primary-600 text-white transition-colors hover:bg-primary-700',
             isActive(pathname, '/create') && 'bg-primary-700',
           )}
         >
-          <HugeiconsIcon icon={Add01Icon} size={26} strokeWidth={2} />
+          <HugeiconsIcon icon={Add01Icon} size={20} strokeWidth={2} />
         </Link>
       </div>
 

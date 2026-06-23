@@ -15,8 +15,9 @@ export default function AppLayout({
   return (
     <Providers>
       <main className="flex">
-        {/* pb en mobile para que el contenido no quede tapado por el bottom nav (fixed). */}
-        <section className="flex-1 h-dvh overflow-y-auto flex flex-col pb-20 lg:pb-0">
+        {/* pb SOLO en mobile (<lg) para que el contenido no quede tapado por el bottom nav
+            (fixed). En desktop no hay barra, así que sin padding (no corta el kanban). */}
+        <section className="flex-1 h-dvh overflow-y-auto flex flex-col max-lg:pb-20">
           <Header />
           {children}
         </section>
