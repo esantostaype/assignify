@@ -11,6 +11,7 @@ import type { NextAuthConfig } from 'next-auth'
 function isPublicPath(pathname: string): boolean {
   return (
     pathname === '/login' ||
+    pathname === '/guide' ||
     pathname.startsWith('/api/auth') ||
     pathname.startsWith('/api/clickup-webhook') ||
     pathname.startsWith('/api/cron')
