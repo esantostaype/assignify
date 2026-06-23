@@ -46,7 +46,7 @@ export const TasksSync: React.FC = () => {
   }
 
   return (
-    <div className="flex flex-col h-full">
+    <div className="flex flex-1 flex-col min-h-0">
       {/* Cabecera unificada (título + buscador). El refresco lo cubre el realtime/webhook;
           el tema vive en el menú de usuario del header. */}
       <PageHeader title="Tasks">
@@ -60,7 +60,7 @@ export const TasksSync: React.FC = () => {
         />
       </PageHeader>
 
-      <div className="flex flex-1 flex-col p-6">
+      <div className="flex flex-1 flex-col p-4 md:p-6 min-h-0">
         <TasksList tasks={tasks} loading={loadingTasks} />
       </div>
     </div>

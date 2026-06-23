@@ -78,7 +78,7 @@ export const TasksList: React.FC<TasksListProps> = ({ tasks, loading = false }) 
 
   if (loading) {
     return (
-      <div className="flex align-baseline gap-4 h-[calc(100dvh-11.375rem)]">
+      <div className="flex flex-1 min-h-0 gap-4 overflow-x-auto">
         {columnOrder.map((column, index) => (
           <div key={column} className="flex flex-[0_0_280px] flex-col overflow-y-auto relative pr-2">
             <div className="sticky top-0 pb-2 flex items-center justify-between z-20 bg-neutral-100">
@@ -123,7 +123,7 @@ export const TasksList: React.FC<TasksListProps> = ({ tasks, loading = false }) 
   }
 
   return (
-    <div className="flex align-baseline gap-4 h-[calc(100dvh-11.375rem)]">
+    <div className="flex flex-1 min-h-0 gap-4 overflow-x-auto">
       {columnOrder.map((column) => {
         const dir = order[column] ?? "asc";
         const list = sortTasks(grouped[column] || [], dir);
