@@ -86,7 +86,7 @@ export function ListsSyncForm() {
         startAdornment={<Icon icon={PiMagnifyingGlass} size={16} />}
       />
 
-      <div className="max-h-[60vh] overflow-auto rounded-lg border border-(--color-border-default)">
+      <div className="max-h-[60vh] overflow-auto rounded-lg border border-(--color-border-default) bg-(--color-surface-card)">
         <table className="w-full text-sm">
           <thead className="sticky top-0 bg-(--color-surface-hover)">
             <tr>

@@ -160,7 +160,7 @@ export const TaskTypesForm: React.FC = () => {
       {/* Existing Types Table */}
       {loading || types.length > 0 ? (
         <div>
-          <div className="border border-(--color-border-default) rounded-lg overflow-hidden">
+          <div className="overflow-hidden rounded-lg border border-(--color-border-default) bg-(--color-surface-card)">
             <table className="w-full text-sm">
               <thead className="bg-(--color-surface-hover)">
                 <tr>
