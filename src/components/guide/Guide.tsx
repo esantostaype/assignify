@@ -11,6 +11,7 @@ import { ThemeToggle } from '@/components/ThemeToggle'
 import { Icon, PiArrowRight, PiGlobe, PiCheck } from '@/lib/icons'
 import { useGuide, type Lang } from './i18n'
 import { WorkedExample } from './WorkedExample'
+import { LoginFlow, SetupMocks, SettingsMock, CriteriaFlow, CreateFlow } from './mocks'
 
 const SECTION_IDS = ['login', 'setup', 'settings', 'criteria', 'example', 'create'] as const
 
@@ -185,21 +186,9 @@ export function Guide() {
             {/* 1 · Login */}
             <section id="login" className="scroll-mt-24">
               <SectionHead index={1} title={t.login.title} lead={t.login.lead} />
-              <ol className="space-y-4">
-                {t.login.steps.map((s, i) => (
-                  <Reveal key={i} delay={i * 0.06}>
-                    <li className="flex gap-4 rounded-2xl border border-(--color-border-default) bg-(--color-surface-card) p-5">
-                      <span className="grid size-9 shrink-0 place-items-center rounded-full bg-primary-500/12 text-sm font-bold text-primary-500">
-                        {i + 1}
-                      </span>
-                      <div>
-                        <h3 className="font-semibold text-(--color-text-strong)">{s.title}</h3>
-                        <p className="mt-1 text-sm leading-relaxed text-(--color-text-muted)">{s.body}</p>
-                      </div>
-                    </li>
-                  </Reveal>
-                ))}
-              </ol>
+              <Reveal>
+                <LoginFlow />
+              </Reveal>
               <Reveal delay={0.1}>
                 <p className="mt-5 rounded-xl border border-dashed border-(--color-border-default) px-4 py-3 text-sm text-(--color-text-muted)">
                   💡 {t.login.note}
@@ -210,17 +199,14 @@ export function Guide() {
             {/* 2 · Setup */}
             <section id="setup" className="scroll-mt-24">
               <SectionHead index={2} title={t.setup.title} lead={t.setup.lead} />
-              <div className="grid gap-4 sm:grid-cols-3">
+              <Reveal>
+                <SetupMocks />
+              </Reveal>
+              <div className="mt-4 grid gap-4 sm:grid-cols-3">
                 {t.setup.items.map((it, i) => (
-                  <Reveal key={i} delay={i * 0.08}>
-                    <div className="h-full rounded-2xl border border-(--color-border-default) bg-(--color-surface-card) p-5">
-                      <span className="inline-block rounded-md bg-primary-500/12 px-2 py-0.5 text-xs font-semibold text-primary-500">
-                        {it.tag}
-                      </span>
-                      <h3 className="mt-3 font-semibold text-(--color-text-strong)">{it.title}</h3>
-                      <p className="mt-1.5 text-sm leading-relaxed text-(--color-text-muted)">{it.body}</p>
-                    </div>
-                  </Reveal>
+                  <p key={i} className="text-sm leading-relaxed text-(--color-text-muted)">
+                    {it.body}
+                  </p>
                 ))}
               </div>
             </section>
@@ -228,6 +214,9 @@ export function Guide() {
             {/* 3 · Settings */}
             <section id="settings" className="scroll-mt-24">
               <SectionHead index={3} title={t.settings.title} lead={t.settings.lead} />
+              <Reveal className="mb-6">
+                <SettingsMock />
+              </Reveal>
               <div className="space-y-4">
                 {t.settings.groups.map((g, i) => (
                   <Reveal key={i} delay={i * 0.05}>
@@ -251,6 +240,9 @@ export function Guide() {
             {/* 4 · Criteria */}
             <section id="criteria" className="scroll-mt-24">
               <SectionHead index={4} title={t.criteria.title} lead={t.criteria.lead} />
+              <Reveal className="mb-8">
+                <CriteriaFlow />
+              </Reveal>
               <div className="grid gap-8 lg:grid-cols-2">
                 <Reveal>
                   <div className="rounded-2xl border border-(--color-border-default) bg-(--color-surface-card) p-5">
@@ -300,6 +292,9 @@ export function Guide() {
             {/* 6 · Create */}
             <section id="create" className="scroll-mt-24">
               <SectionHead index={6} title={t.create.title} lead={t.create.lead} />
+              <Reveal className="mb-6">
+                <CreateFlow />
+              </Reveal>
               <div className="grid gap-3 sm:grid-cols-2">
                 {t.create.fields.map((f, i) => (
                   <Reveal key={i} delay={i * 0.04}>
