@@ -701,12 +701,14 @@ html[data-sidebar="collapsed"] .sidebar-group-header {
 .hot-toast-enter-right { animation: hot-toast-enter-right 0.35s cubic-bezier(0.21, 1.02, 0.73, 1) both; }
 .hot-toast-leave-right { animation: hot-toast-leave-right 0.4s  cubic-bezier(0.06, 0.71, 0.55, 1) forwards; }
 
-/* ─── BrandSpinner — orbiting "worm" ──────────────────────────────────────────
-   One full revolution per iteration. The ease-in-out timing function (applied
-   on the animation declaration in BrandSpinner.tsx) makes the worm accelerate
-   out of each lap and decelerate as it nears completing the turn. */
-@keyframes bsWormSpin {
-  to { transform: rotate(360deg); }
+/* ─── BrandSpinner — worm tracing the isotype's contour ───────────────────────
+   Shifts the dash one full path-length per iteration so the short visible
+   segment travels all the way around the mark's outline. The ease-in-out timing
+   (declared in BrandSpinner.tsx) accelerates the worm out of each lap and
+   decelerates it near completion; offset -100 ≡ 0 (mod pathLength) so the loop
+   restart is seamless. */
+@keyframes bsWormDraw {
+  to { stroke-dashoffset: -100; }
 }
 
 /* ─── Dev Mode — inspect disabled / non-interactive nodes ──────────────────────
