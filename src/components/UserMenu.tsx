@@ -31,8 +31,10 @@ export const UserMenu = () => {
     Promise.resolve(logout()).catch((error) => console.error('Logout failed:', error))
   }
 
+  // Hover con esquinas redondeadas y MÁS TENUE; el wrapper px-1.5 le da margen lateral
+  // para que el hover no toque los bordes del panel.
   const itemCls =
-    'flex w-full items-center gap-2.5 px-3 py-2.5 text-left text-sm font-medium text-(--color-text-default) transition-colors hover:bg-(--color-surface-hover)'
+    'flex w-full items-center gap-2.5 rounded-md px-2.5 py-2 text-left text-sm font-medium text-(--color-text-default) transition-colors hover:bg-(--color-text-muted)/[0.07]'
 
   return (
     <>
@@ -58,45 +60,50 @@ export const UserMenu = () => {
 
             <div className="my-1 border-t border-neutral-200" />
 
-            {/* Dark mode (switch) */}
-            <div className="flex items-center justify-between gap-2 px-3 py-2.5">
-              <span className="flex items-center gap-2.5 text-sm font-medium text-(--color-text-default)">
-                <Icon icon={PiMoon} size={16} />
-                Dark mode
-              </span>
-              <Switch
-                size="sm"
-                checked={theme === 'dark'}
-                onChange={(e) => setTheme(e.target.checked ? 'dark' : 'light')}
-              />
+            {/* Acciones (margen lateral via px-1.5 → el hover no toca los bordes) */}
+            <div className="flex flex-col gap-0.5 px-1.5">
+              {/* Dark mode (switch) */}
+              <div className="flex items-center justify-between gap-2 px-2.5 py-2">
+                <span className="flex items-center gap-2.5 text-sm font-medium text-(--color-text-default)">
+                  <Icon icon={PiMoon} size={16} />
+                  Dark mode
+                </span>
+                <Switch
+                  size="sm"
+                  checked={theme === 'dark'}
+                  onChange={(e) => setTheme(e.target.checked ? 'dark' : 'light')}
+                />
+              </div>
+
+              {/* Profile → ClickUp (pestaña nueva) */}
+              <a href={clickupProfileUrl} target="_blank" rel="noopener noreferrer" onClick={close} className={itemCls}>
+                <Icon icon={PiUser} size={16} />
+                Profile
+              </a>
+
+              {/* Settings → página */}
+              <Link href="/settings" onClick={close} className={itemCls}>
+                <Icon icon={PiGear} size={16} />
+                Settings
+              </Link>
             </div>
-
-            {/* Profile → ClickUp (pestaña nueva) */}
-            <a href={clickupProfileUrl} target="_blank" rel="noopener noreferrer" onClick={close} className={itemCls}>
-              <Icon icon={PiUser} size={16} />
-              Profile
-            </a>
-
-            {/* Settings → página */}
-            <Link href="/settings" onClick={close} className={itemCls}>
-              <Icon icon={PiGear} size={16} />
-              Settings
-            </Link>
 
             <div className="my-1 border-t border-neutral-200" />
 
             {/* Sign out */}
-            <button
-              type="button"
-              onClick={() => {
-                close()
-                setLogoutOpen(true)
-              }}
-              className={cn(itemCls, 'text-error-600 hover:bg-error-500/10')}
-            >
-              <Icon icon={PiSignOut} size={16} />
-              Sign out
-            </button>
+            <div className="px-1.5 pb-0.5">
+              <button
+                type="button"
+                onClick={() => {
+                  close()
+                  setLogoutOpen(true)
+                }}
+                className={cn(itemCls, 'text-error-600 hover:bg-error-500/10')}
+              >
+                <Icon icon={PiSignOut} size={16} />
+                Sign out
+              </button>
+            </div>
           </div>
         )}
       </Dropdown>

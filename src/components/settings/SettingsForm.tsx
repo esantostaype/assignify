@@ -13,10 +13,11 @@ import {
   Spinner,
   AlertDialog,
   Select,
-  Card,
   FormField,
 } from "@/components/ui";
 import { cn } from "@/lib/cn";
+import { HugeiconsIcon } from "@hugeicons/react";
+import { Clock01Icon, Target02Icon, CheckmarkCircle01Icon, Layers01Icon } from "@hugeicons/core-free-icons";
 import {
   Icon,
   PiGear,
@@ -412,10 +413,10 @@ export const SettingsForm: React.FC = () => {
   // Pestañas: los 3 grupos de settings + "Tier durations". Lista vertical a la izquierda
   // (~30%) y los campos de la sección activa a la derecha.
   const TABS = [
-    { id: "work_schedule", label: "Work schedule", desc: "Working hours, lunch & timezone" },
-    { id: "task_assignment", label: "Task assignment", desc: "Assignment engine thresholds" },
-    { id: "approvals", label: "Approvals", desc: "Auto-complete delivered tasks" },
-    { id: "tiers", label: "Tier durations", desc: "Default duration per tier" },
+    { id: "work_schedule", label: "Work schedule", desc: "Working hours, lunch & timezone", icon: Clock01Icon },
+    { id: "task_assignment", label: "Task assignment", desc: "Assignment engine thresholds", icon: Target02Icon },
+    { id: "approvals", label: "Approvals", desc: "Auto-complete delivered tasks", icon: CheckmarkCircle01Icon },
+    { id: "tiers", label: "Tier durations", desc: "Default duration per tier", icon: Layers01Icon },
   ] as const;
   const activeInfo = TABS.find((t) => t.id === activeTab) ?? TABS[0];
   const activeGroup = filteredSettings.find(([g]) => g === activeTab);
@@ -425,8 +426,9 @@ export const SettingsForm: React.FC = () => {
   return (
     <>
       <div className="flex flex-col gap-6 md:flex-row md:items-start">
-        {/* Tabs (vertical en desktop; fila horizontal scrollable en mobile) */}
-        <nav className="flex gap-1.5 overflow-x-auto pb-1 md:w-1/3 md:max-w-[260px] md:shrink-0 md:flex-col md:overflow-visible md:pb-0">
+        {/* Tabs (vertical en desktop con línea separadora; fila horizontal en mobile).
+            Hover muy tenue; el activo se marca solo con fondo (sin barra lateral). */}
+        <nav className="flex gap-1 overflow-x-auto pb-1 md:w-1/4 md:min-w-[210px] md:shrink-0 md:flex-col md:overflow-visible md:border-r md:border-(--color-border-default) md:pb-0 md:pr-4">
           {TABS.map((t) => {
             const active = t.id === activeTab;
             return (
@@ -435,24 +437,25 @@ export const SettingsForm: React.FC = () => {
                 type="button"
                 onClick={() => setActiveTab(t.id)}
                 className={cn(
-                  "shrink-0 rounded-lg border px-3 py-2.5 text-left transition-colors md:w-full",
+                  "flex shrink-0 items-center gap-2.5 rounded-md px-3 py-2.5 text-left transition-colors md:w-full",
                   active
-                    ? "border-primary-500/40 bg-primary-500/10"
-                    : "border-transparent hover:bg-(--color-surface-hover)",
+                    ? "bg-(--color-text-muted)/[0.10] text-(--color-text-strong)"
+                    : "text-(--color-text-default) hover:bg-(--color-text-muted)/[0.05]",
                 )}
               >
-                <div className={cn("text-sm font-semibold", active ? "text-(--color-text-strong)" : "text-(--color-text-default)")}>
-                  {t.label}
+                <HugeiconsIcon icon={t.icon} size={18} strokeWidth={1.5} className="shrink-0" />
+                <div className="min-w-0">
+                  <div className="text-sm font-medium">{t.label}</div>
+                  <div className="hidden truncate text-xs text-(--color-text-muted) md:block">{t.desc}</div>
                 </div>
-                <div className="hidden text-xs text-(--color-text-muted) md:block">{t.desc}</div>
               </button>
             );
           })}
         </nav>
 
-        {/* Panel de la sección activa */}
-        <div className="min-w-0 flex-1">
-          <Card variant="outlined" padding="lg" className="flex flex-col gap-5">
+        {/* Panel de la sección activa (sin card; separado por la línea vertical del nav) */}
+        <div className="min-w-0 flex-1 md:pl-6">
+          <div className="flex flex-col gap-5">
             <div>
               <h3 className="text-base font-semibold text-(--color-text-strong)">{activeInfo.label}</h3>
               <p className="text-sm text-(--color-text-muted)">{activeInfo.desc}</p>
@@ -518,7 +521,7 @@ export const SettingsForm: React.FC = () => {
                   })}
               </div>
             ) : null}
-          </Card>
+          </div>
 
           {/* Acciones */}
           <div className="mt-4 flex items-center justify-between gap-3">
