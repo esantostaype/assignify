@@ -66,7 +66,17 @@ export const ClickUpUsersSync: React.FC = () => {
   })
 
   // Computed values
-  const clickupUsers = usersData?.clickupUsers || []
+  const clickupUsers = useMemo(() => usersData?.clickupUsers || [], [usersData])
+
+  // Mapa email → avatar (foto/iniciales/color) de los datos VIVOS de ClickUp, para pintar
+  // la foto de perfil en el timeline de capacidad (el workload de la DB no la trae).
+  const avatarByEmail = useMemo(() => {
+    const m = new Map<string, { src?: string; initials: string; color: string }>()
+    clickupUsers.forEach((u) =>
+      m.set(u.email, { src: u.profilePicture || undefined, initials: u.initials, color: u.color }),
+    )
+    return m
+  }, [clickupUsers])
   
   const filteredUsers = useMemo(() => {
     return clickupUsers.filter((user) => {
@@ -132,7 +142,7 @@ export const ClickUpUsersSync: React.FC = () => {
       />
 
       <div className="p-4 md:p-6 flex-1 flex flex-col gap-8">
-        <CapacityTimeline workload={workload} loading={workloadLoading} />
+        <CapacityTimeline workload={workload} loading={workloadLoading} avatars={avatarByEmail} />
 
         <UsersList
           users={filteredUsers}

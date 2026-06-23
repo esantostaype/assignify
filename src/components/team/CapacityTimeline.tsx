@@ -9,7 +9,7 @@
 // DAY (10:00–19:00) to the column width, so a 4h task fills ~half a column (not a full
 // day) and a full work day fills the column (minus a small padding).
 import React, { useMemo, useRef, useEffect } from "react";
-import { Card, Tooltip, Skeleton } from "@/components/ui";
+import { Card, Tooltip, Skeleton, Avatar } from "@/components/ui";
 import { Icon, PiCalendarBlank } from "@/lib/icons";
 import type { UserWorkload, PendingTaskBar } from "@/hooks/queries/useWorkload";
 import usHolidays from "@/data/usHolidays.json";
@@ -21,7 +21,6 @@ const FUTURE_DAYS = 60; // up to 2 months ahead
 const WEEK_H = 22; // week-number row height
 const HEADER_H = 38; // day-header row height
 const ROW_H = 34;
-const NAME_W = 200;
 const BAR_PAD = 2; // px inset of a work day inside its column (10:00 .. 19:00)
 // Local work-day bounds (hours) used to map a task's time to a position inside its day.
 // Inszone: 10:00–19:00 local. (If made fully multi-tenant, pass these from settings.)
@@ -120,9 +119,11 @@ interface ShadeBlock extends Block {
 interface CapacityTimelineProps {
   workload: UserWorkload[];
   loading?: boolean;
+  /** Mapa email → avatar (foto/iniciales/color) de ClickUp, para la columna de nombres. */
+  avatars?: Map<string, { src?: string; initials: string; color: string }>;
 }
 
-export const CapacityTimeline: React.FC<CapacityTimelineProps> = ({ workload, loading }) => {
+export const CapacityTimeline: React.FC<CapacityTimelineProps> = ({ workload, loading, avatars }) => {
   const scrollRef = useRef<HTMLDivElement>(null);
   const drag = useRef({ active: false, startX: 0, startScroll: 0 });
 
@@ -289,34 +290,41 @@ export const CapacityTimeline: React.FC<CapacityTimelineProps> = ({ workload, lo
 
       <Card variant="outlined" padding="none" className="mt-3 flex overflow-hidden">
         {/* Names column (fixed; doesn't scroll). Vertical separator = card border. */}
-        <div className="shrink-0 z-20 border-r border-(--color-border-default) px-4" style={{ width: NAME_W }}>
+        <div className="shrink-0 z-20 w-12 border-r border-(--color-border-default) px-2 md:w-[200px] md:px-4">
           {/* full-header spacer; the only horizontal line here sits ABOVE the rows
               (not above the names). */}
           <div style={{ height: WEEK_H + HEADER_H }} />
           {displayRows.map((u, i) => (
-            <div key={u?.id ?? `s${i}`} className="flex items-center justify-between gap-2" style={{ height: ROW_H }}>
+            <div
+              key={u?.id ?? `s${i}`}
+              className="flex items-center justify-center gap-2 md:justify-start"
+              style={{ height: ROW_H }}
+            >
               {u ? (
                 <>
-                  <span className="truncate text-sm text-(--color-text-default)" title={u.name}>
+                  {/* Foto de perfil (24px). En mobile es lo único que se muestra (sin nombre)
+                      para dejar más ancho al gantt. */}
+                  {(() => {
+                    const a = avatars?.get(u.email);
+                    return (
+                      <Avatar
+                        size="xs"
+                        src={a?.src}
+                        alt={u.name}
+                        style={a?.color ? { backgroundColor: a.color, color: "#fff" } : undefined}
+                      >
+                        {a?.initials ?? u.name.slice(0, 2).toUpperCase()}
+                      </Avatar>
+                    );
+                  })()}
+                  <span className="hidden truncate text-sm text-(--color-text-default) md:inline" title={u.name}>
                     {u.name}
-                  </span>
-                  <span className="shrink-0 text-[11px] text-(--color-text-muted)">
-                    {u.status === "on_vacation" ? (
-                      <span className="flex items-center gap-1">
-                        <Icon icon={PiCalendarBlank} size={12} className="text-warning-500" />
-                        Off
-                      </span>
-                    ) : u.taskCount === 0 ? (
-                      <span className="text-success-600">Free</span>
-                    ) : (
-                      `${u.taskCount}t`
-                    )}
                   </span>
                 </>
               ) : (
                 <>
-                  <Skeleton variant="text" width="55%" />
-                  <Skeleton variant="text" width={18} />
+                  <Skeleton variant="circle" width={24} height={24} />
+                  <Skeleton variant="text" width="60%" className="hidden md:block" />
                 </>
               )}
             </div>
