@@ -20,7 +20,7 @@ const PAST_DAYS = 60; // up to 2 months back
 const FUTURE_DAYS = 60; // up to 2 months ahead
 const WEEK_H = 22; // week-number row height
 const HEADER_H = 38; // day-header row height
-const ROW_H = 34;
+const ROW_H = 52;
 const BAR_PAD = 2; // px inset of a work day inside its column (10:00 .. 19:00)
 // Local work-day bounds (hours) used to map a task's time to a position inside its day.
 // Inszone: 10:00–19:00 local. (If made fully multi-tenant, pass these from settings.)
@@ -257,16 +257,21 @@ export const CapacityTimeline: React.FC<CapacityTimelineProps> = ({ workload, lo
 
   const header = (
     <div className="flex flex-wrap items-center justify-between gap-2">
-      {/* Mismo estilo que el título "Synced" de la lista de miembros (text-lg semibold). */}
+      {/* Mismo estilo que el título "Synced" de la lista de miembros (text-lg semibold).
+          La leyenda de prioridades va ABAJO del gantt (igual que en la guía). */}
       <h2 className="text-lg font-semibold text-(--color-text-strong)">Team capacity</h2>
-      <div className="flex items-center gap-3 text-[11px] text-(--color-text-muted)">
-        {(Object.keys(PRIORITY_LABEL) as PendingTaskBar["priority"][]).map((p) => (
-          <span key={p} className="flex items-center gap-1">
-            <span className={`inline-block size-2.5 rounded-sm ${PRIORITY_BAR[p]}`} />
-            {PRIORITY_LABEL[p]}
-          </span>
-        ))}
-      </div>
+    </div>
+  );
+
+  // Leyenda de prioridades (se renderiza debajo del Card).
+  const legend = (
+    <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 px-1">
+      {(["NORMAL", "LOW", "HIGH", "URGENT"] as PendingTaskBar["priority"][]).map((p) => (
+        <span key={p} className="inline-flex items-center gap-1.5 text-[11px] text-(--color-text-muted)">
+          <span className={`size-2.5 rounded-full ${PRIORITY_BAR[p]}`} />
+          {PRIORITY_LABEL[p]}
+        </span>
+      ))}
     </div>
   );
 
@@ -447,7 +452,7 @@ export const CapacityTimeline: React.FC<CapacityTimelineProps> = ({ workload, lo
                           }
                         >
                           <div
-                            className={`absolute inset-y-2 rounded ${PRIORITY_BAR[t.priority]}`}
+                            className={`absolute top-1/2 h-8 -translate-y-1/2 rounded-md ${PRIORITY_BAR[t.priority]}`}
                             style={{ left, width: Math.max(right - left, 6) }}
                           />
                         </Tooltip>
@@ -471,6 +476,7 @@ export const CapacityTimeline: React.FC<CapacityTimelineProps> = ({ workload, lo
           </div>
         </div>
       </Card>
+      {legend}
     </div>
   );
 };
