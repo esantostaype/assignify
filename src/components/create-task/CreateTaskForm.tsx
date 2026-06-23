@@ -151,7 +151,9 @@ const FormikInactivityReset: FC<FormikInactivityResetProps> = ({
   return null;
 };
 
-export const CreateTaskForm: FC = () => {
+// Se monta en la página /create o en el modal interceptado (desktop). `onCreated` lo
+// usa el modal para cerrarse (router.back) tras crear con éxito.
+export const CreateTaskForm: FC<{ onCreated?: () => void }> = ({ onCreated }) => {
   const queryClient = useQueryClient();
 
   const { types, brands, users, tiers, durationUnit, loading: dataLoading } = useTaskData();
@@ -258,6 +260,8 @@ export const CreateTaskForm: FC = () => {
       // Limpia el formulario por completo: valores de Formik + estado local.
       resetForm();
       resetLocalState();
+      // En modal/página: avisar al contenedor (p.ej. cerrar el modal y volver atrás).
+      onCreated?.();
     } catch (error: unknown) {
       setLoading(false);
       if (axios.isAxiosError(error) && error.response?.data?.error) {
@@ -286,7 +290,9 @@ export const CreateTaskForm: FC = () => {
   };
 
   return (
-    <aside className="bg-(--color-surface-card) sticky w-[28rem] p-10 h-dvh overflow-y-auto top-0 border-l border-l-(--color-border-default)">
+    // Contenedor flexible (sin ancho/posición fijos): el ancho/padding los da la página
+    // (/create) o el modal interceptado. `relative` para anclar el overlay de búsqueda.
+    <div className="relative">
       <LoadingOverlay open={loading} label="Creating Task..." />
 
       {/* Bloqueo del formulario mientras el motor busca diseñador: fondo oscuro
@@ -461,6 +467,6 @@ export const CreateTaskForm: FC = () => {
           );
         }}
       </Formik>
-    </aside>
+    </div>
   );
 };
