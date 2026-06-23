@@ -5,7 +5,7 @@
 import { Skeleton } from '@/components/ui'
 
 export const MemberCardSkeleton = () => (
-  <div className="p-4 rounded-lg relative flex flex-col gap-3 justify-between bg-(--color-surface-header)">
+  <div className="p-4 rounded-lg relative flex flex-col gap-4 justify-between bg-(--color-surface-header)">
     {/* Cabecera: avatar + nombre/puesto + botón editar */}
     <div className="flex items-start gap-3">
       <Skeleton variant="circle" width={44} height={44} />

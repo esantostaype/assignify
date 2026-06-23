@@ -131,7 +131,7 @@ export const ClickUpUsersSync: React.FC = () => {
         onSearchChange={setSearchFilter}
       />
 
-      <div className="p-6 flex-1 flex flex-col gap-8">
+      <div className="p-4 md:p-6 flex-1 flex flex-col gap-8">
         <CapacityTimeline workload={workload} loading={workloadLoading} />
 
         <UsersList

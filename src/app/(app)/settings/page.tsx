@@ -10,7 +10,7 @@ export default function PageSettings() {
       </div>
       {/* flex-1 en toda la cadena para que el estado de carga del form se centre en el
           área de contenido (no en todo el alto del site). */}
-      <div className="flex flex-1 flex-col p-6">
+      <div className="flex flex-1 flex-col p-4 md:p-6">
         <div className="mx-auto flex w-full max-w-4xl flex-1 flex-col">
           <SettingsForm />
         </div>

@@ -7,7 +7,7 @@ export default function ListsPage() {
   return (
     <div className="flex flex-col">
       <PageHeader title="Assignable Lists" />
-      <div className="p-6">
+      <div className="p-4 md:p-6">
         <div className="mx-auto w-full max-w-2xl">
           <ListsSyncForm />
         </div>

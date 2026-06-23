@@ -17,9 +17,9 @@ export const Header = () => {
   ]
 
   return (
-    <header className="sticky top-0 z-[60] flex h-16 items-center justify-between border-b border-b-(--color-border-default) bg-(--color-surface-header) px-4">
+    <header className="sticky top-0 z-[60] flex items-center justify-between border-b border-b-(--color-border-default) bg-(--color-surface-header) px-4">
       <div className="flex items-center gap-4">
-        <Logo width={132} height={38} />
+        <Logo width={132} height={38} className="h-[63px]" />
         {/* Nav horizontal solo en desktop (<lg manda el bottom nav de mobile). */}
         <ul className="hidden items-center gap-3 text-sm mb-[-1px] lg:flex">
           {navItems.map((item, index) => (

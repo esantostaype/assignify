@@ -442,7 +442,7 @@ export const SettingsForm: React.FC = () => {
 
   return (
     <>
-      <div className="flex flex-col gap-6 py-8 md:flex-row md:items-start md:gap-12">
+      <div className="flex flex-col gap-6 md:py-8 md:flex-row md:items-start md:gap-12">
         {/* Mobile (<md): el rail colapsa en un dropdown que muestra el tab activo + un menú
             con todos (misma idea que el overflow→dropdown del componente Tabs). */}
         <div ref={navMenuRef} className="relative md:hidden">

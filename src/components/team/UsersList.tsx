@@ -61,7 +61,7 @@ export const UsersList: React.FC<UsersListProps> = ({
     return (
       <div className="flex flex-col gap-8">
         <section>
-          <h2 className="mb-4 text-lg font-semibold text-(--color-text-strong)">
+          <h2 className="mb-3 text-lg font-semibold text-(--color-text-strong)">
             Synced
           </h2>
           <div className="grid grid-cols-1 gap-4 md:grid-cols-1 lg:grid-cols-2 xl:grid-cols-3">
@@ -71,7 +71,7 @@ export const UsersList: React.FC<UsersListProps> = ({
           </div>
         </section>
         <section>
-          <h2 className="mb-4 text-lg font-semibold text-(--color-text-strong)">
+          <h2 className="mb-3 text-lg font-semibold text-(--color-text-strong)">
             Available to sync
           </h2>
           <div className="grid grid-cols-[repeat(auto-fill,minmax(260px,1fr))] gap-3">
