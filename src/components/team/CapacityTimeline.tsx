@@ -47,6 +47,26 @@ const PRIORITY_LABEL: Record<PendingTaskBar["priority"], string> = {
 // Diagonal stripes from a translucent COLOR (consistent in light & dark, unlike fixed
 // black). Painted per CONTIGUOUS block (not per day) so the pattern never breaks between
 // e.g. Saturday and Sunday. Each band uses its own hue.
+// Reparte tareas que SE SOLAPAN (corren en paralelo: p.ej. un High/Urgent sobre un Normal)
+// en "sub-carriles" apilados, para que las barras no queden una encima de otra. Cada lane es
+// la primera fila libre donde la tarea no se solapa con la anterior de esa fila.
+function allocLanes(items: { l: number; r: number }[]): { lane: number[]; count: number } {
+  const order = items.map((it, i) => ({ i, l: it.l, r: it.r })).sort((a, b) => a.l - b.l);
+  const ends: number[] = [];
+  const lane = new Array(items.length).fill(0) as number[];
+  for (const it of order) {
+    let k = ends.findIndex((end) => it.l >= end);
+    if (k === -1) {
+      k = ends.length;
+      ends.push(it.r);
+    } else {
+      ends[k] = it.r;
+    }
+    lane[it.i] = k;
+  }
+  return { lane, count: Math.max(1, ends.length) };
+}
+
 const stripes = (rgba: string) =>
   `repeating-linear-gradient(45deg, transparent, transparent 3px, ${rgba} 3px, ${rgba} 6px)`;
 const WEEKEND_STRIPES = stripes("rgba(148,163,184,0.20)"); // slate
@@ -263,9 +283,9 @@ export const CapacityTimeline: React.FC<CapacityTimelineProps> = ({ workload, lo
     </div>
   );
 
-  // Leyenda de prioridades (se renderiza debajo del Card).
+  // Leyenda de prioridades (va DENTRO del Card, al fondo, como en la guía).
   const legend = (
-    <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 px-1">
+    <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 border-t border-(--color-border-default) px-3 py-2.5">
       {(["NORMAL", "LOW", "HIGH", "URGENT"] as PendingTaskBar["priority"][]).map((p) => (
         <span key={p} className="inline-flex items-center gap-1.5 text-[11px] text-(--color-text-muted)">
           <span className={`size-2.5 rounded-full ${PRIORITY_BAR[p]}`} />
@@ -293,7 +313,8 @@ export const CapacityTimeline: React.FC<CapacityTimelineProps> = ({ workload, lo
     <div className="space-y-3">
       {header}
 
-      <Card variant="outlined" padding="none" className="mt-3 flex overflow-hidden">
+      <Card variant="outlined" padding="none" className="mt-3 flex flex-col overflow-hidden">
+        <div className="flex">
         {/* Names column (fixed; doesn't scroll). Vertical separator = card border. */}
         <div className="shrink-0 z-20 w-12 border-r border-(--color-border-default) px-2 md:w-[200px] md:px-4">
           {/* full-header spacer; the only horizontal line here sits ABOVE the rows
@@ -302,7 +323,7 @@ export const CapacityTimeline: React.FC<CapacityTimelineProps> = ({ workload, lo
           {displayRows.map((u, i) => (
             <div
               key={u?.id ?? `s${i}`}
-              className="flex items-center justify-center gap-2 md:justify-start"
+              className="flex items-center justify-center gap-2.5 border-b border-(--color-border-default) last:border-b-0 md:justify-start"
               style={{ height: ROW_H }}
             >
               {u ? (
@@ -313,7 +334,7 @@ export const CapacityTimeline: React.FC<CapacityTimelineProps> = ({ workload, lo
                     const a = avatars?.get(u.email);
                     return (
                       <Avatar
-                        size="xs"
+                        size="sm"
                         src={a?.src}
                         alt={u.name}
                         style={a?.color ? { backgroundColor: a.color, color: "#fff" } : undefined}
@@ -322,14 +343,23 @@ export const CapacityTimeline: React.FC<CapacityTimelineProps> = ({ workload, lo
                       </Avatar>
                     );
                   })()}
-                  <span className="hidden truncate text-sm text-(--color-text-default) md:inline" title={u.name}>
-                    {u.name}
-                  </span>
+                  <div className="hidden min-w-0 md:block">
+                    <div className="truncate text-sm font-medium text-(--color-text-strong)" title={u.name}>
+                      {u.name}
+                    </div>
+                    <div className="truncate text-[11px] text-(--color-text-muted)">
+                      {u.level}
+                      {u.roles[0] ? ` · ${u.roles[0]}` : ""}
+                    </div>
+                  </div>
                 </>
               ) : (
                 <>
-                  <Skeleton variant="circle" width={24} height={24} />
-                  <Skeleton variant="text" width="60%" className="hidden md:block" />
+                  <Skeleton variant="circle" width={32} height={32} />
+                  <div className="hidden min-w-0 flex-1 md:block">
+                    <Skeleton variant="text" width="70%" />
+                    <Skeleton variant="text" width="45%" className="mt-1.5" />
+                  </div>
                 </>
               )}
             </div>
@@ -418,11 +448,11 @@ export const CapacityTimeline: React.FC<CapacityTimelineProps> = ({ workload, lo
 
               {/* Rows: one per designer (en carga: filas vacías, sin barras). */}
               {displayRows.map((u, i) => {
-                if (!u) return <div key={`s${i}`} className="relative" style={{ height: ROW_H }} />;
+                if (!u) return <div key={`s${i}`} className="relative border-b border-(--color-border-default) last:border-b-0" style={{ height: ROW_H }} />;
                 const vacs = [...(u.currentVacation ? [u.currentVacation] : []), ...u.upcomingVacations];
                 const vBlocks = vacationBlocks(vacs);
                 return (
-                  <div key={u.id} className="relative" style={{ height: ROW_H }}>
+                  <div key={u.id} className="relative border-b border-(--color-border-default) last:border-b-0" style={{ height: ROW_H }}>
                     {/* Vacation bands (working days only → don't overlap holiday/weekend). */}
                     {vBlocks.map((b, i) => (
                       <Tooltip key={`v${i}`} content={`Vacation · ${fmt(days[b.startIdx].ts)} – ${fmt(days[b.startIdx + b.len - 1].ts)}`}>
@@ -433,31 +463,47 @@ export const CapacityTimeline: React.FC<CapacityTimelineProps> = ({ workload, lo
                       </Tooltip>
                     ))}
 
-                    {/* Task bars: positioned/sized over the WORK DAY (real duration). */}
-                    {u.pendingTasks.map((t, i) => {
-                      const left = Math.max(0, xOfWork(t.startDate));
-                      const right = Math.min(trackW, xOfWork(t.dueDate));
-                      if (right <= left) return null;
-                      return (
+                    {/* Task bars over the WORK DAY (real duration). Las que SE SOLAPAN
+                        (paralelas: High/Urgent sobre Normal) se apilan en sub-carriles
+                        delgados separados 2px en vez de encimarse. */}
+                    {(() => {
+                      const bars = u.pendingTasks
+                        .map((t) => ({
+                          t,
+                          left: Math.max(0, xOfWork(t.startDate)),
+                          right: Math.min(trackW, xOfWork(t.dueDate)),
+                        }))
+                        .filter((b) => b.right > b.left);
+                      const { lane, count } = allocLanes(bars.map((b) => ({ l: b.left, r: b.right })));
+                      const GAP = 2;
+                      const usableH = ROW_H - 12;
+                      const barH = Math.min(18, (usableH - (count - 1) * GAP) / count);
+                      const top0 = (ROW_H - (count * barH + (count - 1) * GAP)) / 2;
+                      return bars.map((b, idx) => (
                         <Tooltip
-                          key={`t${i}`}
+                          key={`t${idx}`}
                           content={
                             <span className="flex flex-col gap-0.5">
-                              <span className="font-semibold leading-tight">{t.name}</span>
+                              <span className="font-semibold leading-tight">{b.t.name}</span>
                               <span className="flex items-center gap-1.5 opacity-80">
                                 <Icon icon={PiCalendarBlank} size={12} />
-                                {rangeLabel(t.startDate, t.dueDate)}
+                                {rangeLabel(b.t.startDate, b.t.dueDate)}
                               </span>
                             </span>
                           }
                         >
                           <div
-                            className={`absolute top-1/2 h-8 -translate-y-1/2 rounded-md ${PRIORITY_BAR[t.priority]}`}
-                            style={{ left, width: Math.max(right - left, 6) }}
+                            className={`absolute rounded ${PRIORITY_BAR[b.t.priority]}`}
+                            style={{
+                              left: b.left,
+                              width: Math.max(b.right - b.left, 6),
+                              top: top0 + lane[idx] * (barH + GAP),
+                              height: barH,
+                            }}
                           />
                         </Tooltip>
-                      );
-                    })}
+                      ));
+                    })()}
 
                     {/* "Frees up" marker (if it has a queue and falls inside the range). */}
                     {u.taskCount > 0 && (() => {
@@ -475,8 +521,9 @@ export const CapacityTimeline: React.FC<CapacityTimelineProps> = ({ workload, lo
             </div>
           </div>
         </div>
+        </div>
+        {legend}
       </Card>
-      {legend}
     </div>
   );
 };
