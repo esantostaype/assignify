@@ -5,11 +5,16 @@ import { cn } from '@/lib/cn';
 // Contorno del isotipo de Assignify trazado como UN SOLO path continuo (sin subpaths).
 // El isotipo original (logo.svg) son dos piezas —la barra superior y la figura principal—
 // que se tocan en el punto (15.23,14.86); aquí el trazo pasa por ese punto de unión para
-// recorrer todo el perímetro de una sola pasada, de modo que el "gusano" nunca se parte en
-// dos. bbox ≈ x[0,22.84] y[7.25,30.09]; el viewBox lo encuadra con padding.
+// recorrer todo el perímetro de una sola pasada, de modo que el "gusano" nunca se parte.
+// bbox ≈ x[0,22.84] y[7.25,30.09]; el viewBox lo encuadra con padding.
 const ISO_OUTLINE =
   'M0,7.25 L15.23,7.25 L15.23,14.86 L22.83,14.86 L22.83,30.09 L15.22,30.09 L15.22,22.48 ' +
   'C11.02,22.48 7.61,25.88 7.61,30.09 L0,30.09 C0,21.68 6.82,14.86 15.23,14.86 L0,14.86 Z';
+
+// Ancho del viewBox (en unidades de usuario). Se usa para convertir "2px de pantalla" al
+// grosor de trazo en unidades, sea cual sea el `size` (así evitamos `non-scaling-stroke`,
+// que rompe la normalización de `pathLength` y hacía que el dash se partiera en varios).
+const VIEWBOX_UNITS = 30.84;
 
 export interface BrandSpinnerProps {
   /** Diameter in px. Default 56. */
@@ -25,16 +30,18 @@ export interface BrandSpinnerProps {
 /**
  * BrandSpinner — Assignify's branded loader. The isotype is drawn with a
  * transparent fill and a very faint outline; a single short "worm" segment then
- * runs ALONG that outline (the mark's own contour, one continuous stroke — never
- * split in two). The ease-in-out dash animation accelerates the worm out of each
- * lap and decelerates it near completion; the loop restart is seamless because
- * the dash period equals the full path length.
+ * runs ALONG that outline (the mark's own contour, ONE continuous stroke — never
+ * split). The ease-in-out dash animation accelerates the worm out of each lap
+ * and decelerates it near completion; the loop restart is seamless because the
+ * dash period equals the full path length (`pathLength=100`, dash `22 78`).
  *
- * The stroke is a constant 2 px at any `size` (`vector-effect: non-scaling-stroke`).
- * Use it for prominent, full-section/overlay wait states. The plain `<Spinner>`
- * stays the right pick for tiny inline/button spinners.
+ * Stroke renders at ~2 px for any `size` by converting 2 screen px to user units
+ * (`strokeWidth`), instead of `vector-effect: non-scaling-stroke` — the latter
+ * breaks `pathLength` dashing and made the worm split into several segments.
  */
 export function BrandSpinner({ size = 56, colorClassName = 'text-white', className }: BrandSpinnerProps) {
+  const strokeWidth = (2 * VIEWBOX_UNITS) / size; // = 2 screen px in user units
+
   return (
     <span
       role="status"
@@ -50,8 +57,7 @@ export function BrandSpinner({ size = 56, colorClassName = 'text-white', classNa
           fill="none"
           stroke="currentColor"
           strokeOpacity={0.18}
-          strokeWidth={2}
-          vectorEffect="non-scaling-stroke"
+          strokeWidth={strokeWidth}
           strokeLinejoin="round"
           strokeLinecap="round"
         />
@@ -60,8 +66,7 @@ export function BrandSpinner({ size = 56, colorClassName = 'text-white', classNa
           d={ISO_OUTLINE}
           fill="none"
           stroke="currentColor"
-          strokeWidth={2}
-          vectorEffect="non-scaling-stroke"
+          strokeWidth={strokeWidth}
           strokeLinejoin="round"
           strokeLinecap="round"
           pathLength={100}
