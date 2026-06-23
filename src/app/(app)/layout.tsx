@@ -1,4 +1,4 @@
-import { Header, CreateTaskForm } from '@/components'
+import { Header, CreateTaskForm, BottomNav } from '@/components'
 import { Providers } from '../providers'
 
 // El panel de Create Task es FIJO a la derecha en desktop/laptop (lg+) y se OCULTA en
@@ -15,7 +15,8 @@ export default function AppLayout({
   return (
     <Providers>
       <main className="flex">
-        <section className="flex-1 h-dvh overflow-y-auto flex flex-col">
+        {/* pb en mobile para que el contenido no quede tapado por el bottom nav (fixed). */}
+        <section className="flex-1 h-dvh overflow-y-auto flex flex-col pb-20 lg:pb-0">
           <Header />
           {children}
         </section>
@@ -24,6 +25,8 @@ export default function AppLayout({
         </aside>
       </main>
       {modal}
+      {/* Bottom nav: solo mobile/tablet (<lg). */}
+      <BottomNav />
     </Providers>
   )
 }

@@ -20,8 +20,8 @@ export const Header = () => {
     <header className="sticky top-0 z-[60] flex items-center justify-between border-b border-b-(--color-border-default) bg-(--color-surface-header) px-4">
       <div className="flex items-center gap-4">
         <Logo width={132} height={38} />
-        {/* Nav horizontal (se oculta en mobile en F3, donde manda el bottom nav). */}
-        <ul className="hidden items-center gap-3 text-sm mb-[-1px] md:flex">
+        {/* Nav horizontal solo en desktop (<lg manda el bottom nav de mobile). */}
+        <ul className="hidden items-center gap-3 text-sm mb-[-1px] lg:flex">
           {navItems.map((item, index) => (
             <NavItem key={item.href || index} {...item} />
           ))}

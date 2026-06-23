@@ -21,7 +21,7 @@ export function RouteModal({
 }) {
   const router = useRouter()
   return (
-    <Modal open onClose={() => router.back()} title={title} description={description} size={size}>
+    <Modal open onClose={() => router.back()} title={title} description={description} size={size} fullScreenOnMobile>
       {children}
     </Modal>
   )

@@ -51,6 +51,10 @@ export interface ModalProps {
    *  inspector identifies them as the named components they are
    *  instead of the generic `Modal` primitive. */
   dataComponentName?: string;
+  /** When true, the modal renders edge-to-edge (full screen) on viewports
+   *  below `lg` (1024px) — used by route-intercepted modals (Types/Lists) so
+   *  they read as PAGES on mobile while staying centered dialogs on desktop. */
+  fullScreenOnMobile?: boolean;
   className?: string;
 }
 
@@ -144,6 +148,7 @@ export function Modal({
   closeButtonOffset  = 'default',
   zIndex             = 200,
   dataComponentName  = 'Modal',
+  fullScreenOnMobile = false,
   className,
 }: ModalProps) {
   const [mounted, setMounted] = useState(open);
@@ -167,6 +172,19 @@ export function Modal({
     mq.addEventListener('change', update);
     return () => mq.removeEventListener('change', update);
   }, []);
+
+  // `belowLg` (<1024px) drives the opt-in `fullScreenOnMobile` mode: the
+  // intercepted Types/Lists modals fill the screen on mobile/tablet (page-like)
+  // and stay centered dialogs on desktop.
+  const [belowLg, setBelowLg] = useState(false);
+  useEffect(() => {
+    if (typeof window === 'undefined' || !fullScreenOnMobile) return;
+    const mq = window.matchMedia('(max-width: 1023.98px)');
+    const update = () => setBelowLg(mq.matches);
+    update();
+    mq.addEventListener('change', update);
+    return () => mq.removeEventListener('change', update);
+  }, [fullScreenOnMobile]);
 
   useEffect(() => {
     if (open) {
@@ -211,6 +229,7 @@ export function Modal({
   const duration = visible ? ENTER_MS : EXIT_MS;
   const d = DENSITY[density];
   const hasHeader = !!(header || title || description);
+  const fullScreen = fullScreenOnMobile && belowLg;
 
   return createPortal(
     <div
@@ -222,7 +241,7 @@ export function Modal({
       data-position={position}
       data-density={density}
       aria-labelledby={title ? 'modal-title' : undefined}
-      className={cn('fixed inset-0 flex', WRAP[position])}
+      className={cn('fixed inset-0 flex', fullScreen ? 'p-0' : WRAP[position])}
       style={{ zIndex }}
       onMouseDown={(e) => {
         if (staticBackdrop) return;
@@ -256,11 +275,13 @@ export function Modal({
       <div
         ref={dialogRef}
         className={cn(
-          // Mobile drops to `rounded-lg` (8 px) so the dialog reads as a
-          // tighter card on narrow viewports; tablet+ keeps the
-          // expressive `rounded-2xl` (16 px) curve.
-          'relative w-full rounded-lg md:rounded-2xl bg-(--color-surface-raised) dark:bg-neutral-100 dark:border dark:border-neutral-200 text-(--color-text-default) shadow-2xl flex flex-col max-h-full will-change-transform',
-          SIZE[size],
+          'relative w-full bg-(--color-surface-raised) dark:bg-neutral-100 dark:border dark:border-neutral-200 text-(--color-text-default) flex flex-col will-change-transform',
+          // Full screen on mobile (page-like) for route-intercepted modals; otherwise a
+          // centered, rounded, shadowed card capped at SIZE[size]. Mobile keeps the tighter
+          // rounded-lg, tablet+ the expressive rounded-2xl.
+          fullScreen
+            ? 'h-full max-w-none rounded-none'
+            : cn('max-h-full rounded-lg shadow-2xl md:rounded-2xl', SIZE[size]),
           className,
         )}
         style={{
