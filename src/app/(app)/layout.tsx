@@ -19,8 +19,7 @@ export default function AppLayout({
           <Header />
           {children}
         </section>
-        <aside className="hidden h-dvh w-[28rem] shrink-0 overflow-y-auto border-l border-(--color-border-default) bg-(--color-surface-card) p-10 lg:block">
-          <h2 className="mb-5 text-xl font-semibold text-(--color-text-strong)">Create Task</h2>
+        <aside className="hidden h-dvh w-[28rem] shrink-0 overflow-y-auto border-l border-(--color-border-default) bg-(--color-surface-card) lg:block">
           <CreateTaskForm />
         </aside>
       </main>

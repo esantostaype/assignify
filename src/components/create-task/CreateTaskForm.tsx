@@ -154,7 +154,7 @@ const FormikInactivityReset: FC<FormikInactivityResetProps> = ({
 // (no negro), con el BrandSpinner + texto al centro. Se usa tanto al buscar candidato
 // como al crear la tarea.
 const FormBusyOverlay: FC<{ label: string }> = ({ label }) => (
-  <div className="absolute inset-0 z-20 flex flex-col items-center justify-center gap-4 bg-(--color-surface-card)/50 backdrop-blur-sm">
+  <div className="absolute inset-0 z-20 flex flex-col items-center justify-center gap-4 bg-(--color-surface-card)/50 backdrop-blur-[2px]">
     <BrandSpinner size={52} colorClassName="text-primary-500" />
     <Typography variant="bodySm" className="font-medium">
       {label}
@@ -301,17 +301,20 @@ export const CreateTaskForm: FC<{ onCreated?: () => void }> = ({ onCreated }) =>
   };
 
   return (
-    // Contenedor flexible (sin ancho/posición fijos): el ancho/padding los da la página
-    // (/create) o el modal interceptado. `relative` para anclar el overlay de búsqueda.
+    // CreateTaskForm es dueño de su padding y su título (antes los ponía el contenedor),
+    // así el overlay de "ocupado" cubre TODO el ancho del panel + el padding. `relative`
+    // lo ancla. Padding p-6 en mobile (/create) y p-10 en el panel fijo de desktop (aside).
     <div className="relative">
-      {/* Bloqueo del formulario: mismo color de fondo del form al 50% + blur, con el
+      {/* Bloqueo del formulario: mismo color de fondo del form al 50% + blur leve, con el
           BrandSpinner y el mensaje al centro. Crear tiene prioridad sobre buscar. */}
       {loading ? (
         <FormBusyOverlay label="Creating Task..." />
       ) : (
         fetchingSuggestion && <FormBusyOverlay label="Finding the best match..." />
       )}
-      <Formik
+      <div className="p-6 lg:p-10">
+        <h2 className="mb-6 text-xl font-semibold text-(--color-text-strong)">Create Task</h2>
+        <Formik
         initialValues={initialValues}
         validationSchema={validationSchema}
         onSubmit={handleSubmit}
@@ -466,6 +469,7 @@ export const CreateTaskForm: FC<{ onCreated?: () => void }> = ({ onCreated }) =>
           );
         }}
       </Formik>
+      </div>
     </div>
   );
 };

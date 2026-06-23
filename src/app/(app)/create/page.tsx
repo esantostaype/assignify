@@ -1,11 +1,10 @@
 import { CreateTaskForm } from '@/components/create-task'
 
-// Página real de "Create Task" (deep-link / recarga / mobile). En desktop, al navegar
-// desde la app se intercepta y se muestra como modal (ver @modal/(.)create).
+// Página real de "Create Task" (deep-link / recarga / mobile). El padding y el título
+// los pone el propio CreateTaskForm, así el overlay de "ocupado" cubre todo el panel.
 export default function CreateTaskPage() {
   return (
-    <div className="mx-auto w-full max-w-2xl p-6">
-      <h1 className="mb-5 text-xl font-semibold text-(--color-text-strong)">Create Task</h1>
+    <div className="mx-auto w-full max-w-2xl">
       <CreateTaskForm />
     </div>
   )
