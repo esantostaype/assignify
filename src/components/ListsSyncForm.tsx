@@ -5,7 +5,7 @@
 import { useState, useEffect, useMemo } from 'react'
 import axios from 'axios'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { Button, Switch, Input } from '@/components/ui'
+import { Button, Switch, Input, Skeleton } from '@/components/ui'
 import { Icon, PiMagnifyingGlass } from '@/lib/icons'
 import { hotToast as toast } from '@/lib/hotToast'
 import { taskDataKeys } from '@/hooks/useTaskData'
@@ -19,10 +19,10 @@ interface DiscoveredList {
 }
 
 const ListRowSkeleton = () => (
-  <tr className="animate-pulse border-t border-(--color-border-default)">
-    <td className="p-2 first:pl-4"><div className="h-3 w-40 rounded bg-(--color-surface-hover)" /></td>
-    <td className="p-2"><div className="h-3 w-28 rounded bg-(--color-surface-hover)" /></td>
-    <td className="p-2 text-right last:pr-4"><div className="ml-auto h-5 w-9 rounded-full bg-(--color-surface-hover)" /></td>
+  <tr className="border-t border-(--color-border-default)">
+    <td className="p-2 first:pl-4"><Skeleton variant="text" width={160} /></td>
+    <td className="p-2"><Skeleton variant="text" width={112} /></td>
+    <td className="p-2 last:pr-4"><Skeleton variant="circle" width={36} height={20} className="ml-auto" /></td>
   </tr>
 )
 
@@ -79,7 +79,7 @@ export function ListsSyncForm() {
       </p>
 
       <Input
-        size="sm"
+        size="md"
         placeholder="Search lists..."
         value={search}
         onChange={(e) => setSearch(e.target.value)}

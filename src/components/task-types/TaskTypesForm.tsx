@@ -3,7 +3,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 "use client";
 import React, { useState, useEffect } from "react";
-import { Button, Input, IconButton, Typography, Spinner, DeleteConfirmDialog } from "@/components/ui";
+import { Button, Input, IconButton, Typography, Spinner, Skeleton, DeleteConfirmDialog } from "@/components/ui";
 import { Icon, PiPlus, PiTrash } from "@/lib/icons";
 import { useTaskDataInvalidation } from "@/hooks/useTaskData";
 import axios from "axios";
@@ -18,13 +18,9 @@ interface TaskType {
 
 // Agregar este componente dentro del archivo, antes del componente principal:
 const TaskTypeSkeleton: React.FC = () => (
-  <tr className="border-t border-(--color-border-default) animate-pulse">
-    <td className="p-2 first:pl-4">
-      <div className="h-3 w-32 rounded bg-(--color-surface-hover)"></div>
-    </td>
-    <td className="p-2 last:pr-4">
-      <div className="ml-auto size-8 rounded bg-(--color-surface-hover)"></div>
-    </td>
+  <tr className="border-t border-(--color-border-default)">
+    <td className="p-2 first:pl-4"><Skeleton variant="text" width={128} /></td>
+    <td className="p-2 last:pr-4"><Skeleton variant="rect" width={32} height={32} className="ml-auto" /></td>
   </tr>
 );
 
