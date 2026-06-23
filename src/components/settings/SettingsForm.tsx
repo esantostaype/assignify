@@ -2,7 +2,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 /* eslint-disable react/no-unescaped-entities */
 "use client";
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import {
   Button,
   Input,
@@ -11,6 +11,7 @@ import {
   Progress,
   Alert,
   Spinner,
+  BrandSpinner,
   AlertDialog,
   Select,
   FormField,
@@ -20,10 +21,10 @@ import { HugeiconsIcon } from "@hugeicons/react";
 import { Clock01Icon, Target02Icon, CheckmarkCircle01Icon, Layers01Icon } from "@hugeicons/core-free-icons";
 import {
   Icon,
-  PiGear,
   PiDownloadSimple,
   PiWarning,
   PiArrowsClockwise,
+  PiCaretDown,
 } from "@/lib/icons";
 import {
   useSettings,
@@ -73,6 +74,26 @@ export const SettingsForm: React.FC = () => {
   const [showResetDialog, setShowResetDialog] = useState(false);
   // Pestaña activa: 3 grupos de settings + "tiers".
   const [activeTab, setActiveTab] = useState<string>("work_schedule");
+  // Nav en mobile: el rail vertical colapsa en un dropdown (abierto/cerrado).
+  const [navOpen, setNavOpen] = useState(false);
+  const navMenuRef = useRef<HTMLDivElement>(null);
+
+  // Cierra el dropdown del nav (mobile) al hacer click fuera o pulsar Escape.
+  useEffect(() => {
+    if (!navOpen) return;
+    const onDown = (e: MouseEvent) => {
+      if (navMenuRef.current && !navMenuRef.current.contains(e.target as Node)) setNavOpen(false);
+    };
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setNavOpen(false);
+    };
+    document.addEventListener("mousedown", onDown);
+    document.addEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("mousedown", onDown);
+      document.removeEventListener("keydown", onKey);
+    };
+  }, [navOpen]);
 
   // Duración (días base) → valor mostrado en la unidad activa (redondeado).
   const toUnit = (days: number) => Math.round(daysToUnit(days, unit) * 100) / 100;
@@ -372,12 +393,9 @@ export const SettingsForm: React.FC = () => {
 
   if (isLoading) {
     return (
-      <div className="max-w-6xl mx-auto">
-        <div className="flex items-center gap-2 mb-4">
-          <Icon icon={PiGear} size={20} />
-          <span className="text-lg font-medium">Loading Settings...</span>
-        </div>
-        <Progress />
+      <div className="flex min-h-[60vh] flex-col items-center justify-center gap-4">
+        <BrandSpinner size={64} colorClassName="text-primary-500" />
+        <span className="text-sm font-medium text-(--color-text-muted)">Loading settings…</span>
       </div>
     );
   }
@@ -425,10 +443,58 @@ export const SettingsForm: React.FC = () => {
 
   return (
     <>
-      <div className="flex flex-col gap-6 md:flex-row md:items-start">
-        {/* Tabs (vertical en desktop con línea separadora; fila horizontal en mobile).
-            Hover muy tenue; el activo se marca solo con fondo (sin barra lateral). */}
-        <nav className="flex gap-1 overflow-x-auto pb-1 md:w-1/4 md:min-w-[210px] md:shrink-0 md:flex-col md:overflow-visible md:border-r md:border-(--color-border-default) md:pb-0 md:pr-4">
+      <div className="flex flex-col gap-6 py-8 md:flex-row md:items-start md:gap-12">
+        {/* Mobile (<md): el rail colapsa en un dropdown que muestra el tab activo + un menú
+            con todos (misma idea que el overflow→dropdown del componente Tabs). */}
+        <div ref={navMenuRef} className="relative md:hidden">
+          <button
+            type="button"
+            onClick={() => setNavOpen((o) => !o)}
+            aria-haspopup="menu"
+            aria-expanded={navOpen}
+            className="flex w-full items-center justify-between gap-2.5 rounded-md border border-(--color-border-default) bg-(--color-surface-card) px-3 py-2.5 text-left"
+          >
+            <span className="flex min-w-0 items-center gap-2.5">
+              <HugeiconsIcon icon={activeInfo.icon} size={18} strokeWidth={1.5} className="shrink-0" />
+              <span className="truncate text-sm font-medium text-(--color-text-strong)">{activeInfo.label}</span>
+            </span>
+            <Icon icon={PiCaretDown} size={14} className={cn("shrink-0 transition-transform", navOpen && "rotate-180")} />
+          </button>
+          {navOpen && (
+            <div
+              role="menu"
+              className="absolute inset-x-0 top-full z-20 mt-2 rounded-lg border border-(--color-border-default) bg-(--color-surface-raised) p-1 shadow-xl"
+            >
+              {TABS.map((t) => {
+                const active = t.id === activeTab;
+                return (
+                  <button
+                    key={t.id}
+                    type="button"
+                    role="menuitem"
+                    onClick={() => {
+                      setActiveTab(t.id);
+                      setNavOpen(false);
+                    }}
+                    className={cn(
+                      "flex w-full items-center gap-2.5 rounded-md px-2.5 py-2 text-left transition-colors",
+                      active
+                        ? "bg-(--color-text-muted)/[0.10] text-(--color-text-strong)"
+                        : "text-(--color-text-default) hover:bg-(--color-text-muted)/[0.05]",
+                    )}
+                  >
+                    <HugeiconsIcon icon={t.icon} size={18} strokeWidth={1.5} className="shrink-0" />
+                    <span className="truncate text-sm font-medium">{t.label}</span>
+                  </button>
+                );
+              })}
+            </div>
+          )}
+        </div>
+
+        {/* Desktop (md+): rail vertical. Hover muy tenue; el activo se marca solo con fondo
+            (sin barra lateral). La línea separadora la pone el panel (border-l). */}
+        <nav className="hidden md:flex md:w-1/4 md:min-w-[210px] md:shrink-0 md:flex-col md:gap-1">
           {TABS.map((t) => {
             const active = t.id === activeTab;
             return (
@@ -437,7 +503,7 @@ export const SettingsForm: React.FC = () => {
                 type="button"
                 onClick={() => setActiveTab(t.id)}
                 className={cn(
-                  "flex shrink-0 items-center gap-2.5 rounded-md px-3 py-2.5 text-left transition-colors md:w-full",
+                  "flex w-full items-center gap-2.5 rounded-md px-3 py-2.5 text-left transition-colors",
                   active
                     ? "bg-(--color-text-muted)/[0.10] text-(--color-text-strong)"
                     : "text-(--color-text-default) hover:bg-(--color-text-muted)/[0.05]",
@@ -446,7 +512,7 @@ export const SettingsForm: React.FC = () => {
                 <HugeiconsIcon icon={t.icon} size={18} strokeWidth={1.5} className="shrink-0" />
                 <div className="min-w-0">
                   <div className="text-sm font-medium">{t.label}</div>
-                  <div className="hidden truncate text-xs text-(--color-text-muted) md:block">{t.desc}</div>
+                  <div className="truncate text-xs text-(--color-text-muted)">{t.desc}</div>
                 </div>
               </button>
             );
@@ -454,7 +520,7 @@ export const SettingsForm: React.FC = () => {
         </nav>
 
         {/* Panel de la sección activa (sin card; separado por la línea vertical del nav) */}
-        <div className="min-w-0 flex-1 md:pl-6">
+        <div className="min-w-0 flex-1 md:pl-12 md:border-l md:border-(--color-border-default)">
           <div className="flex flex-col gap-5">
             <div>
               <h3 className="text-base font-semibold text-(--color-text-strong)">{activeInfo.label}</h3>

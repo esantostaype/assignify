@@ -5,7 +5,7 @@ import {
 } from 'react';
 import { createPortal } from 'react-dom';
 import { cn } from '@/lib/cn';
-import { Spinner } from './Spinner';
+import { BrandSpinner } from './BrandSpinner';
 import { Typography } from '@/components/ui/typography';
 
 export interface LoadingOverlayProps {
@@ -135,7 +135,7 @@ export function LoadingOverlay({
         visible ? 'opacity-100' : 'opacity-0',
       )}
     >
-      <Spinner size={spinnerSize} colorClassName={spinnerColorClassName} />
+      <BrandSpinner size={spinnerSize} colorClassName={spinnerColorClassName} />
       {label != null && (
         typeof label === 'string'
           ? (

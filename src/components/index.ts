@@ -1,6 +1,7 @@
 export * from './Sidebar'
 export * from './Header'
 export * from './NavItem'
+export * from './PageHeader'
 export * from './create-task/CreateTaskForm'
 export * from './team/Team'
 export * from './settings/SettingsForm'

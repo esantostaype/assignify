@@ -1,15 +1,14 @@
 'use client'
-import Link from 'next/link'
-import { Queue01Icon, SwatchIcon, UserGroup03Icon, Folder01Icon, Add01Icon } from '@hugeicons/core-free-icons'
-import { HugeiconsIcon } from '@hugeicons/react'
+import { Queue01Icon, SwatchIcon, UserGroup03Icon, Folder01Icon } from '@hugeicons/core-free-icons'
 import { NavItem } from '@/components'
 import { WorkspaceSwitcher } from '@/components/WorkspaceSwitcher'
 import { UserMenu } from '@/components/UserMenu'
 import { Logo } from '@/components/Logo'
 
 export const Header = () => {
-  // Types/Lists ahora son RUTAS (modal en desktop vía intercepting routes; página en
-  // mobile). Settings vive en el menú del avatar (UserMenu). Create es la acción principal.
+  // Types/Lists son RUTAS (modal en desktop vía intercepting routes; página en mobile).
+  // Create NO está aquí: en desktop es el panel fijo de la derecha; en mobile irá en el
+  // bottom nav (F3). Settings vive en el menú del avatar (UserMenu).
   const navItems = [
     { href: '/', label: 'Tasks', icon: Queue01Icon },
     { href: '/team', label: 'Team', icon: UserGroup03Icon },
@@ -31,14 +30,6 @@ export const Header = () => {
       </div>
 
       <div className="flex items-center gap-3">
-        {/* Crear tarea → ruta /create (modal en desktop). En mobile irá en el bottom nav. */}
-        <Link
-          href="/create"
-          className="hidden items-center gap-1.5 rounded-md bg-primary-600 px-3 py-2 text-sm font-medium text-white transition-colors hover:bg-primary-700 md:flex"
-        >
-          <HugeiconsIcon icon={Add01Icon} size={18} strokeWidth={2} />
-          Create
-        </Link>
         <UserMenu />
       </div>
     </header>

@@ -14,6 +14,8 @@ export { DeleteConfirmDialog } from './DeleteConfirmDialog';
 export type { DeleteConfirmDialogProps } from './DeleteConfirmDialog';
 export { Spinner } from './Spinner';
 export type { SpinnerProps } from './Spinner';
+export { BrandSpinner } from './BrandSpinner';
+export type { BrandSpinnerProps } from './BrandSpinner';
 export { LoadingOverlay } from './LoadingOverlay';
 export type { LoadingOverlayProps } from './LoadingOverlay';
 export { Skeleton } from './Skeleton';

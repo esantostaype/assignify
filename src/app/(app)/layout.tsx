@@ -1,9 +1,10 @@
-import { Header } from '@/components'
+import { Header, CreateTaskForm } from '@/components'
 import { Providers } from '../providers'
 
-// `modal` es el slot paralelo @modal: renderiza el modal interceptado (Create/Types/Lists)
-// en desktop, o null (default.tsx) cuando no hay ninguno. El form de Create ya NO es un
-// aside permanente: vive en su ruta /create.
+// El panel de Create Task es FIJO a la derecha en desktop/laptop (lg+) y se OCULTA en
+// mobile/tablet, donde Create vive en su ruta /create (bottom nav — F3). `modal` es el slot
+// paralelo @modal: muestra Types/Lists como modal interceptado en desktop (o null vía
+// default.tsx cuando no hay ninguno).
 export default function AppLayout({
   children,
   modal,
@@ -18,6 +19,10 @@ export default function AppLayout({
           <Header />
           {children}
         </section>
+        <aside className="hidden h-dvh w-[28rem] shrink-0 overflow-y-auto border-l border-(--color-border-default) bg-(--color-surface-card) p-10 lg:block">
+          <h2 className="mb-5 text-xl font-semibold text-(--color-text-strong)">Create Task</h2>
+          <CreateTaskForm />
+        </aside>
       </main>
       {modal}
     </Providers>
