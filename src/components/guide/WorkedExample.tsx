@@ -44,29 +44,45 @@ const PRIO_DOT: Record<Prio, string> = {
 // el criterio del motor (afinidad → fecha → carriles → cascada de Low). El newsletter (Low) se
 // crea en mar y la cascada lo empuja a mié cuando llega el Normal "Investor deck".
 const home: Bar = { id: 'home', m: 'A', start: 0, span: 2, prio: 'normal', step: 0 }
-const onb: Bar = { id: 'onb', m: 'B', start: 0, span: 1, prio: 'normal', step: 1 }
-const one: Bar = { id: 'one', m: 'C', start: 0, span: 1, prio: 'normal', step: 2 }
-const launch: Bar = { id: 'launch', m: 'B', start: 1, span: 1, prio: 'high', step: 3 }
-const deck: Bar = { id: 'deck', m: 'C', start: 1, span: 1, prio: 'normal', step: 5 }
-const hotfix: Bar = { id: 'hotfix', m: 'B', start: 2, span: 1, prio: 'urgent', step: 6 }
-const promo: Bar = { id: 'promo', m: 'A', start: 2, span: 1, prio: 'normal', step: 7 }
-const webinar: Bar = { id: 'webinar', m: 'A', start: 3, span: 1, prio: 'normal', step: 8 }
-const report: Bar = { id: 'report', m: 'B', start: 3, span: 1, prio: 'high', step: 9 }
-const news = (start: number): Bar => ({ id: 'news', m: 'C', start, span: 1, prio: 'low', step: 4 })
+const onb: Bar = { id: 'onb', m: 'B', start: 0, span: 2, prio: 'normal', step: 1 }
+const brand: Bar = { id: 'brand', m: 'C', start: 0, span: 1, prio: 'normal', step: 2 }
+const one: Bar = { id: 'one', m: 'C', start: 1, span: 1, prio: 'normal', step: 3 }
+// Paralelas: launch (High) corre a la vez que el Normal de B; hotfix (Urgent) a la vez que el de A.
+const launch: Bar = { id: 'launch', m: 'B', start: 0, span: 1, prio: 'high', step: 4 }
+const hotfix: Bar = { id: 'hotfix', m: 'A', start: 0, span: 1, prio: 'urgent', step: 5 }
+const deck: Bar = { id: 'deck', m: 'C', start: 2, span: 1, prio: 'normal', step: 7 }
+const news = (start: number): Bar => ({ id: 'news', m: 'C', start, span: 1, prio: 'low', step: 6 })
 
 const STATES: Bar[][] = [
   [],
   [home],
   [home, onb],
-  [home, onb, one],
-  [home, onb, one, launch],
-  [home, onb, one, launch, news(1)],
-  [home, onb, one, launch, deck, news(2)], // cascada: el Low se desliza mar → mié
-  [home, onb, one, launch, deck, news(2), hotfix],
-  [home, onb, one, launch, deck, news(2), hotfix, promo],
-  [home, onb, one, launch, deck, news(2), hotfix, promo, webinar],
-  [home, onb, one, launch, deck, news(2), hotfix, promo, webinar, report],
+  [home, onb, brand],
+  [home, onb, brand, one],
+  [home, onb, brand, one, launch], // High en PARALELO sobre el Normal de B (apilado)
+  [home, onb, brand, one, launch, hotfix], // Urgent en PARALELO sobre el Normal de A (apilado)
+  [home, onb, brand, one, launch, hotfix, news(2)],
+  [home, onb, brand, one, launch, hotfix, deck, news(3)], // cascada: el Low pasa mié → jue
 ]
+
+// Reparte barras que SE SOLAPAN (paralelas) en sub-carriles apilados (cada lane = primera
+// fila libre donde no se solapa con la anterior), para que no queden una encima de otra.
+function allocLanes(items: { l: number; r: number }[]): { lane: number[]; count: number } {
+  const order = items.map((it, i) => ({ i, l: it.l, r: it.r })).sort((a, b) => a.l - b.l)
+  const ends: number[] = []
+  const lane = new Array(items.length).fill(0) as number[]
+  for (const it of order) {
+    let k = ends.findIndex((e) => it.l >= e)
+    if (k === -1) {
+      k = ends.length
+      ends.push(it.r)
+    } else {
+      ends[k] = it.r
+    }
+    lane[it.i] = k
+  }
+  return { lane, count: Math.max(1, ends.length) }
+}
 const COLS = 7
 const LAST = STATES.length - 1
 const WEEK_H = 24
@@ -166,49 +182,57 @@ export function WorkedExample() {
               ))}
             </div>
             {/* Filas con barras */}
-            {t.example.members.map((m) => (
-              <div
-                key={m.id}
-                style={{ height: ROW_H }}
-                className="relative border-b border-(--color-border-default) last:border-b-0"
-              >
-                {/* Líneas de día (punteadas) + fines de semana sombreados */}
-                <div className="absolute inset-0 flex">
-                  {Array.from({ length: COLS }).map((_, i) => (
-                    <div
-                      key={i}
-                      style={i >= 5 ? { background: weekendBg } : undefined}
-                      className="flex-1 border-l border-dashed border-(--color-border-default)/70"
-                    />
-                  ))}
-                </div>
-                {/* Barras del miembro */}
-                <AnimatePresence>
-                  {bars
-                    .filter((b) => b.m === (m.id as MemberId))
-                    .map((b) => (
+            {t.example.members.map((m) => {
+              const mBars = bars.filter((b) => b.m === (m.id as MemberId))
+              const { lane, count } = allocLanes(mBars.map((b) => ({ l: b.start, r: b.start + b.span })))
+              const GAP = 3
+              const usableH = ROW_H - 12
+              const barH = Math.min(28, (usableH - (count - 1) * GAP) / count)
+              const top0 = (ROW_H - (count * barH + (count - 1) * GAP)) / 2
+              return (
+                <div
+                  key={m.id}
+                  style={{ height: ROW_H }}
+                  className="relative border-b border-(--color-border-default) last:border-b-0"
+                >
+                  {/* Líneas de día (punteadas) + fines de semana sombreados */}
+                  <div className="absolute inset-0 flex">
+                    {Array.from({ length: COLS }).map((_, i) => (
+                      <div
+                        key={i}
+                        style={i >= 5 ? { background: weekendBg } : undefined}
+                        className="flex-1 border-l border-dashed border-(--color-border-default)/70"
+                      />
+                    ))}
+                  </div>
+                  {/* Barras del miembro — apiladas (sub-carriles) si corren en paralelo */}
+                  <AnimatePresence>
+                    {mBars.map((b, idx) => (
                       <motion.div
                         key={b.id}
                         layout
-                        initial={{ opacity: 0, y: 6, scale: 0.96 }}
-                        animate={{ opacity: 1, y: 0, scale: 1 }}
+                        initial={{ opacity: 0, scale: 0.96 }}
+                        animate={{ opacity: 1, scale: 1 }}
                         exit={{ opacity: 0, scale: 0.9 }}
                         transition={{ type: 'spring', stiffness: 360, damping: 30 }}
                         style={{
                           left: `calc(${(b.start / COLS) * 100}% + 3px)`,
                           width: `calc(${(b.span / COLS) * 100}% - 6px)`,
+                          top: top0 + lane[idx] * (barH + GAP),
+                          height: barH,
                         }}
                         className={cn(
-                          'absolute top-1/2 flex h-8 -translate-y-1/2 items-center overflow-hidden rounded-md px-2 text-[11px] font-semibold shadow-sm',
+                          'absolute flex items-center overflow-hidden rounded-md px-2 text-[11px] font-semibold shadow-sm',
                           PRIO_BAR[b.prio],
                         )}
                       >
                         <span className="truncate">{t.example.steps[b.step].task}</span>
                       </motion.div>
                     ))}
-                </AnimatePresence>
-              </div>
-            ))}
+                  </AnimatePresence>
+                </div>
+              )
+            })}
           </div>
         </div>
 
