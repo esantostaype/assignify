@@ -19,11 +19,11 @@ interface TaskType {
 // Agregar este componente dentro del archivo, antes del componente principal:
 const TaskTypeSkeleton: React.FC = () => (
   <tr className="border-t border-(--color-border-default) animate-pulse">
-    <td className="p-2 first:pl-4 last:pr-4">
-      <div className="h-3 bg-(--color-surface-hover) rounded w-32"></div>
+    <td className="p-2 first:pl-4">
+      <div className="h-3 w-32 rounded bg-(--color-surface-hover)"></div>
     </td>
-    <td className="p-2 first:pl-4 last:pr-4">
-      <div className="size-8 bg-(--color-surface-hover) rounded"></div>
+    <td className="p-2 last:pr-4">
+      <div className="ml-auto size-8 rounded bg-(--color-surface-hover)"></div>
     </td>
   </tr>
 );
@@ -168,12 +168,8 @@ export const TaskTypesForm: React.FC = () => {
             <table className="w-full text-sm">
               <thead className="bg-(--color-surface-hover)">
                 <tr>
-                  <th className="p-2 first:pl-4 last:pr-4 text-left text-sm font-medium text-gray-300">
-                    <span>Name</span>
-                  </th>
-                  <th className="p-2 first:pl-4 last:pr-4 text-left text-sm font-medium text-gray-300 w-[5rem]">
-                    <span>Actions</span>
-                  </th>
+                  <th className="p-2 text-left font-medium text-(--color-text-muted) first:pl-4">Name</th>
+                  <th className="w-[5rem] p-2 text-right font-medium text-(--color-text-muted) last:pr-4">Actions</th>
                 </tr>
               </thead>
               <tbody>
@@ -207,8 +203,8 @@ export const TaskTypesForm: React.FC = () => {
                           </span>
                         )}
                       </td>
-                      <td className="p-2 first:pl-4 last:pr-4">
-                        <div>
+                      <td className="p-2 last:pr-4">
+                        <div className="flex justify-end">
                           <IconButton
                             aria-label="Delete task type"
                             size="sm"
