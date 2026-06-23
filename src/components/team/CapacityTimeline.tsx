@@ -316,14 +316,14 @@ export const CapacityTimeline: React.FC<CapacityTimelineProps> = ({ workload, lo
       <Card variant="outlined" padding="none" className="mt-3 flex flex-col overflow-hidden">
         <div className="flex">
         {/* Names column (fixed; doesn't scroll). Vertical separator = card border. */}
-        <div className="shrink-0 z-20 w-12 border-r border-(--color-border-default) px-2 md:w-[200px] md:px-4">
+        <div className="shrink-0 z-20 w-12 border-r border-(--color-border-default) md:w-[200px]">
           {/* full-header spacer; the only horizontal line here sits ABOVE the rows
               (not above the names). */}
-          <div style={{ height: WEEK_H + HEADER_H }} />
+          <div style={{ height: WEEK_H + HEADER_H }} className="border-b border-(--color-border-default)" />
           {displayRows.map((u, i) => (
             <div
               key={u?.id ?? `s${i}`}
-              className="flex items-center justify-center gap-2.5 border-b border-(--color-border-default) last:border-b-0 md:justify-start"
+              className="flex items-center justify-center gap-2.5 border-b border-(--color-border-default) px-2 last:border-b-0 md:justify-start md:px-4"
               style={{ height: ROW_H }}
             >
               {u ? (
