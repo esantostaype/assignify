@@ -8,11 +8,11 @@
 // navigable ±2 months (wheel/trackpad or dragging with the mouse). Bars map the WORK
 // DAY (10:00–19:00) to the column width, so a 4h task fills ~half a column (not a full
 // day) and a full work day fills the column (minus a small padding).
-import React, { useMemo, useRef, useEffect } from "react";
+import React, { useMemo, useRef, useEffect, useState } from "react";
 import { Card, Tooltip, Skeleton, Avatar } from "@/components/ui";
 import { Icon, PiCalendarBlank } from "@/lib/icons";
 import type { UserWorkload, PendingTaskBar } from "@/hooks/queries/useWorkload";
-import usHolidays from "@/data/usHolidays.json";
+import axios from "axios";
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 const DAY_W = 46; // px per day column
@@ -73,18 +73,12 @@ const WEEKEND_STRIPES = stripes("rgba(148,163,184,0.20)"); // slate
 const HOLIDAY_STRIPES = stripes("rgba(239,68,68,0.18)"); // red
 const VACATION_STRIPES = stripes("rgba(245,158,11,0.32)"); // amber
 
-// Holidays (YYYY-MM-DD) → name. The engine never schedules on these (skips them like weekends).
-const HOLIDAY_NAME_BY_YMD: Record<string, string> = Object.fromEntries(
-  (usHolidays as Array<{ date: string; name: string }>).map((h) => [h.date, h.name])
-);
+// Los feriados ya NO salen de un JSON: se leen de la DB del workspace (/api/holidays)
+// dentro del componente y se marcan visualmente. El motor también los respeta (H2).
 
 /** Local midnight of a date (drops the time → aligns with the day column). */
 function midnightLocal(d: Date): number {
   return new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
-}
-function ymdLocal(ts: number): string {
-  const d = new Date(ts);
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 }
 function fmt(ts: number): string {
   const d = new Date(ts);
@@ -147,6 +141,35 @@ export const CapacityTimeline: React.FC<CapacityTimelineProps> = ({ workload, lo
   const scrollRef = useRef<HTMLDivElement>(null);
   const drag = useRef({ active: false, startX: 0, startScroll: 0 });
 
+  // Feriados del workspace (de la DB) para sombrear sus columnas. El motor ya los respeta
+  // (H2); aquí es solo la marca visual. Recurrentes (year null) aplican a cualquier año.
+  const [holidayRows, setHolidayRows] = useState<
+    { name: string; month: number; day: number; year: number | null }[]
+  >([]);
+  useEffect(() => {
+    let alive = true;
+    axios
+      .get("/api/holidays")
+      .then((r) => { if (alive) setHolidayRows(r.data ?? []); })
+      .catch(() => { /* sin feriados: el gantt simplemente no sombrea ninguno */ });
+    return () => { alive = false; };
+  }, []);
+  const holidayName = useMemo(() => {
+    const pad = (n: number) => String(n).padStart(2, "0");
+    const dated = new Map<string, string>(); // "YYYY-MM-DD" → nombre
+    const recurring = new Map<string, string>(); // "MM-DD" → nombre
+    for (const h of holidayRows) {
+      const mmdd = `${pad(h.month)}-${pad(h.day)}`;
+      if (h.year == null) recurring.set(mmdd, h.name);
+      else dated.set(`${h.year}-${mmdd}`, h.name);
+    }
+    return (ts: number): string | undefined => {
+      const d = new Date(ts);
+      const mmdd = `${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+      return dated.get(`${d.getFullYear()}-${mmdd}`) ?? recurring.get(mmdd);
+    };
+  }, [holidayRows]);
+
   const { rangeStart, totalDays, days, weeks, shades, rows, todayOffset } = useMemo(() => {
     const today = midnightLocal(new Date());
     const start = today - PAST_DAYS * DAY_MS;
@@ -166,7 +189,7 @@ export const CapacityTimeline: React.FC<CapacityTimelineProps> = ({ workload, lo
         isToday: ts === today,
         isFirstOfMonth: d.getDate() === 1,
         monthLabel: MONTH[d.getMonth()],
-        holiday: HOLIDAY_NAME_BY_YMD[ymdLocal(ts)],
+        holiday: holidayName(ts),
       });
     }
 
@@ -207,7 +230,7 @@ export const CapacityTimeline: React.FC<CapacityTimelineProps> = ({ workload, lo
       .sort((a, b) => b.availableInDays - a.availableInDays);
 
     return { rangeStart: start, totalDays: total, days: dayList, weeks: weekList, shades: shadeList, rows: sorted, todayOffset: PAST_DAYS };
-  }, [workload]);
+  }, [workload, holidayName]);
 
   const trackW = totalDays * DAY_W;
 

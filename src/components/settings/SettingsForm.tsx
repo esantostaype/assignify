@@ -18,7 +18,7 @@ import {
 } from "@/components/ui";
 import { cn } from "@/lib/cn";
 import { HugeiconsIcon } from "@hugeicons/react";
-import { Clock01Icon, Target02Icon, CheckmarkCircle01Icon, Layers01Icon } from "@hugeicons/core-free-icons";
+import { Clock01Icon, Target02Icon, CheckmarkCircle01Icon, Layers01Icon, Calendar03Icon } from "@hugeicons/core-free-icons";
 import {
   Icon,
   PiDownloadSimple,
@@ -35,6 +35,7 @@ import { useTaskDataInvalidation } from "@/hooks/useTaskData";
 import { daysToUnit, unitToDays, DURATION_UNITS, type DurationUnit } from "@/utils/duration-utils";
 import axios from "axios";
 import { hotToast as toast } from "@/lib/hotToast";
+import { HolidaysSettings } from "@/components/settings/HolidaysSettings";
 
 interface SettingValue {
   category: string;
@@ -458,6 +459,7 @@ export const SettingsForm: React.FC = () => {
     { id: "work_schedule", label: "Work schedule", desc: "Working hours, lunch & timezone", icon: Clock01Icon },
     { id: "task_assignment", label: "Task assignment", desc: "Assignment engine thresholds", icon: Target02Icon },
     { id: "approvals", label: "Approvals", desc: "Auto-complete delivered tasks", icon: CheckmarkCircle01Icon },
+    { id: "holidays", label: "Holidays", desc: "Non-working days for scheduling", icon: Calendar03Icon },
     { id: "tiers", label: "Tier durations", desc: "Default duration per tier", icon: Layers01Icon },
   ] as const;
   const activeInfo = TABS.find((t) => t.id === activeTab) ?? TABS[0];
@@ -592,6 +594,8 @@ export const SettingsForm: React.FC = () => {
                   </div>
                 )}
               </>
+            ) : activeTab === "holidays" ? (
+              <HolidaysSettings />
             ) : activeGroup ? (
               <div className="grid grid-cols-1 gap-x-6 gap-y-5 sm:grid-cols-2">
                 {activeGroup[1]
@@ -613,7 +617,9 @@ export const SettingsForm: React.FC = () => {
             ) : null}
           </div>
 
-          {/* Acciones */}
+          {/* Acciones (no aplican a Holidays: cada fila se guarda al instante) */}
+          {activeTab !== "holidays" && (
+          <>
           <div className="mt-4 flex items-center justify-between gap-3">
             <IconButton
               aria-label="Reset settings to defaults"
@@ -646,6 +652,8 @@ export const SettingsForm: React.FC = () => {
                 <span className="text-sm">You have unsaved changes. Don&apos;t forget to save.</span>
               </div>
             </Alert>
+          )}
+          </>
           )}
         </div>
       </div>
