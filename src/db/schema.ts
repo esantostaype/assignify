@@ -35,6 +35,19 @@ export const tierList = sqliteTable(
   (t) => ({ workspaceNameUnique: unique('tier_list_workspace_name_unique').on(t.workspaceId, t.name) })
 )
 
+// [SaaS] Feriados por workspace (reemplaza el usHolidays.json hardcodeado). `year` NULL =
+// recurrente (mismo mes/día CADA año); con `year` = fecha única (p. ej. Thanksgiving). El
+// motor (isNonWorkingDay) y el gantt los leen de aquí, cacheados por workspace.
+export const holiday = sqliteTable('holiday', {
+  id: integer('id').primaryKey({ autoIncrement: true }),
+  name: text('name').notNull(),
+  month: integer('month').notNull(), // 1-12
+  day: integer('day').notNull(), // 1-31
+  year: integer('year'), // null → recurrente; set → fecha única
+  workspaceId: text('workspace_id'),
+  createdAt: createdAt(),
+})
+
 // [SaaS] PK COMPUESTO (id de ClickUp + workspaceId): la MISMA persona puede ser
 // miembro de varios workspaces. `email` deja de ser único global (mismo correo en
 // distintos workspaces). workspaceId se deja nullable a propósito para no romper los
