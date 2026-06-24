@@ -63,3 +63,28 @@ export async function getHolidayMatcher(workspaceId?: string | null): Promise<Ho
   }
   return { dated, recurring }
 }
+
+export interface HolidayInput {
+  name: string
+  month: number
+  day: number
+  year: number | null // null → recurrente; set → fecha única
+}
+
+/** Valida y normaliza la entrada de un feriado (POST/PATCH/import). Devuelve el row
+ *  normalizado o un STRING con el mensaje de error (para responder 400). */
+export function parseHolidayInput(raw: unknown): HolidayInput | string {
+  const b = (raw ?? {}) as Record<string, unknown>
+  const name = typeof b.name === 'string' ? b.name.trim() : ''
+  const month = Number(b.month)
+  const day = Number(b.day)
+  const year =
+    b.year === null || b.year === undefined || b.year === '' ? null : Number(b.year)
+
+  if (!name) return 'Name is required'
+  if (!Number.isInteger(month) || month < 1 || month > 12) return 'Month must be between 1 and 12'
+  if (!Number.isInteger(day) || day < 1 || day > 31) return 'Day must be between 1 and 31'
+  if (year !== null && (!Number.isInteger(year) || year < 1970 || year > 2100))
+    return 'Year must be 1970-2100 or empty (recurring)'
+  return { name, month, day, year }
+}
