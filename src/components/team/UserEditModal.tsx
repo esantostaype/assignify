@@ -9,7 +9,6 @@ import axios from 'axios'
 import { hotToast as toast } from '@/lib/hotToast'
 import { useQueryClient } from '@tanstack/react-query'
 import { UserRoleRow } from './UserRoleRow'
-import { UserVacationRow } from './UserVacationRow'
 import { AddRoleForm } from './AddRoleForm'
 import { AddVacationForm } from './AddVacationForm'
 import { Icon, PiUser, PiCalendarBlank, PiMedal, PiUserCheck, PiTrash } from '@/lib/icons'
@@ -21,12 +20,21 @@ import {
   Switch,
   Button,
   Modal,
+  IconButton,
   DiscardChangesDialog,
   DeleteConfirmDialog,
+  DataTable,
   type SelectOption,
+  type DataTableColumn,
 } from '@/components/ui'
 
 type UserLevel = 'JUNIOR' | 'MID' | 'SENIOR'
+
+interface VacationItem {
+  id: number
+  startDate: string
+  endDate: string
+}
 
 interface PendingRole {
   tempId: number
@@ -156,6 +164,51 @@ export const UserEditModal: React.FC<UserEditModalProps> = ({ open, userId, user
     if (vacationId < 0) setVacationsToAdd((prev) => prev.filter((v) => v.tempId !== vacationId))
     else setVacationIdsToRemove((prev) => [...prev, vacationId])
   }
+
+  // Columnas del DataTable de vacaciones (borrado DIRECTO; se confirma al Save).
+  const vacationColumns: DataTableColumn<VacationItem>[] = [
+    {
+      key: 'start',
+      header: 'Start Date',
+      accessor: (v) => new Date(v.startDate).getTime(),
+      skeleton: 'text',
+      cell: (v) => new Date(v.startDate).toLocaleDateString(),
+    },
+    {
+      key: 'end',
+      header: 'End Date',
+      skeleton: 'text',
+      cell: (v) => new Date(v.endDate).toLocaleDateString(),
+    },
+    {
+      key: 'duration',
+      header: 'Duration',
+      skeleton: 'text',
+      cell: (v) =>
+        `${Math.ceil((new Date(v.endDate).getTime() - new Date(v.startDate).getTime()) / (1000 * 60 * 60 * 24))} days`,
+    },
+    {
+      key: 'actions',
+      header: '',
+      align: 'right',
+      width: 72,
+      skeleton: 'actions',
+      expandedBare: true,
+      cell: (v) => (
+        <div className="flex justify-end">
+          <IconButton
+            aria-label="Remove vacation"
+            size="sm"
+            color="error"
+            variant="soft"
+            onClick={() => deleteVacation(v.id)}
+          >
+            <Icon icon={PiTrash} size={16} />
+          </IconButton>
+        </div>
+      ),
+    },
+  ]
 
   const invalidateAfterWrite = () => {
     qc.invalidateQueries({ queryKey: userKeys.details(userId) })
@@ -352,36 +405,16 @@ export const UserEditModal: React.FC<UserEditModalProps> = ({ open, userId, user
                 <Icon icon={PiCalendarBlank} size={20} />
                 Vacations
               </h3>
-              <div className="mb-4 overflow-hidden rounded-lg border border-(--color-border-default)">
-                <table className="w-full">
-                  <thead className="bg-(--color-surface-hover)">
-                    <tr>
-                      <th className="p-2 text-left text-sm font-medium text-(--color-text-muted) first:pl-4 last:pr-4">Start Date</th>
-                      <th className="p-2 text-left text-sm font-medium text-(--color-text-muted) first:pl-4 last:pr-4">End Date</th>
-                      <th className="p-2 text-left text-sm font-medium text-(--color-text-muted) first:pl-4 last:pr-4">Duration</th>
-                      <th className="w-[5rem] p-2 text-left text-sm font-medium text-(--color-text-muted) first:pl-4 last:pr-4">Actions</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {visibleVacations.map((vacation) => (
-                      <UserVacationRow key={vacation.id} vacation={vacation} onDelete={deleteVacation} loading={loadingUser} />
-                    ))}
-                    {!loadingUser && visibleVacations.length === 0 && (
-                      <tr>
-                        <td colSpan={4} className="px-3 py-4 text-center text-(--color-text-subtle)">
-                          No vacations scheduled
-                        </td>
-                      </tr>
-                    )}
-                    {loadingUser && (
-                      <tr>
-                        <td colSpan={4} className="px-3 py-4 text-center text-(--color-text-subtle)">
-                          Loading vacations...
-                        </td>
-                      </tr>
-                    )}
-                  </tbody>
-                </table>
+              <div className="mb-4">
+                <DataTable<VacationItem>
+                  data={visibleVacations}
+                  columns={vacationColumns}
+                  rowKey={(v) => v.id}
+                  loading={loadingUser}
+                  showSearch={false}
+                  hidePageSizePicker
+                  emptyState="No vacations scheduled"
+                />
               </div>
 
               <AddVacationForm onAdd={addVacation} loading={false} existingVacations={visibleVacations} userId={userId} />

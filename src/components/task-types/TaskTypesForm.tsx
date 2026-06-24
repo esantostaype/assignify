@@ -3,7 +3,10 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 "use client";
 import React, { useState, useEffect } from "react";
-import { Button, Input, IconButton, Typography, Spinner, Skeleton, DeleteConfirmDialog } from "@/components/ui";
+import {
+  Button, Input, IconButton, Typography, Spinner, DeleteConfirmDialog,
+  DataTable, type DataTableColumn,
+} from "@/components/ui";
 import { Icon, PiPlus, PiTrash } from "@/lib/icons";
 import { useTaskDataInvalidation } from "@/hooks/useTaskData";
 import axios from "axios";
@@ -15,14 +18,6 @@ interface TaskType {
   description?: string;
   color?: string;
 }
-
-// Agregar este componente dentro del archivo, antes del componente principal:
-const TaskTypeSkeleton: React.FC = () => (
-  <tr className="border-t border-(--color-border-default)">
-    <td className="p-2 first:pl-4"><Skeleton variant="text" width={128} /></td>
-    <td className="p-2 last:pr-4"><Skeleton variant="rect" width={32} height={32} className="ml-auto" /></td>
-  </tr>
-);
 
 export const TaskTypesForm: React.FC = () => {
   const { invalidateAll } = useTaskDataInvalidation();
@@ -139,7 +134,7 @@ export const TaskTypesForm: React.FC = () => {
 
   // Description copy reflects whether the type has dependent categories.
   const deleteDescription = (type: TaskType) => `Are you sure you want to delete the task type "${type.name}"? This action cannot be undone.`
-  
+
 
   // Handle key press
   const handleKeyPress = (e: React.KeyboardEvent) => {
@@ -154,117 +149,110 @@ export const TaskTypesForm: React.FC = () => {
     }
   };
 
+  // Columnas del DataTable. La edición del nombre sigue siendo inline (click → input);
+  // el DataTable aporta búsqueda, paginación y auto-hide por ancho del contenedor.
+  const columns: DataTableColumn<TaskType>[] = [
+    {
+      key: "name",
+      header: "Name",
+      accessor: (type) => type.name,
+      skeleton: "text",
+      cell: (type) =>
+        editingId === type.id ? (
+          <Input
+            value={editingName}
+            onChange={(e) => setEditingName(e.target.value)}
+            onKeyDown={handleKeyPress}
+            onBlur={saveEdit}
+            autoFocus
+            size="sm"
+            className="w-full max-w-xs"
+          />
+        ) : (
+          <span
+            onClick={() => startEditing(type)}
+            className="cursor-pointer hover:text-primary-600 transition-colors"
+            title="Click to edit"
+          >
+            {type.name}
+          </span>
+        ),
+    },
+    {
+      key: "actions",
+      header: "",
+      align: "right",
+      width: 72,
+      skeleton: "actions",
+      expandedBare: true,
+      cell: (type) => (
+        <div className="flex justify-end">
+          <IconButton
+            aria-label="Delete task type"
+            size="sm"
+            color="error"
+            variant="soft"
+            onClick={() => setPendingDelete(type)}
+            disabled={editingId === type.id || deleting === type.id}
+          >
+            {deleting === type.id ? <Spinner colorClassName="" /> : <Icon icon={PiTrash} size={16} />}
+          </IconButton>
+        </div>
+      ),
+    },
+  ];
+
   return (
     <>
-    <div className="space-y-6">
-      {/* Existing Types Table */}
-      {loading || types.length > 0 ? (
+      <div className="space-y-6">
+        <DataTable<TaskType>
+          data={types}
+          columns={columns}
+          rowKey={(type) => type.id}
+          loading={loading}
+          emptyState="No task types yet. Add one below."
+          searchPlaceholder="Search task types…"
+        />
+
+        {/* Add New Type */}
         <div>
-          <div className="overflow-hidden rounded-lg border border-(--color-border-default) bg-(--color-surface-card)">
-            <table className="w-full text-sm">
-              <thead className="bg-(--color-surface-hover)">
-                <tr>
-                  <th className="p-2 text-left font-medium text-(--color-text-muted) first:pl-4">Name</th>
-                  <th className="w-[5rem] p-2 text-right font-medium text-(--color-text-muted) last:pr-4">Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {loading ? (
-                  <>
-                    <TaskTypeSkeleton />
-                    <TaskTypeSkeleton />
-                  </>
-                ) : (
-                  // Datos reales
-                  types.map((type) => (
-                    <tr key={type.id} className="border-t border-(--color-border-default)">
-                      <td className="p-2 first:pl-4 last:pr-4">
-                        {editingId === type.id ? (
-                          <Input
-                            value={editingName}
-                            onChange={(e) => setEditingName(e.target.value)}
-                            onKeyDown={handleKeyPress}
-                            onBlur={saveEdit}
-                            autoFocus
-                            size="sm"
-                            className="w-full"
-                          />
-                        ) : (
-                          <span
-                            onClick={() => startEditing(type)}
-                            className="cursor-pointer hover:text-primary-600 transition-colors w-[10rem]"
-                            title="Click to edit"
-                          >
-                            {type.name}
-                          </span>
-                        )}
-                      </td>
-                      <td className="p-2 last:pr-4">
-                        <div className="flex justify-end">
-                          <IconButton
-                            aria-label="Delete task type"
-                            size="sm"
-                            color="error"
-                            variant="soft"
-                            onClick={() => setPendingDelete(type)}
-                            disabled={editingId === type.id || deleting === type.id}
-                          >
-                            {deleting === type.id ? (
-                              <Spinner colorClassName="" />
-                            ) : (
-                              <Icon icon={PiTrash} size={16} />
-                            )}
-                          </IconButton>
-                        </div>
-                      </td>
-                    </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
+          <Typography variant="label" as="label">Add New Task Type</Typography>
+          <div className="flex gap-2 mt-1.5">
+            <Input
+              placeholder="Enter task type name..."
+              value={newTypeName}
+              onChange={(e) => setNewTypeName(e.target.value)}
+              onKeyDown={handleKeyPress}
+              size="md"
+              className="flex-1"
+              disabled={loading || saving || editingId !== null}
+            />
+            <Button
+              startIcon={<Icon icon={PiPlus} size={16} />}
+              onClick={addNewType}
+              disabled={
+                loading || !newTypeName.trim() || saving || editingId !== null
+              }
+              loading={saving && !editingId}
+              color="primary"
+            >
+              Add Type
+            </Button>
           </div>
         </div>
-      ) : null}
-
-      {/* Add New Type */}
-      <div>
-        <Typography variant="label" as="label">Add New Task Type</Typography>
-        <div className="flex gap-2 mt-1.5">
-          <Input
-            placeholder="Enter task type name..."
-            value={newTypeName}
-            onChange={(e) => setNewTypeName(e.target.value)}
-            onKeyDown={handleKeyPress}
-            size="md"
-            className="flex-1"
-            disabled={loading || saving || editingId !== null}
-          />
-          <Button
-            startIcon={<Icon icon={PiPlus} size={16} />}
-            onClick={addNewType}
-            disabled={
-              loading || !newTypeName.trim() || saving || editingId !== null
-            }
-            loading={saving && !editingId}
-            color="primary"
-          >
-            Add Type
-          </Button>
-        </div>
       </div>
-    </div>
 
-    <DeleteConfirmDialog
-      open={!!pendingDelete}
-      onClose={() => setPendingDelete(null)}
-      onConfirm={() => {
-        if (pendingDelete) deleteType(pendingDelete.id, pendingDelete.name);
-        setPendingDelete(null);
-      }}
-      title="Delete Task Type"
-      description={pendingDelete ? deleteDescription(pendingDelete) : undefined}
-      confirmLabel="Delete Task Type"
-    />
+      <DeleteConfirmDialog
+        open={!!pendingDelete}
+        onClose={() => setPendingDelete(null)}
+        onConfirm={() => {
+          if (pendingDelete) deleteType(pendingDelete.id, pendingDelete.name);
+          setPendingDelete(null);
+        }}
+        title="Delete Task Type"
+        description={pendingDelete ? deleteDescription(pendingDelete) : undefined}
+        confirmLabel="Delete Task Type"
+      />
     </>
   );
 };

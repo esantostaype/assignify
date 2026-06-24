@@ -1,12 +1,11 @@
 'use client'
 // [SaaS] Elegir qué LISTAS de ClickUp del workspace son "asignables" (se guardan
-// como brands). Tabla con un switch por lista (estilo Task Types) en vez del
-// MultiSelect anterior: se ve todo de un vistazo y se activa/desactiva directo.
-import { useState, useEffect, useMemo } from 'react'
+// como brands). Tabla (DataTable) con un switch por lista: se ve todo de un vistazo
+// y se activa/desactiva directo; el botón Save persiste toda la selección.
+import { useState, useEffect } from 'react'
 import axios from 'axios'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { Button, Switch, Input, Skeleton } from '@/components/ui'
-import { Icon, PiMagnifyingGlass } from '@/lib/icons'
+import { Button, Switch, DataTable, type DataTableColumn } from '@/components/ui'
 import { hotToast as toast } from '@/lib/hotToast'
 import { taskDataKeys } from '@/hooks/useTaskData'
 
@@ -18,14 +17,6 @@ interface DiscoveredList {
   isAssignable: boolean
 }
 
-const ListRowSkeleton = () => (
-  <tr className="border-t border-(--color-border-default)">
-    <td className="p-2 first:pl-4"><Skeleton variant="text" width={160} /></td>
-    <td className="p-2"><Skeleton variant="text" width={112} /></td>
-    <td className="p-2 last:pr-4"><Skeleton variant="circle" width={36} height={20} className="ml-auto" /></td>
-  </tr>
-)
-
 export function ListsSyncForm() {
   const qc = useQueryClient()
   const { data, isLoading } = useQuery({
@@ -36,7 +27,6 @@ export function ListsSyncForm() {
 
   // Selección (assignable) como Set para alternar directo desde cada switch.
   const [selected, setSelected] = useState<Set<string>>(new Set())
-  const [search, setSearch] = useState('')
   useEffect(() => {
     if (data) setSelected(new Set(data.filter((l) => l.isAssignable).map((l) => l.id)))
   }, [data])
@@ -63,13 +53,46 @@ export function ListsSyncForm() {
       return next
     })
 
-  const lists = useMemo(
-    () =>
-      (data ?? []).filter(
-        (l) => !search || l.name.toLowerCase().includes(search.toLowerCase())
+  const columns: DataTableColumn<DiscoveredList>[] = [
+    {
+      key: 'name',
+      header: 'List',
+      accessor: (l) => l.name,
+      width: 240,
+      skeleton: 'text',
+      cell: (l) => <span className="font-medium text-(--color-text-strong)">{l.name}</span>,
+    },
+    {
+      key: 'space',
+      header: 'Space',
+      accessor: (l) => (l.folderName ? `${l.folderName} / ${l.spaceName}` : l.spaceName),
+      skeleton: 'text',
+      cell: (l) => (
+        <span className="text-(--color-text-muted)">
+          {l.folderName ? `${l.folderName} / ` : ''}
+          {l.spaceName}
+        </span>
       ),
-    [data, search]
-  )
+    },
+    {
+      key: 'assignable',
+      header: 'Assignable',
+      align: 'right',
+      width: 120,
+      skeleton: 'chip',
+      expandedInteractive: true,
+      cell: (l) => (
+        <div className="flex justify-end">
+          <Switch
+            checked={selected.has(l.id)}
+            onChange={() => toggle(l.id)}
+            size="sm"
+            aria-label={`Make ${l.name} assignable`}
+          />
+        </div>
+      ),
+    },
+  ]
 
   return (
     <div className="flex flex-col gap-4">
@@ -78,53 +101,14 @@ export function ListsSyncForm() {
         you can choose when creating a task.
       </p>
 
-      <Input
-        size="md"
-        placeholder="Search lists..."
-        value={search}
-        onChange={(e) => setSearch(e.target.value)}
-        startAdornment={<Icon icon={PiMagnifyingGlass} size={16} />}
+      <DataTable<DiscoveredList>
+        data={data ?? []}
+        columns={columns}
+        rowKey={(l) => l.id}
+        loading={isLoading}
+        searchPlaceholder="Search lists…"
+        emptyState="No lists found in this workspace"
       />
-
-      <div className="max-h-[60vh] overflow-auto rounded-lg border border-(--color-border-default) bg-(--color-surface-card)">
-        <table className="w-full text-sm">
-          <thead className="sticky top-0 bg-(--color-surface-hover)">
-            <tr>
-              <th className="p-2 text-left font-medium text-(--color-text-muted) first:pl-4">List</th>
-              <th className="p-2 text-left font-medium text-(--color-text-muted)">Space</th>
-              <th className="w-24 p-2 text-right font-medium text-(--color-text-muted) last:pr-4">Assignable</th>
-            </tr>
-          </thead>
-          <tbody>
-            {isLoading ? (
-              <>
-                <ListRowSkeleton />
-                <ListRowSkeleton />
-                <ListRowSkeleton />
-              </>
-            ) : lists.length === 0 ? (
-              <tr>
-                <td colSpan={3} className="p-6 text-center text-(--color-text-muted)">
-                  {search ? 'No lists match your search' : 'No lists found in this workspace'}
-                </td>
-              </tr>
-            ) : (
-              lists.map((l) => (
-                <tr key={l.id} className="border-t border-(--color-border-default)">
-                  <td className="p-2 font-medium text-(--color-text-strong) first:pl-4">{l.name}</td>
-                  <td className="p-2 text-(--color-text-muted)">
-                    {l.folderName ? `${l.folderName} / ` : ''}
-                    {l.spaceName}
-                  </td>
-                  <td className="p-2 text-right last:pr-4">
-                    <Switch checked={selected.has(l.id)} onChange={() => toggle(l.id)} size="sm" />
-                  </td>
-                </tr>
-              ))
-            )}
-          </tbody>
-        </table>
-      </div>
 
       <div className="flex justify-end">
         <Button onClick={() => save.mutate([...selected])} loading={save.isPending} disabled={isLoading}>

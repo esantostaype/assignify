@@ -1,7 +1,7 @@
 /* eslint-disable react/no-unescaped-entities */
 "use client";
 import React, { useState, useEffect } from "react";
-import { Button, Input, Alert, Select } from "@/components/ui";
+import { Button, Input, Alert, Select, DataTable, type DataTableColumn } from "@/components/ui";
 import { Icon, PiDownloadSimple, PiWarning } from "@/lib/icons";
 import { useTaskDataInvalidation } from "@/hooks/useTaskData";
 import { daysToUnit, unitToDays, DURATION_UNITS, type DurationUnit } from "@/utils/duration-utils";
@@ -23,32 +23,6 @@ const UNIT_OPTIONS: { value: DurationUnit; label: string }[] = [
 
 // Redondea el valor mostrado en la unidad (evita 29.999…).
 const toUnit = (days: number, unit: DurationUnit) => Math.round(daysToUnit(days, unit) * 100) / 100;
-
-const TierSkeleton: React.FC = () => {
-  const skeletonColumns = Array.from({ length: 6 }, (_, index) => (
-    <th key={index} className="p-2 first:pl-4 last:pr-4 text-left text-sm font-medium text-gray-300">
-      <div className="flex items-center gap-2 justify-center animate-pulse">
-        <div className="h-4 bg-(--color-surface-hover) rounded w-16"></div>
-      </div>
-    </th>
-  ));
-  const skeletonInputs = Array.from({ length: 6 }, (_, index) => (
-    <td key={index} className="p-2 first:pl-4 last:pr-4">
-      <div className="pt-2 w-full flex justify-center animate-pulse">
-        <div className="flex flex-col items-center gap-1">
-          <div className="h-10 bg-(--color-surface-hover) rounded w-24"></div>
-          <div className="h-3 bg-(--color-surface-hover) rounded w-8"></div>
-        </div>
-      </div>
-    </td>
-  ));
-  return (
-    <>
-      <thead className="bg-(--color-surface-hover)"><tr>{skeletonColumns}</tr></thead>
-      <tbody><tr>{skeletonInputs}</tr></tbody>
-    </>
-  );
-};
 
 export const TierListForm: React.FC = () => {
   const { invalidateTiers } = useTaskDataInvalidation();
@@ -136,6 +110,55 @@ export const TierListForm: React.FC = () => {
     }
   };
 
+  // Cada tier es una FILA (Tier · Duration). El DataTable aporta auto-hide por ancho
+  // del contenedor; la edición de la duración persiste al pulsar Save.
+  const columns: DataTableColumn<TierData>[] = [
+    {
+      key: "name",
+      header: "Tier",
+      accessor: (t) => t.name,
+      skeleton: "text",
+      cell: (t) => (
+        <span className="font-medium text-(--color-text-strong)">
+          Tier {t.name}
+          {tierChanges[t.id] !== undefined && (
+            <span
+              className="ml-2 inline-block h-2 w-2 rounded-full bg-warning-500 align-middle"
+              title="Changed"
+            />
+          )}
+        </span>
+      ),
+    },
+    {
+      key: "duration",
+      header: "Duration",
+      width: 220,
+      skeleton: "text",
+      cell: (t) => {
+        const hasChanged = tierChanges[t.id] !== undefined;
+        const currentValue = tierChanges[t.id] ?? toUnit(t.duration, unit);
+        return (
+          <div className="flex items-center gap-2">
+            <Input
+              type="number"
+              value={currentValue.toString()}
+              onChange={(e) => {
+                const value = parseFloat(e.target.value);
+                if (!isNaN(value) && value > 0) handleTierDurationChange(t.id, value);
+              }}
+              min={unit === "minutes" ? 1 : 0.1}
+              step={unit === "days" ? 0.1 : 1}
+              size="sm"
+              className={`w-24 [&_input]:text-center${hasChanged ? " border-warning-500" : ""}`}
+            />
+            <span className="text-xs text-(--color-text-muted)">{unit}</span>
+          </div>
+        );
+      },
+    },
+  ];
+
   return (
     <>
       <div className="flex items-center justify-between gap-3 mb-4">
@@ -162,60 +185,17 @@ export const TierListForm: React.FC = () => {
         </Alert>
       )}
 
-      <div className="border border-(--color-border-default) rounded-lg overflow-y-hidden overflow-x-auto">
-        <table className="w-full">
-          {loadingTiers ? (
-            <TierSkeleton />
-          ) : (
-            <>
-              <thead className="bg-(--color-surface-hover)">
-                <tr>
-                  {tiers.map((tier) => {
-                    const hasChanged = tierChanges[tier.id] !== undefined;
-                    return (
-                      <th key={tier.id} className="p-2 first:pl-4 last:pr-4 text-left text-sm font-medium text-gray-300">
-                        <div className="flex items-center gap-2 justify-center">
-                          <span>Tier {tier.name}</span>
-                          {hasChanged && <div className="w-2 h-2 bg-orange-500 rounded-full" title="Changed" />}
-                        </div>
-                      </th>
-                    );
-                  })}
-                </tr>
-              </thead>
-              <tbody>
-                <tr>
-                  {tiers.map((tier) => {
-                    const hasChanged = tierChanges[tier.id] !== undefined;
-                    const currentValue = tierChanges[tier.id] ?? toUnit(tier.duration, unit);
-                    return (
-                      <td key={tier.id} className="p-2 first:pl-4 last:pr-4">
-                        <div className="pt-2 w-full flex justify-center">
-                          <div className="flex flex-col items-center gap-1">
-                            <Input
-                              type="number"
-                              value={currentValue.toString()}
-                              onChange={(e) => {
-                                const value = parseFloat(e.target.value);
-                                if (!isNaN(value) && value > 0) handleTierDurationChange(tier.id, value);
-                              }}
-                              min={unit === "minutes" ? 1 : 0.1}
-                              step={unit === "days" ? 0.1 : 1}
-                              size="md"
-                              className={`w-24 [&_input]:text-center${hasChanged ? " border-warning-500" : ""}`}
-                            />
-                            <span className="text-xs text-(--color-text-muted)">{unit}</span>
-                          </div>
-                        </div>
-                      </td>
-                    );
-                  })}
-                </tr>
-              </tbody>
-            </>
-          )}
-        </table>
-      </div>
+      <DataTable<TierData>
+        data={tiers}
+        columns={columns}
+        rowKey={(t) => t.id}
+        loading={loadingTiers}
+        skeletonRowCount={4}
+        showSearch={false}
+        hidePageSizePicker
+        emptyState="No tiers configured"
+      />
+
       <div className="flex items-center justify-end mt-4">
         <Button
           startIcon={<Icon icon={PiDownloadSimple} size={16} />}
