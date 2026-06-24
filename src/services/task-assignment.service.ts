@@ -7,14 +7,14 @@ import { user as userTable, userRole, userVacation } from '@/db/schema';
 import { eq, and, or, isNull, gte } from 'drizzle-orm';
 import { Priority, Status, Level } from '@/db/enums';
 import { UserSlot, UserWithRoles, Task, TaskTimingResult, UserVacation, VacationAwareUserSlot, RankedCandidate, MemberStatus } from '@/interfaces';
-import { getNextAvailableStart, calculateWorkingDeadline, OCCUPYING_STATUSES } from '@/utils/task-calculation-utils';
+import { getNextAvailableStart, calculateWorkingDeadline, OCCUPYING_STATUSES, isNonWorkingDay, setActiveHolidays } from '@/utils/task-calculation-utils';
 import { CACHE_KEYS } from '@/config';
 import { getAppSettings } from '@/services/app-settings.service';
 import { getFromCache, setInCache } from '@/utils/cache';
 import { fetchActiveClickUpTasks, type ActiveClickUpTask } from '@/services/clickup-tasks.service';
 import { mapClickUpPriority } from '@/utils/clickup-status-mapping-utils';
 import { pickBestAcrossAffinity, PRIORITY_RANK } from '@/services/assignment-ranking';
-import usHolidays from '@/data/usHolidays.json'
+import { getHolidayMatcher } from '@/services/holidays.service'
 
 // Duración a asumir para una tarea pendiente cuyo `durationDays` no conocemos
 // (creada fuera de Assignify, sin fila en task_meta). 1 día = el viejo "1 por tarea".
@@ -29,43 +29,23 @@ const OVERLOAD_THRESHOLD_DAYS = 10;
 // ON_APPROVAL ya está entregado: no cuenta ni para carga ni para disponibilidad.
 const PENDING_CLICKUP_STATUSES: ActiveClickUpTask['status'][] = ['TO_DO', 'IN_PROGRESS'];
 
-function getUSHolidays(startDate: Date, endDate: Date): Date[] {
-  const holidays: Date[] = [];
-  const start = new Date(startDate);
-  const end = new Date(endDate);
-
-  usHolidays.forEach(holiday => {
-    const holidayDate = new Date(holiday.date + 'T00:00:00Z');
-    if (holidayDate >= start && holidayDate <= end) {
-      holidays.push(holidayDate);
-    }
-  });
-
-  return holidays;
-}
-
 function calculateWorkingDaysBetween(startDate: Date, endDate: Date, excludeVacations: UserVacation[] = []): number {
   if (startDate >= endDate) return 0;
 
   let workingDays = 0;
   const current = new Date(startDate);
-  const holidays = getUSHolidays(startDate, endDate);
 
   while (current < endDate) {
-    const dayOfWeek = current.getUTCDay();
-
-    if (dayOfWeek !== 0 && dayOfWeek !== 6) {
-      const isHoliday = holidays.some(holiday =>
-        holiday.toISOString().split('T')[0] === current.toISOString().split('T')[0]
-      );
-
+    // isNonWorkingDay = fin de semana O festivo (festivos del workspace vía
+    // setActiveHolidays, fijado en el entry point antes de este cálculo).
+    if (!isNonWorkingDay(current)) {
       const isOnVacation = excludeVacations.some(vacation => {
         const vacStart = new Date(vacation.startDate);
         const vacEnd = new Date(vacation.endDate);
         return current >= vacStart && current <= vacEnd;
       });
 
-      if (!isHoliday && !isOnVacation) {
+      if (!isOnVacation) {
         workingDays++;
       }
     }
@@ -141,6 +121,11 @@ async function getVacationAwareUserSlots(
   workspaceId: string | null,
   clickupToken: string | undefined
 ): Promise<VacationAwareUserSlot[]> {
+  // Festivos del workspace (de la DB) para todos los cálculos de fechas que siguen.
+  // Entry point del motor: tanto la sugerencia (/suggestion/simple) como la creación
+  // (/parallel) pasan por aquí. Fallback al JSON si el workspace no tiene festivos.
+  setActiveHolidays(await getHolidayMatcher(workspaceId));
+
   const allUsersWithRoles = await db.query.user.findMany({
     // [SaaS] Solo los miembros del workspace activo (aislamiento multi-inquilino).
     where: and(eq(userTable.active, true), eq(userTable.workspaceId, workspaceId ?? '__none__')),

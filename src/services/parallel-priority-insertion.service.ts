@@ -13,7 +13,8 @@ import { db } from '@/db';
 import { user as userTable, userVacation, taskMeta } from '@/db/schema';
 import { eq, gte, inArray } from 'drizzle-orm';
 import { Priority } from '@/db/enums';
-import { getNextAvailableStart, calculateWorkingDeadline } from '@/utils/task-calculation-utils';
+import { getNextAvailableStart, calculateWorkingDeadline, setActiveHolidays } from '@/utils/task-calculation-utils';
+import { getHolidayMatcher } from '@/services/holidays.service';
 import { UserVacation } from '@/interfaces';
 import { getActiveClickUpTasksByUser, type ClickUpFetchOptions } from '@/services/clickup-tasks.service';
 import { mapClickUpPriority } from '@/utils/clickup-status-mapping-utils';
@@ -157,6 +158,8 @@ export async function calculateParallelPriorityInsertion(
 ): Promise<ParallelInsertionResult> {
   // El workspace activo llega vía clickupOpts.teamId → settings del motor por inquilino.
   const workspaceId = clickupOpts.teamId ?? null;
+  // Festivos del workspace (de la DB) para los cálculos de fechas/carriles que siguen.
+  setActiveHolidays(await getHolidayMatcher(workspaceId));
   const now = new Date();
   const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
 
@@ -255,6 +258,8 @@ export async function cascadeLowTasksForUser(
   clickupOpts: ClickUpFetchOptions = {}
 ): Promise<CascadeMove[]> {
   const workspaceId = clickupOpts.teamId ?? null;
+  // Festivos del workspace (de la DB) para los cálculos de fechas que siguen.
+  setActiveHolidays(await getHolidayMatcher(workspaceId));
 
   // 1. Low TO_DO del usuario (en vivo de ClickUp).
   const userTasks = await getActiveClickUpTasksByUser(userId, clickupOpts);

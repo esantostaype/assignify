@@ -16,12 +16,30 @@ import usHolidays from '@/data/usHolidays.json';
  */
 export const OCCUPYING_STATUSES: Status[] = [Status.TO_DO, Status.IN_PROGRESS];
 
-// Set de festivos (YYYY-MM-DD en UTC) para lookup O(1).
-const HOLIDAY_SET = new Set((usHolidays as Array<{ date: string }>).map((h) => h.date));
+// Feriados. Por defecto los del JSON (FALLBACK); el motor los REEMPLAZA por los del
+// workspace vía setActiveHolidays() (cargados de la DB, cacheados) antes de cada cálculo
+// síncrono. Matcher = fechas únicas "YYYY-MM-DD" + recurrentes "MM-DD" (aplican cada año).
+export interface HolidayMatcher {
+  dated: Set<string>; // "YYYY-MM-DD"
+  recurring: Set<string>; // "MM-DD"
+}
+const FALLBACK_HOLIDAYS: HolidayMatcher = {
+  dated: new Set((usHolidays as Array<{ date: string }>).map((h) => h.date)),
+  recurring: new Set<string>(),
+};
+let activeHolidays: HolidayMatcher = FALLBACK_HOLIDAYS;
 
-/** ¿La fecha (en UTC) cae en un día festivo? */
+/** Fija los feriados activos del workspace para los cálculos síncronos que siguen. `null`
+ *  vuelve al fallback (JSON). Llamar en los entry points IO (tras el await que los carga)
+ *  inmediatamente ANTES del cálculo síncrono, sin awaits en medio. */
+export function setActiveHolidays(m: HolidayMatcher | null): void {
+  activeHolidays = m ?? FALLBACK_HOLIDAYS;
+}
+
+/** ¿La fecha (en UTC) cae en un festivo (fecha única o recurrente mes/día del workspace)? */
 function isHoliday(date: Date): boolean {
-  return HOLIDAY_SET.has(date.toISOString().split('T')[0]);
+  const iso = date.toISOString().split('T')[0]; // YYYY-MM-DD
+  return activeHolidays.dated.has(iso) || activeHolidays.recurring.has(iso.slice(5)); // MM-DD
 }
 
 /** ¿La fecha (en UTC) es fin de semana o festivo (día no laborable)? */
