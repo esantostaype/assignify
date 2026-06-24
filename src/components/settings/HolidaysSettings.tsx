@@ -4,11 +4,12 @@ import React, { useEffect, useRef, useState } from "react";
 import {
   Button,
   IconButton,
+  Input,
+  Select,
   Skeleton,
   AlertDialog,
   DeleteConfirmDialog,
 } from "@/components/ui";
-import { cn } from "@/lib/cn";
 import { Icon, PiPlus, PiTrash, PiDownloadSimple, PiUploadSimple } from "@/lib/icons";
 import axios from "axios";
 import { hotToast as toast } from "@/lib/hotToast";
@@ -21,13 +22,29 @@ interface HolidayRow {
   year: number | null; // null → recurrente cada año; con año → fecha única
 }
 
-type EditField = "name" | "month" | "day" | "year";
+// Fila en edición: los campos numéricos viven como STRING (lo que el <Input> necesita);
+// se parsean a number/null solo al guardar. year "" = recurrente.
+interface DraftRow {
+  id: number;
+  name: string;
+  month: string;
+  day: string;
+  year: string;
+}
 
 const MONTHS = [
   "January", "February", "March", "April", "May", "June",
   "July", "August", "September", "October", "November", "December",
 ];
-const monthName = (m: number) => MONTHS[m - 1] ?? String(m);
+const MONTH_OPTIONS = MONTHS.map((m, i) => ({ value: String(i + 1), label: m }));
+
+const toDraft = (h: HolidayRow): DraftRow => ({
+  id: h.id,
+  name: h.name,
+  month: String(h.month),
+  day: String(h.day),
+  year: h.year == null ? "" : String(h.year),
+});
 
 // Plantilla CSV de ejemplo. Columna Year vacía = recurrente (cada año).
 const TEMPLATE_CSV = [
@@ -41,20 +58,24 @@ const TEMPLATE_CSV = [
 ].join("\n");
 
 export const HolidaysSettings: React.FC = () => {
-  const [rows, setRows] = useState<HolidayRow[]>([]);
+  const [rows, setRows] = useState<DraftRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [adding, setAdding] = useState(false);
   const [importing, setImporting] = useState(false);
-  const [pendingDelete, setPendingDelete] = useState<HolidayRow | null>(null);
+  const [pendingDelete, setPendingDelete] = useState<DraftRow | null>(null);
   const [pendingCsv, setPendingCsv] = useState<string | null>(null);
+  const [focusNewId, setFocusNewId] = useState<number | null>(null);
 
-  const [editing, setEditing] = useState<{ id: number; field: EditField } | null>(null);
-  const [draft, setDraft] = useState("");
+  // Última versión CONFIRMADA por el servidor de cada fila → para detectar cambios
+  // (no re-guardar si no cambió) y para revertir si la API falla.
+  const savedRef = useRef<Map<number, DraftRow>>(new Map());
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const load = async () => {
     const res = await axios.get<HolidayRow[]>("/api/holidays");
-    setRows(res.data);
+    const drafts = (res.data ?? []).map(toDraft);
+    savedRef.current = new Map(drafts.map((d) => [d.id, d]));
+    setRows(drafts);
   };
 
   useEffect(() => {
@@ -71,58 +92,56 @@ export const HolidaysSettings: React.FC = () => {
     })();
   }, []);
 
-  const startEdit = (row: HolidayRow, field: EditField) => {
-    setEditing({ id: row.id, field });
-    setDraft(field === "year" ? (row.year == null ? "" : String(row.year)) : String(row[field]));
-  };
-  const cancelEdit = () => {
-    setEditing(null);
-    setDraft("");
-  };
+  const setField = (id: number, key: keyof DraftRow, value: string) =>
+    setRows((prev) => prev.map((r) => (r.id === id ? { ...r, [key]: value } : r)));
 
-  // Guarda la celda editada: PATCH la fila COMPLETA con el campo cambiado.
-  // `raw` permite pasar el valor explícito (p. ej. el <select> de mes en su onChange,
-  // sin esperar al re-render de `draft`).
-  const commitEdit = async (row: HolidayRow, field: EditField, raw: string = draft) => {
-    if (!editing) return;
-    const next: HolidayRow = { ...row };
-    if (field === "name") next.name = raw.trim();
-    else if (field === "year") next.year = raw.trim() === "" ? null : Number(raw);
-    else if (field === "month") next.month = Number(raw);
-    else next.day = Number(raw);
+  // Guarda la fila si cambió respecto a lo confirmado. `override` permite pasar el valor
+  // nuevo del <Select> de mes sin esperar al re-render de `rows`.
+  const commit = async (id: number, override?: Partial<DraftRow>) => {
+    const base = rows.find((r) => r.id === id);
+    if (!base) return;
+    const draft: DraftRow = { ...base, ...override };
+    const prev = savedRef.current.get(id);
 
-    // Sin cambios → solo cerrar.
     if (
-      next.name === row.name && next.month === row.month &&
-      next.day === row.day && next.year === row.year
+      prev && prev.name === draft.name && prev.month === draft.month &&
+      prev.day === draft.day && prev.year === draft.year
     ) {
-      cancelEdit();
+      return; // sin cambios
+    }
+
+    const name = draft.name.trim();
+    const month = Number(draft.month);
+    const day = Number(draft.day);
+    const year = draft.year.trim() === "" ? null : Number(draft.year);
+
+    const msg =
+      (!name && "Name can't be empty") ||
+      ((!Number.isInteger(month) || month < 1 || month > 12) && "Month must be 1–12") ||
+      ((!Number.isInteger(day) || day < 1 || day > 31) && "Day must be 1–31") ||
+      (year != null && (!Number.isInteger(year) || year < 1970 || year > 2100) && "Year must be 1970–2100 or empty");
+    if (msg) {
+      toast.error({ title: "Invalid value", description: msg as string });
+      if (prev) setRows((p) => p.map((r) => (r.id === id ? prev : r))); // revertir
       return;
     }
 
-    // Validación local (la API revalida igual).
-    const bad =
-      (field === "name" && !next.name && "Name can't be empty") ||
-      (field === "month" && (!Number.isInteger(next.month) || next.month < 1 || next.month > 12) && "Month must be 1–12") ||
-      (field === "day" && (!Number.isInteger(next.day) || next.day < 1 || next.day > 31) && "Day must be 1–31") ||
-      (field === "year" && next.year != null && (!Number.isInteger(next.year) || next.year < 1970 || next.year > 2100) && "Year must be 1970–2100 or empty");
-    if (bad) {
-      toast.error({ title: "Invalid value", description: bad as string });
-      cancelEdit();
-      return;
-    }
+    // Normalizado (refleja trim + year vacío) en UI + como nuevo "guardado".
+    const normalized: DraftRow = {
+      id, name, month: String(month), day: String(day), year: year == null ? "" : String(year),
+    };
+    setRows((p) => p.map((r) => (r.id === id ? normalized : r)));
+    savedRef.current.set(id, normalized);
 
-    // Optimista + cerrar; revertir si la API falla.
-    setRows((prev) => prev.map((r) => (r.id === row.id ? next : r)));
-    cancelEdit();
     try {
-      await axios.patch(`/api/holidays/${row.id}`, {
-        name: next.name, month: next.month, day: next.day, year: next.year,
-      });
+      await axios.patch(`/api/holidays/${id}`, { name, month, day, year });
     } catch (e) {
       console.error("Error updating holiday:", e);
       toast.error({ title: "Couldn't save holiday", description: "Change reverted." });
-      setRows((prev) => prev.map((r) => (r.id === row.id ? row : r)));
+      if (prev) {
+        savedRef.current.set(id, prev);
+        setRows((p) => p.map((r) => (r.id === id ? prev : r)));
+      }
     }
   };
 
@@ -132,10 +151,10 @@ export const HolidaysSettings: React.FC = () => {
       const res = await axios.post<HolidayRow>("/api/holidays", {
         name: "New holiday", month: 1, day: 1, year: null,
       });
-      setRows((prev) => [...prev, res.data]);
-      // Editar el nombre de inmediato (queda seleccionado para sobrescribir).
-      setEditing({ id: res.data.id, field: "name" });
-      setDraft(res.data.name);
+      const d = toDraft(res.data);
+      savedRef.current.set(d.id, d);
+      setRows((prev) => [...prev, d]);
+      setFocusNewId(d.id); // enfoca + selecciona el nombre del nuevo
     } catch (e) {
       console.error("Error adding holiday:", e);
       toast.error({ title: "Couldn't add holiday", description: "Please try again." });
@@ -144,15 +163,18 @@ export const HolidaysSettings: React.FC = () => {
     }
   };
 
-  const deleteRow = async (row: HolidayRow) => {
-    const prev = rows;
+  const deleteRow = async (row: DraftRow) => {
+    const before = rows;
+    const beforeSaved = savedRef.current.get(row.id);
+    savedRef.current.delete(row.id);
     setRows((p) => p.filter((r) => r.id !== row.id)); // optimista
     try {
       await axios.delete(`/api/holidays/${row.id}`);
     } catch (e) {
       console.error("Error deleting holiday:", e);
       toast.error({ title: "Couldn't delete holiday", description: "Restored." });
-      setRows(prev);
+      if (beforeSaved) savedRef.current.set(row.id, beforeSaved);
+      setRows(before);
     }
   };
 
@@ -203,82 +225,17 @@ export const HolidaysSettings: React.FC = () => {
     URL.revokeObjectURL(url);
   };
 
-  // Input "que sigue pareciendo texto": transparente, sin borde, foco con subrayado tenue.
-  const cellInputCls =
-    "w-full bg-transparent px-0 py-0.5 text-sm text-(--color-text-strong) outline-none " +
-    "border-b border-(--color-primary-500)";
-
-  const renderCell = (row: HolidayRow, field: EditField) => {
-    const isEditing = editing?.id === row.id && editing.field === field;
-
-    if (isEditing && field === "month") {
-      return (
-        <select
-          autoFocus
-          value={draft}
-          onChange={(e) => {
-            setDraft(e.target.value);
-            commitEdit(row, field, e.target.value);
-          }}
-          onBlur={() => commitEdit(row, field)}
-          onKeyDown={(e) => {
-            if (e.key === "Escape") cancelEdit();
-          }}
-          className={cn(cellInputCls, "cursor-pointer")}
-        >
-          {MONTHS.map((m, i) => (
-            <option key={m} value={String(i + 1)}>{m}</option>
-          ))}
-        </select>
-      );
-    }
-
-    if (isEditing) {
-      return (
-        <input
-          autoFocus
-          value={draft}
-          inputMode={field === "name" ? "text" : "numeric"}
-          placeholder={field === "year" ? "Every year" : undefined}
-          onFocus={(e) => e.target.select()}
-          onChange={(e) => setDraft(e.target.value)}
-          onBlur={() => commitEdit(row, field)}
-          onKeyDown={(e) => {
-            if (e.key === "Enter") commitEdit(row, field);
-            else if (e.key === "Escape") cancelEdit();
-          }}
-          className={cellInputCls}
-        />
-      );
-    }
-
-    let text: string;
-    if (field === "name") text = row.name;
-    else if (field === "month") text = monthName(row.month);
-    else if (field === "day") text = String(row.day);
-    else text = row.year == null ? "Every year" : String(row.year);
-
-    return (
-      <span
-        onDoubleClick={() => startEdit(row, field)}
-        title="Double-click to edit"
-        className={cn(
-          "-mx-1 block cursor-text rounded px-1 py-0.5 hover:bg-(--color-text-muted)/[0.06]",
-          field === "year" && row.year == null && "text-(--color-text-muted)",
-        )}
-      >
-        {text}
-      </span>
-    );
+  // Enter en un <Input> dispara el blur (→ commit) y quita el foco.
+  const onCellKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === "Enter") e.currentTarget.blur();
   };
 
   return (
     <div className="flex flex-col gap-5">
-      {/* Toolbar: descripción + plantilla + importar */}
+      {/* Toolbar: hint + plantilla + importar */}
       <div className="flex flex-wrap items-center justify-between gap-3">
         <p className="max-w-md text-sm text-(--color-text-muted)">
-          Double-click a cell to edit.{" "}
-          <span className="text-(--color-text-default)">Every year</span> repeats annually; set a year for a one-off date.
+          Leave <span className="text-(--color-text-default)">Year</span> empty to repeat every year, or set one for a single date.
         </p>
         <div className="flex items-center gap-2">
           <input
@@ -310,27 +267,27 @@ export const HolidaysSettings: React.FC = () => {
         </div>
       </div>
 
-      {/* Tabla editable (doble click en una celda → input) */}
+      {/* Tabla editable: cada celda es un Input/Select (sm) de la librería */}
       <div className="overflow-hidden rounded-lg border border-(--color-border-default) bg-(--color-surface-card)">
         <table className="w-full text-sm">
           <thead className="bg-(--color-surface-hover)">
             <tr>
               <th className="p-2 text-left font-medium text-(--color-text-muted) first:pl-4">Name</th>
-              <th className="w-[8rem] p-2 text-left font-medium text-(--color-text-muted)">Month</th>
-              <th className="w-[4.5rem] p-2 text-left font-medium text-(--color-text-muted)">Day</th>
-              <th className="w-[8rem] p-2 text-left font-medium text-(--color-text-muted)">Repeats</th>
-              <th className="w-[4rem] p-2 text-right font-medium text-(--color-text-muted) last:pr-4">Actions</th>
+              <th className="w-[9rem] p-2 text-left font-medium text-(--color-text-muted)">Month</th>
+              <th className="w-[5.5rem] p-2 text-left font-medium text-(--color-text-muted)">Day</th>
+              <th className="w-[8rem] p-2 text-left font-medium text-(--color-text-muted)">Year</th>
+              <th className="w-[3.5rem] p-2 text-right font-medium text-(--color-text-muted) last:pr-4">Actions</th>
             </tr>
           </thead>
           <tbody>
             {loading ? (
               [0, 1, 2].map((i) => (
                 <tr key={i} className="border-t border-(--color-border-default)">
-                  <td className="p-2 first:pl-4"><Skeleton variant="text" width={160} /></td>
-                  <td className="p-2"><Skeleton variant="text" width={70} /></td>
-                  <td className="p-2"><Skeleton variant="text" width={28} /></td>
-                  <td className="p-2"><Skeleton variant="text" width={70} /></td>
-                  <td className="p-2 last:pr-4"><Skeleton variant="rect" width={32} height={32} className="ml-auto" /></td>
+                  <td className="p-1.5 first:pl-4"><Skeleton variant="rect" height={32} /></td>
+                  <td className="p-1.5"><Skeleton variant="rect" height={32} /></td>
+                  <td className="p-1.5"><Skeleton variant="rect" height={32} /></td>
+                  <td className="p-1.5"><Skeleton variant="rect" height={32} /></td>
+                  <td className="p-1.5 last:pr-4"><Skeleton variant="rect" width={32} height={32} className="ml-auto" /></td>
                 </tr>
               ))
             ) : rows.length === 0 ? (
@@ -342,11 +299,55 @@ export const HolidaysSettings: React.FC = () => {
             ) : (
               rows.map((row) => (
                 <tr key={row.id} className="border-t border-(--color-border-default)">
-                  <td className="p-2 first:pl-4">{renderCell(row, "name")}</td>
-                  <td className="p-2">{renderCell(row, "month")}</td>
-                  <td className="p-2">{renderCell(row, "day")}</td>
-                  <td className="p-2">{renderCell(row, "year")}</td>
-                  <td className="p-2 last:pr-4">
+                  <td className="p-1.5 align-middle first:pl-4">
+                    <Input
+                      size="sm"
+                      value={row.name}
+                      autoFocus={row.id === focusNewId}
+                      onFocus={(e) => {
+                        if (row.id === focusNewId) {
+                          e.currentTarget.select();
+                          setFocusNewId(null);
+                        }
+                      }}
+                      onChange={(e) => setField(row.id, "name", e.target.value)}
+                      onBlur={() => commit(row.id)}
+                      onKeyDown={onCellKeyDown}
+                    />
+                  </td>
+                  <td className="p-1.5 align-middle">
+                    <Select
+                      size="sm"
+                      value={row.month}
+                      onChange={(val) => {
+                        setField(row.id, "month", val);
+                        commit(row.id, { month: val });
+                      }}
+                      options={MONTH_OPTIONS}
+                    />
+                  </td>
+                  <td className="p-1.5 align-middle">
+                    <Input
+                      size="sm"
+                      value={row.day}
+                      inputMode="numeric"
+                      onChange={(e) => setField(row.id, "day", e.target.value)}
+                      onBlur={() => commit(row.id)}
+                      onKeyDown={onCellKeyDown}
+                    />
+                  </td>
+                  <td className="p-1.5 align-middle">
+                    <Input
+                      size="sm"
+                      value={row.year}
+                      inputMode="numeric"
+                      placeholder="Every year"
+                      onChange={(e) => setField(row.id, "year", e.target.value)}
+                      onBlur={() => commit(row.id)}
+                      onKeyDown={onCellKeyDown}
+                    />
+                  </td>
+                  <td className="p-1.5 align-middle last:pr-4">
                     <div className="flex justify-end">
                       <IconButton
                         aria-label={`Delete ${row.name}`}
