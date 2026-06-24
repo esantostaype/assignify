@@ -6,9 +6,11 @@ import {
   IconButton,
   Input,
   Select,
-  Skeleton,
+  Switch,
+  DataTable,
   AlertDialog,
   DeleteConfirmDialog,
+  type DataTableColumn,
 } from "@/components/ui";
 import { Icon, PiPlus, PiTrash, PiDownloadSimple, PiUploadSimple } from "@/lib/icons";
 import axios from "axios";
@@ -37,6 +39,13 @@ const MONTHS = [
   "July", "August", "September", "October", "November", "December",
 ];
 const MONTH_OPTIONS = MONTHS.map((m, i) => ({ value: String(i + 1), label: m }));
+
+const CURRENT_YEAR = new Date().getFullYear();
+// Años disponibles para fechas únicas: un par atrás y varios adelante.
+const YEAR_OPTIONS = Array.from({ length: 9 }, (_, i) => CURRENT_YEAR - 2 + i).map((y) => ({
+  value: String(y),
+  label: String(y),
+}));
 
 const toDraft = (h: HolidayRow): DraftRow => ({
   id: h.id,
@@ -96,7 +105,7 @@ export const HolidaysSettings: React.FC = () => {
     setRows((prev) => prev.map((r) => (r.id === id ? { ...r, [key]: value } : r)));
 
   // Guarda la fila si cambió respecto a lo confirmado. `override` permite pasar el valor
-  // nuevo del <Select> de mes sin esperar al re-render de `rows`.
+  // nuevo de un control (Select/Switch) sin esperar al re-render de `rows`.
   const commit = async (id: number, override?: Partial<DraftRow>) => {
     const base = rows.find((r) => r.id === id);
     if (!base) return;
@@ -145,6 +154,17 @@ export const HolidaysSettings: React.FC = () => {
     }
   };
 
+  // Repeats ON = recurrente (year vacío); OFF = fecha única (año actual por defecto).
+  const setRepeats = (row: DraftRow, recurring: boolean) => {
+    const year = recurring ? "" : row.year || String(CURRENT_YEAR);
+    setField(row.id, "year", year);
+    commit(row.id, { year });
+  };
+  const setYear = (row: DraftRow, val: string) => {
+    setField(row.id, "year", val);
+    commit(row.id, { year: val });
+  };
+
   const addRow = async () => {
     try {
       setAdding(true);
@@ -153,8 +173,8 @@ export const HolidaysSettings: React.FC = () => {
       });
       const d = toDraft(res.data);
       savedRef.current.set(d.id, d);
-      setRows((prev) => [...prev, d]);
-      setFocusNewId(d.id); // enfoca + selecciona el nombre del nuevo
+      setRows((prev) => [d, ...prev]); // arriba → visible en la primera página
+      setFocusNewId(d.id);
     } catch (e) {
       console.error("Error adding holiday:", e);
       toast.error({ title: "Couldn't add holiday", description: "Please try again." });
@@ -230,156 +250,171 @@ export const HolidaysSettings: React.FC = () => {
     if (e.key === "Enter") e.currentTarget.blur();
   };
 
-  return (
-    <div className="flex flex-col gap-5">
-      {/* Toolbar: hint + plantilla + importar */}
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <p className="max-w-md text-sm text-(--color-text-muted)">
-          Leave <span className="text-(--color-text-default)">Year</span> empty to repeat every year, or set one for a single date.
-        </p>
+  // Columnas del DataTable: cada celda es un Input/Select/Switch (sm) de la librería.
+  // El auto-hide por ancho del contenedor, la paginación y la búsqueda vienen del DataTable.
+  const columns: DataTableColumn<DraftRow>[] = [
+    {
+      key: "name",
+      header: "Name",
+      accessor: (r) => r.name,
+      width: 220,
+      skeleton: "text",
+      cell: (r) => (
+        <Input
+          size="sm"
+          value={r.name}
+          autoFocus={r.id === focusNewId}
+          onFocus={(e) => {
+            if (r.id === focusNewId) {
+              e.currentTarget.select();
+              setFocusNewId(null);
+            }
+          }}
+          onChange={(e) => setField(r.id, "name", e.target.value)}
+          onBlur={() => commit(r.id)}
+          onKeyDown={onCellKeyDown}
+        />
+      ),
+    },
+    {
+      key: "month",
+      header: "Month",
+      width: 150,
+      accessor: (r) => MONTHS[Number(r.month) - 1] ?? r.month,
+      skeleton: "text",
+      cell: (r) => (
+        <Select
+          size="sm"
+          value={r.month}
+          onChange={(val) => {
+            setField(r.id, "month", val);
+            commit(r.id, { month: val });
+          }}
+          options={MONTH_OPTIONS}
+        />
+      ),
+    },
+    {
+      key: "day",
+      header: "Day",
+      width: 84, // pequeño
+      accessor: (r) => r.day,
+      skeleton: "text",
+      cell: (r) => (
+        <Input
+          size="sm"
+          value={r.day}
+          inputMode="numeric"
+          onChange={(e) => setField(r.id, "day", e.target.value)}
+          onBlur={() => commit(r.id)}
+          onKeyDown={onCellKeyDown}
+        />
+      ),
+    },
+    {
+      key: "repeats",
+      header: "Repeats",
+      width: 172,
+      accessor: (r) => (r.year === "" ? "Every year" : r.year),
+      skeleton: "chip",
+      expandedInteractive: true,
+      cell: (r) => (
         <div className="flex items-center gap-2">
-          <input
-            ref={fileInputRef}
-            type="file"
-            accept=".csv,text/csv"
-            onChange={onPickFile}
-            className="hidden"
+          <Switch
+            size="sm"
+            checked={r.year === ""}
+            onChange={(e) => setRepeats(r, e.target.checked)}
+            aria-label="Repeats every year"
           />
-          <Button
-            size="sm"
-            variant="outlined"
-            color="neutral"
-            startIcon={<Icon icon={PiDownloadSimple} size={16} />}
-            onClick={downloadTemplate}
-          >
-            Template
-          </Button>
-          <Button
-            size="sm"
-            variant="outlined"
-            color="neutral"
-            startIcon={<Icon icon={PiUploadSimple} size={16} />}
-            onClick={() => fileInputRef.current?.click()}
-            loading={importing}
-          >
-            Import CSV
-          </Button>
+          {r.year === "" ? (
+            <span className="text-xs text-(--color-text-muted)">Every year</span>
+          ) : (
+            <div className="w-[84px]">
+              <Select size="sm" value={r.year} onChange={(val) => setYear(r, val)} options={YEAR_OPTIONS} />
+            </div>
+          )}
         </div>
-      </div>
+      ),
+    },
+    {
+      key: "actions",
+      header: "",
+      align: "right",
+      width: 64,
+      skeleton: "actions",
+      expandedBare: true,
+      cell: (r) => (
+        <div className="flex justify-end">
+          <IconButton
+            aria-label={`Delete ${r.name}`}
+            size="sm"
+            color="error"
+            variant="soft"
+            onClick={() => setPendingDelete(r)}
+          >
+            <Icon icon={PiTrash} size={16} />
+          </IconButton>
+        </div>
+      ),
+    },
+  ];
 
-      {/* Tabla editable: cada celda es un Input/Select (sm) de la librería */}
-      <div className="overflow-hidden rounded-lg border border-(--color-border-default) bg-(--color-surface-card)">
-        <table className="w-full text-sm">
-          <thead className="bg-(--color-surface-hover)">
-            <tr>
-              <th className="p-2 text-left font-medium text-(--color-text-muted) first:pl-4">Name</th>
-              <th className="w-[9rem] p-2 text-left font-medium text-(--color-text-muted)">Month</th>
-              <th className="w-[5.5rem] p-2 text-left font-medium text-(--color-text-muted)">Day</th>
-              <th className="w-[8rem] p-2 text-left font-medium text-(--color-text-muted)">Year</th>
-              <th className="w-[3.5rem] p-2 text-right font-medium text-(--color-text-muted) last:pr-4">Actions</th>
-            </tr>
-          </thead>
-          <tbody>
-            {loading ? (
-              [0, 1, 2].map((i) => (
-                <tr key={i} className="border-t border-(--color-border-default)">
-                  <td className="p-1.5 first:pl-4"><Skeleton variant="rect" height={32} /></td>
-                  <td className="p-1.5"><Skeleton variant="rect" height={32} /></td>
-                  <td className="p-1.5"><Skeleton variant="rect" height={32} /></td>
-                  <td className="p-1.5"><Skeleton variant="rect" height={32} /></td>
-                  <td className="p-1.5 last:pr-4"><Skeleton variant="rect" width={32} height={32} className="ml-auto" /></td>
-                </tr>
-              ))
-            ) : rows.length === 0 ? (
-              <tr className="border-t border-(--color-border-default)">
-                <td colSpan={5} className="p-6 text-center text-sm text-(--color-text-muted)">
-                  No holidays yet. Add one or import a CSV.
-                </td>
-              </tr>
-            ) : (
-              rows.map((row) => (
-                <tr key={row.id} className="border-t border-(--color-border-default)">
-                  <td className="p-1.5 align-middle first:pl-4">
-                    <Input
-                      size="sm"
-                      value={row.name}
-                      autoFocus={row.id === focusNewId}
-                      onFocus={(e) => {
-                        if (row.id === focusNewId) {
-                          e.currentTarget.select();
-                          setFocusNewId(null);
-                        }
-                      }}
-                      onChange={(e) => setField(row.id, "name", e.target.value)}
-                      onBlur={() => commit(row.id)}
-                      onKeyDown={onCellKeyDown}
-                    />
-                  </td>
-                  <td className="p-1.5 align-middle">
-                    <Select
-                      size="sm"
-                      value={row.month}
-                      onChange={(val) => {
-                        setField(row.id, "month", val);
-                        commit(row.id, { month: val });
-                      }}
-                      options={MONTH_OPTIONS}
-                    />
-                  </td>
-                  <td className="p-1.5 align-middle">
-                    <Input
-                      size="sm"
-                      value={row.day}
-                      inputMode="numeric"
-                      onChange={(e) => setField(row.id, "day", e.target.value)}
-                      onBlur={() => commit(row.id)}
-                      onKeyDown={onCellKeyDown}
-                    />
-                  </td>
-                  <td className="p-1.5 align-middle">
-                    <Input
-                      size="sm"
-                      value={row.year}
-                      inputMode="numeric"
-                      placeholder="Every year"
-                      onChange={(e) => setField(row.id, "year", e.target.value)}
-                      onBlur={() => commit(row.id)}
-                      onKeyDown={onCellKeyDown}
-                    />
-                  </td>
-                  <td className="p-1.5 align-middle last:pr-4">
-                    <div className="flex justify-end">
-                      <IconButton
-                        aria-label={`Delete ${row.name}`}
-                        size="sm"
-                        color="error"
-                        variant="soft"
-                        onClick={() => setPendingDelete(row)}
-                      >
-                        <Icon icon={PiTrash} size={16} />
-                      </IconButton>
-                    </div>
-                  </td>
-                </tr>
-              ))
-            )}
-          </tbody>
-        </table>
-      </div>
+  return (
+    <div className="flex flex-col gap-4">
+      <DataTable<DraftRow>
+        data={rows}
+        columns={columns}
+        rowKey={(r) => r.id}
+        loading={loading}
+        pageSize={10}
+        searchPlaceholder="Search holidays…"
+        emptyState="No holidays yet. Add one or import a CSV."
+        toolbar={
+          <>
+            <Button
+              size="sm"
+              variant="soft"
+              color="primary"
+              startIcon={<Icon icon={PiPlus} size={16} />}
+              onClick={addRow}
+              loading={adding}
+              disabled={loading}
+            >
+              Add holiday
+            </Button>
+            <Button
+              size="sm"
+              variant="outlined"
+              color="neutral"
+              startIcon={<Icon icon={PiDownloadSimple} size={16} />}
+              onClick={downloadTemplate}
+            >
+              Template
+            </Button>
+            <Button
+              size="sm"
+              variant="outlined"
+              color="neutral"
+              startIcon={<Icon icon={PiUploadSimple} size={16} />}
+              onClick={() => fileInputRef.current?.click()}
+              loading={importing}
+            >
+              Import CSV
+            </Button>
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept=".csv,text/csv"
+              onChange={onPickFile}
+              className="hidden"
+            />
+          </>
+        }
+      />
 
-      {/* Agregar fila */}
-      <div>
-        <Button
-          variant="soft"
-          color="primary"
-          startIcon={<Icon icon={PiPlus} size={16} />}
-          onClick={addRow}
-          loading={adding}
-          disabled={loading}
-        >
-          Add holiday
-        </Button>
-      </div>
+      <p className="text-sm text-(--color-text-muted)">
+        Toggle <span className="text-(--color-text-default)">Repeats</span> off to pin a holiday to a single year; leave it on to repeat every year.
+      </p>
 
       {/* Confirmar borrado */}
       <DeleteConfirmDialog
