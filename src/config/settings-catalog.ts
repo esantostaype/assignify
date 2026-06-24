@@ -81,10 +81,10 @@ export const DEFAULT_SETTINGS: SettingDefinition[] = [
   {
     category: 'work_schedule',
     key: 'utc_offset_hours',
-    value: -5,
+    value: -8,
     dataType: 'number',
-    label: 'Timezone offset (hours)',
-    description: 'Difference of the local timezone relative to UTC (Peru = -5)',
+    label: 'Timezone',
+    description: 'Workspace timezone (GMT offset). The work hours above are entered in this local time. Default: California (GMT-8).',
     group: 'work_schedule',
     order: 5,
     minValue: -12,

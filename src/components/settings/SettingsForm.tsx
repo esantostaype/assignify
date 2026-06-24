@@ -53,6 +53,19 @@ interface TierData {
 // Grupos permitidos
 const ALLOWED_GROUPS = ["work_schedule", "task_assignment", "approvals"];
 
+// Zona horaria como dropdown (el valor guardado sigue siendo el offset GMT en horas).
+const TZ_CITY: Record<number, string> = {
+  [-11]: "Pago Pago", [-10]: "Honolulu", [-9]: "Anchorage", [-8]: "Los Angeles",
+  [-7]: "Denver", [-6]: "Mexico City", [-5]: "Lima · New York", [-4]: "Santiago",
+  [-3]: "Buenos Aires · São Paulo", [0]: "London", [1]: "Madrid", [2]: "Cairo",
+  [3]: "Moscow", [4]: "Dubai", [5]: "Karachi", [7]: "Bangkok", [8]: "Singapore",
+  [9]: "Tokyo", [10]: "Sydney", [12]: "Auckland",
+};
+const TIMEZONE_OPTIONS = Array.from({ length: 27 }, (_, i) => i - 12).map((v) => ({
+  value: String(v),
+  label: `GMT${v >= 0 ? "+" : ""}${v}${TZ_CITY[v] ? ` · ${TZ_CITY[v]}` : ""}`,
+}));
+
 export const SettingsForm: React.FC = () => {
   const { data: settingsData, isLoading, error, refetch } = useSettings();
   const updateSettingsMutation = useUpdateSettings();
@@ -307,6 +320,18 @@ export const SettingsForm: React.FC = () => {
     const settingKey = `${setting.category}.${setting.key}`;
     const currentValue = settingValues[settingKey]?.value ?? setting.value;
     const hasChanged = settingValues[settingKey]?.hasChanged ?? false;
+
+    // Zona horaria: dropdown de offsets GMT (en vez de un número crudo).
+    if (setting.key === "utc_offset_hours") {
+      return (
+        <Select
+          size={size}
+          value={currentValue.toString()}
+          onChange={(val) => handleSettingChange(setting.category, setting.key, parseInt(val, 10))}
+          options={TIMEZONE_OPTIONS}
+        />
+      );
+    }
 
     switch (setting.dataType) {
       case "boolean":
