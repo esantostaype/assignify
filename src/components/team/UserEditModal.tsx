@@ -413,6 +413,7 @@ export const UserEditModal: React.FC<UserEditModalProps> = ({ open, userId, user
                   loading={loadingUser}
                   showSearch={false}
                   hidePageSizePicker
+                  skeletonRowCount={1}
                   emptyState="No vacations scheduled"
                 />
               </div>

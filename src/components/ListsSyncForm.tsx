@@ -106,7 +106,9 @@ export function ListsSyncForm() {
         columns={columns}
         rowKey={(l) => l.id}
         loading={isLoading}
-        searchPlaceholder="Search lists…"
+        showSearch={false}
+        hidePageSizePicker
+        skeletonRowCount={3}
         emptyState="No lists found in this workspace"
       />
 

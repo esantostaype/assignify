@@ -210,8 +210,10 @@ export const TaskTypesForm: React.FC = () => {
           columns={columns}
           rowKey={(type) => type.id}
           loading={loading}
+          showSearch={false}
+          hidePageSizePicker
+          skeletonRowCount={3}
           emptyState="No task types yet. Add one below."
-          searchPlaceholder="Search task types…"
         />
 
         {/* Add New Type */}
