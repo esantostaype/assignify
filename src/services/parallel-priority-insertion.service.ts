@@ -16,7 +16,7 @@ import { Priority } from '@/db/enums';
 import { getNextAvailableStart, calculateWorkingDeadline, setActiveHolidays } from '@/utils/task-calculation-utils';
 import { getHolidayMatcher } from '@/services/holidays.service';
 import { UserVacation } from '@/interfaces';
-import { getActiveClickUpTasksByUser, type ClickUpFetchOptions } from '@/services/clickup-tasks.service';
+import { getActiveClickUpTasksByUser, type ActiveClickUpTask, type ClickUpFetchOptions } from '@/services/clickup-tasks.service';
 import { mapClickUpPriority } from '@/utils/clickup-status-mapping-utils';
 import { getAppSettings } from '@/services/app-settings.service';
 import { rescheduleClickUpTaskDates } from '@/services/clickup.service';
@@ -24,6 +24,11 @@ import { isMovableLow, computeLowCascade, type MovableLow, type CascadeMove } fr
 
 // Rango de prioridad: mayor número = más prioritaria.
 const PRIORITY_RANK: Record<Priority, number> = { LOW: 1, NORMAL: 2, HIGH: 3, URGENT: 4 };
+
+// Estados de ClickUp que OCUPAN al diseñador (forman el carril). ON_APPROVAL ya está
+// ENTREGADO: no ocupa, así que su slot queda LIBRE para la tarea nueva. Mismo criterio
+// que el "¿QUIÉN?" (PENDING_CLICKUP_STATUSES en task-assignment.service).
+const OCCUPYING_CLICKUP_STATUSES: ActiveClickUpTask['status'][] = ['TO_DO', 'IN_PROGRESS'];
 
 const MS_PER_DAY = 1000 * 60 * 60 * 24;
 
@@ -164,10 +169,14 @@ export async function calculateParallelPriorityInsertion(
   const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
 
   // Tareas activas del usuario leídas EN VIVO de ClickUp (no de la DB).
-  // fetchActiveClickUpTasks ya excluye completadas; conservamos solo las que aún
-  // cuentan (deadline >= hoy) para el cálculo de carriles por prioridad.
+  // Solo TO_DO/IN_PROGRESS forman el carril: ON_APPROVAL ya está entregado y NO ocupa al
+  // diseñador, así que su slot QUEDA LIBRE para la tarea nueva. Si el diseñador entregó
+  // antes de tiempo la última de su cola (→ ON_APPROVAL), la nueva debe empezar donde
+  // termina la última que SÍ ocupa, no detrás de la ya entregada.
+  // Conservamos solo las que aún cuentan (deadline >= hoy).
   const clickUpTasks = await getActiveClickUpTasksByUser(userId, clickupOpts);
   const tasks: TaskRow[] = clickUpTasks
+    .filter((t) => OCCUPYING_CLICKUP_STATUSES.includes(t.status))
     .map((t) => ({
       id: t.clickupId,
       name: t.name,
