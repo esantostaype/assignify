@@ -243,22 +243,18 @@ export const CapacityTimeline: React.FC<CapacityTimelineProps> = ({ workload, lo
     return dayIdx * DAY_W + BAR_PAD + frac * (DAY_W - 2 * BAR_PAD);
   };
 
-  // Vacation bands restricted to WORKING days (skip weekends & holidays → holiday/weekend
-  // prevails, no overlap). Returns contiguous working-day blocks inside the vacations.
+  // Bandas de vacación CONTINUAS sobre todo el rango: incluyen sábados, domingos y
+  // feriados que caigan dentro (la vacación del 13 al 19 se ve completa, no recortada al
+  // viernes). Devuelve bloques contiguos de días dentro de las vacaciones.
   const vacationBlocks = (vacations: { startDate: string; endDate: string }[]): Block[] => {
     if (vacations.length === 0) return [];
     const inVac = (ts: number) =>
       vacations.some((v) => ts >= midnightLocal(new Date(v.startDate)) && ts <= midnightLocal(new Date(v.endDate)));
     const blocks: Block[] = [];
     for (let i = 0; i < totalDays; ) {
-      const d = days[i];
-      if (inVac(d.ts) && !d.isWeekend && !d.holiday) {
+      if (inVac(days[i].ts)) {
         let len = 1;
-        while (i + len < totalDays) {
-          const d2 = days[i + len];
-          if (inVac(d2.ts) && !d2.isWeekend && !d2.holiday) len++;
-          else break;
-        }
+        while (i + len < totalDays && inVac(days[i + len].ts)) len++;
         blocks.push({ startIdx: i, len });
         i += len;
       } else i++;
@@ -430,7 +426,7 @@ export const CapacityTimeline: React.FC<CapacityTimelineProps> = ({ workload, lo
                   </div>
                 );
                 return d.holiday ? (
-                  <Tooltip key={i} content={`Holiday · ${d.holiday}`}>
+                  <Tooltip key={i} content={`${d.holiday} · ${fmt(d.ts)}`}>
                     {cell}
                   </Tooltip>
                 ) : (
@@ -476,7 +472,7 @@ export const CapacityTimeline: React.FC<CapacityTimelineProps> = ({ workload, lo
                 const vBlocks = vacationBlocks(vacs);
                 return (
                   <div key={u.id} className="relative border-b border-(--color-border-default) last:border-b-0" style={{ height: ROW_H }}>
-                    {/* Vacation bands (working days only → don't overlap holiday/weekend). */}
+                    {/* Bandas de vacación continuas (incluyen fines de semana y feriados). */}
                     {vBlocks.map((b, i) => (
                       <Tooltip key={`v${i}`} content={`Vacation · ${fmt(days[b.startIdx].ts)} – ${fmt(days[b.startIdx + b.len - 1].ts)}`}>
                         <div
