@@ -411,9 +411,14 @@ export const CapacityTimeline: React.FC<CapacityTimelineProps> = ({ workload, lo
                 const cell = (
                   <div
                     className={`flex h-full flex-col items-center justify-center text-[10px] leading-tight ${weekLine} ${
-                      d.isWeekend ? "bg-(--color-text-muted)/[0.07] text-(--color-text-muted)/50" : "text-(--color-text-muted)"
+                      d.isWeekend || d.holiday ? "text-(--color-text-muted)/50" : "text-(--color-text-muted)"
                     }`}
-                    style={{ width: DAY_W }}
+                    style={{
+                      width: DAY_W,
+                      // Mismo sombreado que el área de tracks → el header (incluido el número)
+                      // de un feriado/fin de semana lleva su fondo de rayas.
+                      backgroundImage: d.holiday ? HOLIDAY_STRIPES : d.isWeekend ? WEEKEND_STRIPES : undefined,
+                    }}
                   >
                     <span>{d.isFirstOfMonth ? d.monthLabel : d.weekday}</span>
                     {d.isToday ? (
@@ -464,6 +469,21 @@ export const CapacityTimeline: React.FC<CapacityTimelineProps> = ({ workload, lo
                 className="pointer-events-none absolute inset-y-0 z-10 w-0.5 bg-error-500"
                 style={{ left: todayOffset * DAY_W + DAY_W / 2 }}
               />
+
+              {/* Zonas de hover de feriado: TODA la columna (no solo el número de arriba)
+                  muestra el tooltip con nombre + fecha. */}
+              <div className="pointer-events-none absolute inset-0 z-20">
+                {days.map((d, i) =>
+                  d.holiday ? (
+                    <Tooltip key={`ht${i}`} content={`${d.holiday} · ${fmt(d.ts)}`}>
+                      <div
+                        className="pointer-events-auto absolute inset-y-0"
+                        style={{ left: i * DAY_W, width: DAY_W }}
+                      />
+                    </Tooltip>
+                  ) : null
+                )}
+              </div>
 
               {/* Rows: one per designer (en carga: filas vacías, sin barras). */}
               {displayRows.map((u, i) => {
