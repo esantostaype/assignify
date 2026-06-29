@@ -514,7 +514,7 @@ export const CapacityTimeline: React.FC<CapacityTimelineProps> = ({ workload, lo
                         }))
                         .filter((b) => b.right > b.left);
                       const { lane, count } = allocLanes(bars.map((b) => ({ l: b.left, r: b.right })));
-                      const GAP = 2;
+                      const GAP = 4; // separación entre barras paralelas (sub-carriles)
                       const usableH = ROW_H - 12;
                       const barH = Math.min(18, (usableH - (count - 1) * GAP) / count);
                       const top0 = (ROW_H - (count * barH + (count - 1) * GAP)) / 2;
