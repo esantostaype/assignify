@@ -21,9 +21,11 @@ export async function POST(request: Request) {
     password?: unknown
   }
 
-  const envUser = process.env.HUGEICONS_USER
-  const envPass = process.env.HUGEICONS_PASSWORD
-  const token = process.env.HUGEICONS_SESSION_TOKEN
+  // .trim() en las vars del .env: en Windows los valores suelen arrastrar un \r (CRLF) o
+  // espacios al final que romperían la comparación exacta byte-a-byte.
+  const envUser = process.env.HUGEICONS_USER?.trim()
+  const envPass = process.env.HUGEICONS_PASSWORD?.trim()
+  const token = process.env.HUGEICONS_SESSION_TOKEN?.trim()
 
   if (!envUser || !envPass || !token) {
     return NextResponse.json(
@@ -32,9 +34,21 @@ export async function POST(request: Request) {
     )
   }
 
-  const okUser = typeof body.username === 'string' && safeEqual(body.username, envUser)
-  const okPass = typeof body.password === 'string' && safeEqual(body.password, envPass)
+  const inUser = typeof body.username === 'string' ? body.username.trim() : ''
+  const inPass = typeof body.password === 'string' ? body.password : ''
+  const okUser = safeEqual(inUser, envUser)
+  const okPass = safeEqual(inPass, envPass)
   if (!okUser || !okPass) {
+    // Diagnóstico SIN exponer secretos (solo presencia + longitudes) — temporal, para
+    // ver en los logs del server si el mismatch es de usuario o de contraseña.
+    console.warn('[hugeicons-login] mismatch', {
+      userOk: okUser,
+      passOk: okPass,
+      envUserLen: envUser.length,
+      inUserLen: inUser.length,
+      envPassLen: envPass.length,
+      inPassLen: inPass.length,
+    })
     return NextResponse.json({ error: 'Invalid username or password' }, { status: 401 })
   }
 
