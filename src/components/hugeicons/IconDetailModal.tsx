@@ -7,6 +7,7 @@ import { Select, ColorPicker } from '@/components/ui/input';
 import { Menu, type MenuItem } from '@/components/ui/navigation';
 import { Typography } from '@/components/ui/typography';
 import { hotToast as toast } from '@/lib/hotToast';
+import { useUiTheme } from '@/providers/UiThemeProvider';
 import {
   Icon, PiCopy, PiDownloadSimple, PiCopySimple, PiCaretDown, PiArrowsClockwise,
 } from '@/lib/icons';
@@ -34,7 +35,13 @@ const SIZE_OPTIONS = ['16', '20', '24', '32', '48', '64', '96', '128'].map((n) =
 
 const DEFAULT_STROKE_WIDTH = '1.5';
 const DEFAULT_SIZE  = '24';
-const DEFAULT_COLOR = '#111827';
+// The default (un-touched-by-the-user) icon color has to follow the app's
+// theme — a fixed dark hex reads fine in light mode but disappears against
+// the modal's own dark-mode surface.  Matches `--color-text-strong` in each
+// theme.  Once the producer picks their own color via `ColorPicker` it's
+// respected as-is regardless of theme.
+const DEFAULT_COLOR_LIGHT = '#111827';
+const DEFAULT_COLOR_DARK  = '#F3F4F6';
 
 export interface IconDetailModalProps {
   open: boolean;
@@ -59,9 +66,12 @@ function getStyleIcon(name: string, style: IconStyle): IconSvgElement | undefine
  * (`Button` + `Menu`, no bespoke split-button).
  */
 export function IconDetailModal({ open, onClose, iconName, style, onStyleChange }: IconDetailModalProps) {
+  const { theme } = useUiTheme();
+  const defaultColor = theme === 'dark' ? DEFAULT_COLOR_DARK : DEFAULT_COLOR_LIGHT;
+
   const [strokeWidth, setStrokeWidth] = useState(DEFAULT_STROKE_WIDTH);
   const [size, setSize]   = useState(DEFAULT_SIZE);
-  const [color, setColor] = useState(DEFAULT_COLOR);
+  const [color, setColor] = useState(defaultColor);
   // Labels the Download / Copy buttons with whatever format was picked
   // last, so repeat exports read at a glance — mirrors the reference
   // picker's persistent "SVG STROKED" button label.
@@ -71,12 +81,15 @@ export function IconDetailModal({ open, onClose, iconName, style, onStyleChange 
   // Re-seed the customization controls whenever a NEW icon is opened, so it
   // starts at the default weight/size/color rather than whatever was left
   // over from the previously-viewed icon.  `style` itself is controlled by
-  // the parent and doesn't need re-seeding here.
+  // the parent and doesn't need re-seeding here.  Deliberately NOT keyed on
+  // `theme`/`defaultColor` — toggling dark mode while the modal is already
+  // open shouldn't stomp on a color the producer picked on purpose.
   useEffect(() => {
     if (!open) return;
     setStrokeWidth(DEFAULT_STROKE_WIDTH);
     setSize(DEFAULT_SIZE);
-    setColor(DEFAULT_COLOR);
+    setColor(defaultColor);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, iconName]);
 
   if (!iconName) return null;
@@ -96,7 +109,7 @@ export function IconDetailModal({ open, onClose, iconName, style, onStyleChange 
   const handleReset = () => {
     setStrokeWidth(DEFAULT_STROKE_WIDTH);
     setSize(DEFAULT_SIZE);
-    setColor(DEFAULT_COLOR);
+    setColor(defaultColor);
   };
 
   const handleDownload = async (format: ExportFormat) => {
@@ -139,18 +152,12 @@ export function IconDetailModal({ open, onClose, iconName, style, onStyleChange 
     <Modal open={open} onClose={onClose} size="sm" title="Icon details">
       <div className="flex flex-col items-center gap-5">
         <div
-          className="flex h-32 w-32 items-center justify-center rounded-2xl"
-          // A fixed light checkerboard rather than a theme-reactive token —
-          // `bg-neutral-100` flips to near-black in dark mode, and the
-          // icon's own default color is also a near-black hex, so the two
-          // would blend into invisibility.  A canvas that stays put
-          // regardless of theme (or whatever color is picked) is the only
-          // way to always keep the preview legible.
-          style={{
-            color,
-            backgroundImage: 'repeating-conic-gradient(#e2e4e9 0% 25%, #f7f8fa 0% 50%)',
-            backgroundSize: '16px 16px',
-          }}
+          // En dark el token `bg-neutral-100` casi no se distingue del
+          // fondo del propio Modal — se usa el mismo fondo que el input
+          // de archivos (`--color-surface-card`) solo en dark, light queda
+          // igual que antes.
+          className="flex h-32 w-32 items-center justify-center rounded-2xl bg-neutral-100 dark:bg-(--color-surface-card)"
+          style={{ color }}
         >
           {data ? <HugeIcon icon={data} size={previewSize} strokeWidth={strokeWidth} /> : null}
         </div>
