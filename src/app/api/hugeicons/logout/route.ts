@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { HUGEICONS_COOKIE } from '../login/route'
+import { HUGEICONS_COOKIE } from '@/lib/hugeicons-auth'
 
 // Cierra la sesión propia de Hugeicons borrando su cookie.
 export const runtime = 'nodejs'

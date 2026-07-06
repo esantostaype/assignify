@@ -1,12 +1,11 @@
 import { NextResponse } from 'next/server'
 import { timingSafeEqual } from 'node:crypto'
+import { HUGEICONS_COOKIE } from '@/lib/hugeicons-auth'
 
 // Login propio de Hugeicons (independiente de Auth.js). Verifica username/password contra
 // el .env y, si coinciden, setea la cookie de sesión que el middleware valida.
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
-
-export const HUGEICONS_COOKIE = 'hugeicons_session'
 
 // Comparación en tiempo constante (evita fugas por timing). Longitudes distintas → false.
 function safeEqual(a: string, b: string): boolean {

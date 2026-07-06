@@ -5,13 +5,10 @@
 //                      /login). El login principal sigue igual.
 import NextAuth from 'next-auth'
 import { authConfig, isPublicPath } from '@/auth.config'
+import { HUGEICONS_COOKIE } from '@/lib/hugeicons-auth'
 import { NextResponse, type NextRequest } from 'next/server'
 
 const { auth } = NextAuth(authConfig)
-
-// Cookie de la sesión propia de Hugeicons (mismo nombre que /api/hugeicons/login; se repite
-// aquí a propósito para NO importar ese route y arrastrar node:crypto al runtime Edge).
-const HUGEICONS_COOKIE = 'hugeicons_session'
 
 function isHugeiconsPath(pathname: string): boolean {
   return (
