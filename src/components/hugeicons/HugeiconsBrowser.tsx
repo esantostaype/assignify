@@ -8,13 +8,14 @@ import { Pagination } from '@/components/ui/navigation';
 import { EmptyState } from '@/components/ui/data';
 import { Typography } from '@/components/ui/typography';
 import { PiMagnifyingGlass } from '@/lib/icons';
-import { Spinner } from '@/components/ui';
+import { Skeleton, Chip } from '@/components/ui';
 import { HugeIcon } from './HugeIcon';
 import { ICON_NAMES, getStrokeIcon, getDuotoneIcon, loadIconData } from './iconCatalog';
 import { IconDetailModal, type IconStyle } from './IconDetailModal';
-import { filterIconNames } from './searchSynonyms';
+import { filterIconNames, getSearchSuggestions } from './searchSynonyms';
 
 const PAGE_SIZE = 100;
+const SKELETON_CARD_COUNT = 100;
 
 /** Page-level tab filter — "All" has no data of its own (every icon is
  *  always rendered as either Stroke or Duotone), so it just means "no
@@ -33,6 +34,31 @@ function findIconName(param: string | null): string | null {
   if (!param) return null;
   const lower = param.toLowerCase();
   return ICON_NAMES.find((n) => n.toLowerCase() === lower) ?? null;
+}
+
+function IconCardSkeleton() {
+  return (
+    <Card
+      padding="sm"
+      className="flex aspect-square flex-col items-center justify-between gap-2"
+      aria-hidden
+    >
+      <div className="flex flex-1 w-full items-center justify-center">
+        <Skeleton variant="circle" width={30} height={30} />
+      </div>
+      <Skeleton variant="text" width="72%" height={10} />
+    </Card>
+  );
+}
+
+function IconGridSkeleton() {
+  return (
+    <div className="grid grid-cols-[repeat(auto-fill,minmax(112px,1fr))] gap-3">
+      {Array.from({ length: SKELETON_CARD_COUNT }, (_, index) => (
+        <IconCardSkeleton key={index} />
+      ))}
+    </div>
+  );
 }
 
 /**
@@ -103,6 +129,7 @@ export function HugeiconsBrowser() {
   // in a name can't accidentally spell an unrelated term.  See
   // searchSynonyms.ts.
   const filtered = useMemo(() => filterIconNames(ICON_NAMES, query), [query]);
+  const suggestions = useMemo(() => getSearchSuggestions(query), [query]);
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
   const safePage    = Math.min(page, totalPages);
@@ -112,45 +139,74 @@ export function HugeiconsBrowser() {
 
   const handleTabChange = (v: string) => { setTab(v as PageStyleFilter); setPage(1); };
   const handleSearch    = (v: string) => { setQuery(v); setPage(1); };
+  const handleSuggestion = (suggestion: string) => { setQuery(suggestion); setPage(1); };
 
   return (
     <>
       <div className="p-4 md:p-6">
-        <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <Tabs variant="pills" size="md" defaultValue="all" value={tab} onValueChange={handleTabChange}>
-            <TabList overflow="none">
-              <Tab value="all">All</Tab>
-              <Tab value="stroke">Stroke</Tab>
-              <Tab value="duotone">Duotone</Tab>
-            </TabList>
-          </Tabs>
-          <div className="w-full sm:w-72">
-            <SearchInput
-              placeholder="Search icons…"
-              value={query}
-              onChange={(e) => handleSearch(e.target.value)}
-            />
+        <div className="mx-auto w-full max-w-7xl">
+          <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <Tabs variant="pills" size="md" defaultValue="all" value={tab} onValueChange={handleTabChange}>
+              <TabList overflow="none">
+                <Tab value="all">All</Tab>
+                <Tab value="stroke">Stroke</Tab>
+                <Tab value="duotone">Duotone</Tab>
+              </TabList>
+            </Tabs>
+            <div className="w-full sm:w-72">
+              <SearchInput
+                placeholder="Search icons…"
+                value={query}
+                onChange={(e) => handleSearch(e.target.value)}
+              />
+            </div>
           </div>
-        </div>
 
-        {!ready ? (
-          <div className="flex flex-col items-center justify-center gap-3 py-24 text-(--color-text-muted)">
-            {loadError ? (
-              <span className="text-sm">Couldn&apos;t load the icon library. Please reload the page.</span>
-            ) : (
-              <>
-                <Spinner />
-                <span className="text-sm">Loading icons…</span>
-              </>
-            )}
-          </div>
-        ) : pageItems.length === 0 ? (
-          <EmptyState
-            icon={PiMagnifyingGlass}
-            title="No icons found"
-            description={`No icon names match "${query}".`}
-          />
-        ) : tab === 'all' ? (
+          {/* Sugerencias de búsqueda (sinónimos ES/EN): fila completa alineada a la
+              izquierda; cada término es un Chip clickeable que rellena el buscador. */}
+          {suggestions.length > 0 && (
+            <div className="mb-4 flex w-full flex-wrap gap-1.5">
+              {suggestions.map((suggestion) => (
+                <Chip
+                  key={suggestion}
+                  size="sm"
+                  color="primary"
+                  variant="soft"
+                  role="button"
+                  tabIndex={0}
+                  onClick={() => handleSuggestion(suggestion)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                      e.preventDefault();
+                      handleSuggestion(suggestion);
+                    }
+                  }}
+                  className="cursor-pointer transition-colors hover:bg-primary-200"
+                >
+                  {suggestion}
+                </Chip>
+              ))}
+            </div>
+          )}
+
+          <div className="min-h-[calc(100vh-10rem)]">
+            {!ready ? (
+              loadError ? (
+                <div className="flex min-h-[calc(100vh-10rem)] items-center justify-center text-center text-sm text-(--color-text-muted)">
+                  Couldn&apos;t load the icon library. Please reload the page.
+                </div>
+              ) : (
+                <IconGridSkeleton />
+              )
+            ) : pageItems.length === 0 ? (
+              <div className="flex min-h-[calc(100vh-10rem)] items-center justify-center">
+                <EmptyState
+                  icon={PiMagnifyingGlass}
+                  title="No icons found"
+                  description={`No icon names match "${query}".`}
+                />
+              </div>
+            ) : tab === 'all' ? (
           // "All" lists BOTH renditions of every icon as their own
           // independent cards — a Stroke card immediately followed by that
           // same icon's Duotone card — rather than merging the two into a
@@ -216,12 +272,14 @@ export function HugeiconsBrowser() {
             })}
           </div>
         )}
+        </div>
 
         {totalPages > 1 && (
           <div className="mt-6 flex justify-center">
             <Pagination page={safePage} totalPages={totalPages} onChange={setPage} />
           </div>
         )}
+        </div>
       </div>
 
       <IconDetailModal
