@@ -1,9 +1,10 @@
 ﻿'use client';
 
 import {
-  useCallback, useEffect, useId, useRef, useState,
+  useCallback, useEffect, useId, useLayoutEffect, useRef, useState,
   type PointerEvent as RPointerEvent, type ReactNode,
 } from 'react';
+import { createPortal } from 'react-dom';
 import { cn } from '@/lib/cn';
 import { Icon, PiCaretDown, PiPlus } from '@/lib/icons';
 import { FormField } from './FormField';
@@ -95,6 +96,8 @@ export function ColorPicker({
   const [open, setOpen] = useState(false);
   const [saved, setSaved] = useState<string[]>([]);
   const rootRef = useRef<HTMLDivElement>(null);
+  const triggerRef = useRef<HTMLButtonElement>(null);
+  const popoverRef = useRef<HTMLDivElement>(null);
 
   // Popover mount / visible lifecycle — mirrors `<Select>` so the
   // exit transition can play before the popover unmounts.  `mounted`
@@ -103,6 +106,39 @@ export function ColorPicker({
   const [mounted, setMounted] = useState(false);
   const [visible, setVisible] = useState(false);
   const enterScheduledRef = useRef(false);
+
+  // Viewport-relative position for the portaled popover — flips to "up"
+  // when there isn't enough room below.  Mirrors `<Select>`'s own
+  // positioning so the picker still renders fully visible instead of
+  // being clipped inside a Modal's scroll body.
+  const [dropDirection, setDropDirection] = useState<'down' | 'up'>('down');
+  const [pos, setPos] = useState<{ left: number; anchorY: number } | null>(null);
+
+  useLayoutEffect(() => {
+    if (!open) return;
+    const trig = triggerRef.current;
+    if (!trig) return;
+    const recompute = () => {
+      const rect = trig.getBoundingClientRect();
+      const vh = window.innerHeight;
+      const spaceBelow = vh - rect.bottom;
+      const spaceAbove = rect.top;
+      const estimated = 420;
+      const upwards = spaceBelow < estimated && spaceAbove > spaceBelow;
+      setDropDirection(upwards ? 'up' : 'down');
+      setPos({
+        left: rect.left,
+        anchorY: upwards ? rect.top - 6 : rect.bottom + 6,
+      });
+    };
+    recompute();
+    window.addEventListener('resize', recompute);
+    window.addEventListener('scroll', recompute, true);
+    return () => {
+      window.removeEventListener('resize', recompute);
+      window.removeEventListener('scroll', recompute, true);
+    };
+  }, [open]);
 
   useEffect(() => {
     if (open) {
@@ -151,11 +187,15 @@ export function ColorPicker({
   const computedHex = isValidHex(current) ? current : defaultValue;
   const hasSelection = isValidHex(current);
 
-  // Close on outside click
+  // Close on outside click — accounts for the portaled popover so a click
+  // inside it doesn't register as "outside" the trigger.
   useEffect(() => {
     if (!open) return;
     const onDown = (e: MouseEvent) => {
-      if (rootRef.current && !rootRef.current.contains(e.target as Node)) setOpen(false);
+      const target = e.target as Node;
+      const insideTrigger = rootRef.current?.contains(target);
+      const insidePopover = popoverRef.current?.contains(target);
+      if (!insideTrigger && !insidePopover) setOpen(false);
     };
     document.addEventListener('mousedown', onDown);
     return () => document.removeEventListener('mousedown', onDown);
@@ -226,6 +266,7 @@ export function ColorPicker({
 
   const trigger = (
     <button
+      ref={triggerRef}
       type="button"
       id={inputId}
       disabled={disabled}
@@ -260,19 +301,30 @@ export function ColorPicker({
     </button>
   );
 
-  const popover = mounted && (
+  const popover = mounted && pos && typeof window !== 'undefined' && createPortal(
     <div
+      ref={popoverRef}
       data-component="ColorPickerPopover"
+      // React synthesises events along the React tree, so a click here
+      // would still bubble up to ancestor onMouseDown handlers (e.g.
+      // Modal's outside-click detector).  Stop it.
+      onMouseDown={(e) => e.stopPropagation()}
       style={{
+        left:   pos.left,
+        top:    dropDirection === 'down' ? pos.anchorY : undefined,
+        bottom: dropDirection === 'up'   ? window.innerHeight - pos.anchorY : undefined,
         // Slide-in 8 px + fade — same vocabulary as the Select /
-        // MultiSelect dropdowns.  The popover anchors below the
-        // trigger so it slides DOWN into place on open and UP out
-        // on close.
+        // MultiSelect dropdowns.  Direction follows the drop anchor so
+        // the panel always slides AWAY from the trigger.
         opacity: visible ? 1 : 0,
-        transform: visible ? 'translate3d(0, 0, 0)' : 'translate3d(0, -8px, 0)',
+        transform: visible
+          ? 'translate3d(0, 0, 0)'
+          : dropDirection === 'up'
+            ? 'translate3d(0, 8px, 0)'
+            : 'translate3d(0, -8px, 0)',
         transition: `opacity ${visible ? DROPDOWN_ENTER_MS : DROPDOWN_EXIT_MS}ms ${DROPDOWN_EASE}, transform ${visible ? DROPDOWN_ENTER_MS : DROPDOWN_EXIT_MS}ms ${DROPDOWN_EASE}`,
       }}
-      className="absolute top-[calc(100%+6px)] left-0 z-50 w-[260px] rounded-xl border border-(--color-border-default) bg-(--color-surface-card) p-3 shadow-xl"
+      className="fixed z-[300] w-[260px] rounded-xl border border-(--color-border-default) bg-(--color-surface-card) p-3 shadow-xl"
     >
       {/* Saturation / Value area */}
       <div
@@ -349,7 +401,8 @@ export function ColorPicker({
           ))}
         </div>
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 
   const field = (
