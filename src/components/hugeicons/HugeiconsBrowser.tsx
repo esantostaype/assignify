@@ -145,7 +145,7 @@ export function HugeiconsBrowser() {
     <>
       <div className="p-4 md:p-6">
         <div className="mx-auto w-full max-w-7xl">
-          <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div className={`flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between ${suggestions.length > 0 ? 'mb-2' : 'mb-4'}`}>
             <Tabs variant="pills" size="md" defaultValue="all" value={tab} onValueChange={handleTabChange}>
               <TabList overflow="none">
                 <Tab value="all">All</Tab>
@@ -165,7 +165,7 @@ export function HugeiconsBrowser() {
           {/* Sugerencias de búsqueda (sinónimos ES/EN): fila completa alineada a la
               izquierda; cada término es un Chip clickeable que rellena el buscador. */}
           {suggestions.length > 0 && (
-            <div className="mb-4 flex w-full flex-wrap gap-1.5">
+            <div className="mb-6 flex w-full flex-wrap justify-end gap-1.5">
               {suggestions.map((suggestion) => (
                 <Chip
                   key={suggestion}
