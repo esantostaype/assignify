@@ -33,8 +33,8 @@ const STROKE_WIDTH_OPTIONS = [
 
 const SIZE_OPTIONS = ['16', '20', '24', '32', '48', '64', '96', '128'].map((n) => ({ value: n, label: `${n}px` }));
 
-const DEFAULT_STROKE_WIDTH = '1.5';
-const DEFAULT_SIZE  = '24';
+const DEFAULT_STROKE_WIDTH = '1';
+const DEFAULT_SIZE  = '48';
 // The default (un-touched-by-the-user) icon color has to follow the app's
 // theme — a fixed dark hex reads fine in light mode but disappears against
 // the modal's own dark-mode surface.  Matches `--color-text-strong` in each
