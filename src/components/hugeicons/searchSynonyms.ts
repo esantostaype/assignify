@@ -237,7 +237,7 @@ export const SEARCH_SYNONYMS: string[][] = [
   // ── Transport ──────────────────────────────────────────────────
   ['car', 'vehicle', 'automobile', 'auto', 'carro', 'coche', 'vehiculo', 'automovil'],
   ['truck', 'lorry', 'camion'],
-  ['plane', 'flight', 'airplane', 'aircraft', 'avion', 'vuelo', 'aeronave'],
+  ['plane', 'flight', 'airplane', 'aircraft', 'jet', 'avion', 'aviones', 'avioneta', 'aeroplano', 'aereo', 'vuelo', 'aeronave'],
   ['ship', 'boat', 'vessel', 'barco', 'bote', 'embarcacion'],
   ['train', 'railway', 'railroad', 'tren', 'ferrocarril'],
   ['bus', 'autobus', 'camioneta'],
@@ -357,31 +357,268 @@ function normalize(s: string): string {
   return s.normalize('NFD').replace(/\p{Diacritic}/gu, '').toLowerCase();
 }
 
-const groupIndex: Map<string, Set<string>> = (() => {
-  const index = new Map<string, Set<string>>();
-  for (const group of SEARCH_SYNONYMS) {
-    const asSet = new Set(group);
-    for (const term of group) index.set(normalize(term), asSet);
+const PARTIAL_SYNONYM_MIN_CHARS = 3;
+const FUZZY_SYNONYM_MIN_CHARS = 5;
+const DEFAULT_SUGGESTION_LIMIT = 8;
+
+type SynonymGroup = {
+  termsList: string[];
+};
+
+type CandidateSource =
+  | 'query'
+  | 'query-variant'
+  | 'synonym-exact'
+  | 'synonym-partial'
+  | 'synonym-fuzzy';
+
+type SearchTermCandidate = {
+  term: string;
+  score: number;
+  source: CandidateSource;
+};
+
+type SearchQuery = {
+  normalized: string;
+  compact: string;
+  tokens: string[];
+  terms: SearchTermCandidate[];
+  suggestions: string[];
+};
+
+type IconSearchMeta = {
+  words: string[];
+  searchableWords: string[];
+  compactName: string;
+  compactNameNoIcon: string;
+  initials: string;
+};
+
+const normalizedSynonymGroups: SynonymGroup[] = SEARCH_SYNONYMS.map((group) => {
+  const termsList = [...new Set(group.map((term) => normalize(term)))];
+  return { termsList };
+});
+
+const allSynonymTerms = [...new Set(normalizedSynonymGroups.flatMap((group) => group.termsList))];
+
+function addGroupToIndex(index: Map<string, SynonymGroup[]>, key: string, group: SynonymGroup) {
+  const groups = index.get(key);
+  if (groups) {
+    if (!groups.includes(group)) groups.push(group);
+  } else {
+    index.set(key, [group]);
+  }
+}
+
+const groupIndex: Map<string, SynonymGroup[]> = (() => {
+  const index = new Map<string, SynonymGroup[]>();
+  for (const group of normalizedSynonymGroups) {
+    for (const term of group.termsList) addGroupToIndex(index, term, group);
   }
   return index;
 })();
+
+const partialGroupIndex: Map<string, SynonymGroup[]> = (() => {
+  const index = new Map<string, SynonymGroup[]>();
+  for (const group of normalizedSynonymGroups) {
+    for (const term of group.termsList) {
+      const compactTerm = compact(term);
+      for (let length = PARTIAL_SYNONYM_MIN_CHARS; length <= compactTerm.length; length++) {
+        addGroupToIndex(index, compactTerm.slice(0, length), group);
+      }
+    }
+  }
+  return index;
+})();
+
+function compact(s: string): string {
+  return s.replace(/\s+/g, '');
+}
+
+function addCandidate(
+  candidates: Map<string, SearchTermCandidate>,
+  term: string,
+  score: number,
+  source: CandidateSource
+) {
+  const normalized = normalize(term.trim());
+  if (!normalized) return;
+
+  const current = candidates.get(normalized);
+  if (!current || score > current.score) {
+    candidates.set(normalized, { term: normalized, score, source });
+  }
+}
+
+function addGroupCandidates(
+  candidates: Map<string, SearchTermCandidate>,
+  groups: SynonymGroup[] | undefined,
+  score: number,
+  source: CandidateSource
+): boolean {
+  if (!groups) return false;
+  for (const group of groups) {
+    for (const term of group.termsList) addCandidate(candidates, term, score, source);
+  }
+  return true;
+}
+
+function addSuggestion(suggestions: Map<string, number>, term: string, score: number) {
+  const current = suggestions.get(term);
+  if (current === undefined || score > current) suggestions.set(term, score);
+}
+
+function addGroupSuggestions(
+  suggestions: Map<string, number>,
+  groups: SynonymGroup[] | undefined,
+  fragment: string,
+  score: number
+) {
+  if (!groups) return;
+
+  const compactFragment = compact(fragment);
+  for (const group of groups) {
+    for (const term of group.termsList) {
+      if (term === fragment) continue;
+      const termScore = compact(term).startsWith(compactFragment) ? score + 20 : score;
+      addSuggestion(suggestions, term, termScore);
+    }
+  }
+}
+
+function tokenVariants(fragment: string): string[] {
+  const variants = new Set<string>([fragment]);
+  if (fragment.length <= 3) return [...variants];
+
+  if (fragment.endsWith('ies') && fragment.length > 4) variants.add(`${fragment.slice(0, -3)}y`);
+  if (fragment.endsWith('ves') && fragment.length > 4) {
+    variants.add(`${fragment.slice(0, -3)}f`);
+    variants.add(`${fragment.slice(0, -3)}fe`);
+  }
+  if (fragment.endsWith('es') && fragment.length > 4) variants.add(fragment.slice(0, -2));
+  if (fragment.endsWith('s') && fragment.length > 3) variants.add(fragment.slice(0, -1));
+
+  return [...variants];
+}
+
+function fuzzyThreshold(term: string): number {
+  if (term.length >= 8) return 2;
+  if (term.length >= FUZZY_SYNONYM_MIN_CHARS) return 1;
+  return 0;
+}
+
+function editDistance(a: string, b: string, maxDistance: number): number {
+  if (a === b) return 0;
+  if (Math.abs(a.length - b.length) > maxDistance) return maxDistance + 1;
+
+  let previous = Array.from({ length: b.length + 1 }, (_, i) => i);
+  for (let i = 1; i <= a.length; i++) {
+    const current = [i];
+    let rowMin = current[0];
+
+    for (let j = 1; j <= b.length; j++) {
+      const cost = a[i - 1] === b[j - 1] ? 0 : 1;
+      const value = Math.min(
+        previous[j] + 1,
+        current[j - 1] + 1,
+        previous[j - 1] + cost
+      );
+      current[j] = value;
+      rowMin = Math.min(rowMin, value);
+    }
+
+    if (rowMin > maxDistance) return maxDistance + 1;
+    previous = current;
+  }
+
+  return previous[b.length];
+}
+
+function fuzzyMatches(a: string, b: string): boolean {
+  const maxDistance = fuzzyThreshold(a);
+  if (maxDistance === 0) return false;
+  if (a[0] !== b[0]) return false;
+  return editDistance(a, b, maxDistance) <= maxDistance;
+}
+
+function addSynonymMatches(
+  candidates: Map<string, SearchTermCandidate>,
+  suggestions: Map<string, number>,
+  fragment: string
+) {
+  if (!fragment) return;
+
+  const exactGroups = groupIndex.get(fragment);
+  const foundExactGroup = addGroupCandidates(candidates, exactGroups, 190, 'synonym-exact');
+  addGroupSuggestions(suggestions, exactGroups, fragment, 90);
+  if (foundExactGroup) return;
+
+  const compactFragment = compact(fragment);
+  if (compactFragment.length >= PARTIAL_SYNONYM_MIN_CHARS) {
+    const partialGroups = partialGroupIndex.get(compactFragment);
+    addGroupCandidates(candidates, partialGroups, 150, 'synonym-partial');
+    addGroupSuggestions(suggestions, partialGroups, fragment, 70);
+  }
+
+  if (fragment.length < FUZZY_SYNONYM_MIN_CHARS) return;
+
+  const fuzzyGroups = new Set<SynonymGroup>();
+  for (const term of allSynonymTerms) {
+    if (fuzzyMatches(fragment, term)) {
+      for (const group of groupIndex.get(term) ?? []) fuzzyGroups.add(group);
+      addSuggestion(suggestions, term, 65);
+    }
+  }
+  addGroupCandidates(candidates, [...fuzzyGroups], 130, 'synonym-fuzzy');
+}
+
+function buildSearchQuery(query: string): SearchQuery {
+  const normalized = normalize(query.trim());
+  if (!normalized) {
+    return { normalized: '', compact: '', tokens: [], terms: [], suggestions: [] };
+  }
+
+  const candidates = new Map<string, SearchTermCandidate>();
+  const suggestions = new Map<string, number>();
+  const tokens = normalized.split(/\s+/).filter(Boolean);
+  const fragments = [...new Set([normalized, ...tokens])];
+
+  addCandidate(candidates, normalized, 260, 'query');
+
+  for (const fragment of fragments) {
+    for (const variant of tokenVariants(fragment)) {
+      addCandidate(candidates, variant, variant === fragment ? 250 : 230, 'query-variant');
+      addSynonymMatches(candidates, suggestions, variant);
+    }
+  }
+
+  suggestions.delete(normalized);
+
+  return {
+    normalized,
+    compact: compact(normalized),
+    tokens,
+    terms: [...candidates.values()],
+    suggestions: [...suggestions.entries()]
+      .sort((a, b) => b[1] - a[1] || a[0].length - b[0].length || a[0].localeCompare(b[0]))
+      .map(([term]) => term),
+  };
+}
 
 /**
  * Expands a raw search query into every term it should ALSO match — the
  * original query plus every synonym-group it belongs to.  Multi-word
  * queries are expanded word-by-word so "money transfer" still benefits
- * from the "money" group.  Acentos normalizados (búsqueda en español).
+ * from the "money" group.  Partial synonym keys kick in from 3 characters,
+ * so "avio" expands through "avion" into "airplane" / "plane".  Acentos
+ * normalizados (búsqueda en español).
  */
 export function expandSearchTerms(query: string): string[] {
-  const normalized = normalize(query.trim());
-  if (!normalized) return [];
+  return buildSearchQuery(query).terms.map((candidate) => candidate.term);
+}
 
-  const terms = new Set<string>([normalized]);
-  for (const word of normalized.split(/\s+/)) {
-    const group = groupIndex.get(word);
-    if (group) for (const term of group) terms.add(normalize(term));
-  }
-  return [...terms];
+export function getSearchSuggestions(query: string, limit = DEFAULT_SUGGESTION_LIMIT): string[] {
+  return buildSearchQuery(query).suggestions.slice(0, limit);
 }
 
 /**
@@ -390,9 +627,7 @@ export function expandSearchTerms(query: string): string[] {
  * than one long substring) avoids false hits where two adjacent words
  * happen to spell a third: "airplane" + "Takeoff" contains the literal
  * substring "planet" at the join, which a whole-name `.includes()` would
- * wrongly surface for a "globe/planet" search.  Digits stay glued to the
- * word before them so a search for a bare word still prefix-matches
- * "Agreement01" via `.includes()`.
+ * wrongly surface for a "globe/planet" search.
  */
 function splitIconWords(name: string): string[] {
   return name
@@ -403,14 +638,24 @@ function splitIconWords(name: string): string[] {
     .filter(Boolean);
 }
 
-const wordsCache = new Map<string, string[]>();
+const metaCache = new Map<string, IconSearchMeta>();
+function metaFor(name: string): IconSearchMeta {
+  let meta = metaCache.get(name);
+  if (meta) return meta;
+
+  const words = splitIconWords(name).map(normalize);
+  const searchableWords = words.filter((word) => word !== 'icon');
+  const compactName = compact(words.join(''));
+  const compactNameNoIcon = compact(searchableWords.join(''));
+  const initials = searchableWords.map((word) => word[0]).join('');
+
+  meta = { words, searchableWords, compactName, compactNameNoIcon, initials };
+  metaCache.set(name, meta);
+  return meta;
+}
+
 function wordsFor(name: string): string[] {
-  let words = wordsCache.get(name);
-  if (!words) {
-    words = splitIconWords(name);
-    wordsCache.set(name, words);
-  }
-  return words;
+  return metaFor(name).words;
 }
 
 /**
@@ -436,6 +681,75 @@ function matchesFromWordBoundary(words: string[], startIdx: number, term: string
   return remaining.length === 0;
 }
 
+function normalizedWord(word: string): string {
+  return word.replace(/\d+$/, '');
+}
+
+function bestFuzzyWordScore(words: string[], term: string): number {
+  const maxDistance = fuzzyThreshold(term);
+  if (maxDistance === 0) return 0;
+
+  let best = 0;
+  for (const word of words) {
+    const plainWord = normalizedWord(word);
+    if (!plainWord || plainWord[0] !== term[0]) continue;
+    const distance = editDistance(term, plainWord, maxDistance);
+    if (distance <= maxDistance) best = Math.max(best, 115 - distance * 25);
+  }
+  return best;
+}
+
+function scoreTermForIcon(meta: IconSearchMeta, candidate: SearchTermCandidate): number {
+  const termCompact = compact(candidate.term);
+  if (!termCompact) return 0;
+  const cameFromSynonym = candidate.source.startsWith('synonym');
+  const fullNameBonus = cameFromSynonym ? 50 : 90;
+  const prefixBonus = cameFromSynonym ? 50 : 75;
+  const wordBonus = cameFromSynonym ? 50 : 70;
+  const wordPrefixBonus = cameFromSynonym ? 45 : 55;
+
+  if (meta.compactNameNoIcon === termCompact) return candidate.score + fullNameBonus;
+  if (meta.compactNameNoIcon.startsWith(termCompact)) return candidate.score + prefixBonus;
+  if (meta.compactName === termCompact || meta.compactName.startsWith(termCompact)) {
+    return candidate.score + prefixBonus;
+  }
+
+  for (const word of meta.searchableWords) {
+    const plainWord = normalizedWord(word);
+    if (word === termCompact || plainWord === termCompact) return candidate.score + wordBonus;
+    if (word.startsWith(termCompact) || plainWord.startsWith(termCompact)) return candidate.score + wordPrefixBonus;
+  }
+
+  if (meta.words.some((_, i) => matchesFromWordBoundary(meta.words, i, termCompact))) {
+    return candidate.score + wordPrefixBonus;
+  }
+
+  if (candidate.source === 'query' || candidate.source === 'query-variant') {
+    return bestFuzzyWordScore(meta.searchableWords, termCompact);
+  }
+
+  return 0;
+}
+
+function scoreIconName(name: string, search: SearchQuery): number {
+  const meta = metaFor(name);
+  let best = 0;
+
+  if (search.compact) {
+    if (meta.compactNameNoIcon === search.compact) best = Math.max(best, 420);
+    if (meta.compactNameNoIcon.startsWith(search.compact)) best = Math.max(best, 390);
+    if (search.compact.length >= 2 && meta.initials.startsWith(search.compact)) {
+      best = Math.max(best, meta.initials === search.compact ? 340 : 300);
+    }
+  }
+
+  for (const candidate of search.terms) {
+    best = Math.max(best, scoreTermForIcon(meta, candidate));
+  }
+
+  return best;
+}
+
 /**
  * True if `name` matches the (already-expanded) search `terms`.  Multi-word
  * synonym phrases ("pie chart") are compacted to "piechart" first — the
@@ -445,14 +759,19 @@ function matchesFromWordBoundary(words: string[], startIdx: number, term: string
 export function iconNameMatches(name: string, terms: string[]): boolean {
   const words = wordsFor(name);
   return terms.some((term) => {
-    const compact = term.replace(/\s+/g, '');
-    return words.some((_, i) => matchesFromWordBoundary(words, i, compact));
+    const termCompact = compact(normalize(term));
+    return words.some((_, i) => matchesFromWordBoundary(words, i, termCompact));
   });
 }
 
-/** Filters `names` against a raw query — synonym-expanded, word-aware. */
+/** Filters and ranks `names` against a raw query — synonym-expanded, word-aware, typo-tolerant. */
 export function filterIconNames(names: readonly string[], query: string): string[] {
-  const terms = expandSearchTerms(query);
-  if (terms.length === 0) return [...names];
-  return names.filter((n) => iconNameMatches(n, terms));
+  const search = buildSearchQuery(query);
+  if (search.terms.length === 0) return [...names];
+
+  return names
+    .map((name, index) => ({ name, index, score: scoreIconName(name, search) }))
+    .filter((result) => result.score > 0)
+    .sort((a, b) => b.score - a.score || a.index - b.index)
+    .map((result) => result.name);
 }
