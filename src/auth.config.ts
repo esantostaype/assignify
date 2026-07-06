@@ -8,7 +8,7 @@ import type { NextAuthConfig } from 'next-auth'
 //   /login           → la propia pantalla de login
 //   /api/auth/*       → endpoints de Auth.js (signin/callback/session/csrf…)
 //   /api/clickup-webhook, /api/cron/* → servicios externos con su PROPIO secreto
-function isPublicPath(pathname: string): boolean {
+export function isPublicPath(pathname: string): boolean {
   return (
     pathname === '/login' ||
     pathname === '/guide' ||
