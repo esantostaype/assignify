@@ -4,7 +4,7 @@
  * or PNG.  Plain browser API glue (Blob / Canvas / Clipboard), not UI — the
  * modal owns the try/catch + toast around each call.
  */
-import type { IconSvgElement } from '@/lib/hugeicons/stroke';
+import type { IconSvgElement } from './iconCatalog';
 
 const ESCAPE_MAP: Record<string, string> = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' };
 function escapeAttr(value: string): string {

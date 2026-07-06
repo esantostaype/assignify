@@ -8,8 +8,9 @@ import { Pagination } from '@/components/ui/navigation';
 import { EmptyState } from '@/components/ui/data';
 import { Typography } from '@/components/ui/typography';
 import { PiMagnifyingGlass } from '@/lib/icons';
+import { Spinner } from '@/components/ui';
 import { HugeIcon } from './HugeIcon';
-import { ICON_NAMES, getStrokeIcon, getDuotoneIcon } from './iconCatalog';
+import { ICON_NAMES, getStrokeIcon, getDuotoneIcon, loadIconData } from './iconCatalog';
 import { IconDetailModal, type IconStyle } from './IconDetailModal';
 import { filterIconNames } from './searchSynonyms';
 
@@ -68,6 +69,18 @@ export function HugeiconsBrowser() {
     setOpenedStyle(style);
   };
 
+  // Los datos de los iconos (~11MB) ya NO van en el bundle: se descargan en runtime desde
+  // /public la primera vez que se abre la galería (así el build no los compila).
+  const [ready, setReady] = useState(false);
+  const [loadError, setLoadError] = useState(false);
+  useEffect(() => {
+    let alive = true;
+    loadIconData()
+      .then(() => { if (alive) setReady(true); })
+      .catch(() => { if (alive) setLoadError(true); });
+    return () => { alive = false; };
+  }, []);
+
   // Keep the URL in sync with the current filter/search/open-icon state —
   // rebuilt from scratch each time so the params never fight each other.
   // `replace` (not `push`) so browsing icons doesn't spam history.
@@ -120,7 +133,18 @@ export function HugeiconsBrowser() {
           </div>
         </div>
 
-        {pageItems.length === 0 ? (
+        {!ready ? (
+          <div className="flex flex-col items-center justify-center gap-3 py-24 text-(--color-text-muted)">
+            {loadError ? (
+              <span className="text-sm">Couldn&apos;t load the icon library. Please reload the page.</span>
+            ) : (
+              <>
+                <Spinner />
+                <span className="text-sm">Loading icons…</span>
+              </>
+            )}
+          </div>
+        ) : pageItems.length === 0 ? (
           <EmptyState
             icon={PiMagnifyingGlass}
             title="No icons found"

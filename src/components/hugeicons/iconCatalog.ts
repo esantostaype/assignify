@@ -13,12 +13,43 @@
  * misshapen to ship.  Stroke and Duotone are the only two styles this
  * catalog offers.
  */
-import strokeIcons from '@/lib/hugeicons/stroke';
-import duotoneIcons from '@/lib/hugeicons/duotone';
-import type { IconSvgElement } from '@/lib/hugeicons/stroke';
+// Tipo de un icono Hugeicons: lista cruda de nodos SVG `[tag, attrs][]` (la consume HugeIcon).
+export type IconSvgElement = ReadonlyArray<readonly [string, Record<string, string | number>]>;
 
-export type { IconSvgElement };
-export { strokeIcons, duotoneIcons };
+// Los DATOS de los iconos (4567 × stroke/duotone) ya NO se bundlean: se sirven como JSON
+// estático desde /public/hugeicons y se cargan EN RUNTIME la primera vez que se abre la
+// galería. Esto saca ~85k líneas del grafo de webpack → el build deja de compilarlas.
+// (Regenerar los JSON con `node scripts/gen-hugeicons-json.js` si se re-vendorizan los iconos.)
+type IconMap = Record<string, IconSvgElement>;
+let strokeCache: IconMap | null = null;
+let duotoneCache: IconMap | null = null;
+let loadPromise: Promise<void> | null = null;
+
+/** ¿Ya están los datos en memoria? (getStrokeIcon/getDuotoneIcon devuelven undefined si no.) */
+export function iconsLoaded(): boolean {
+  return strokeCache !== null && duotoneCache !== null;
+}
+
+/** Descarga (UNA vez) los datos de iconos desde /public. Idempotente; dedupe de la promesa;
+ *  si falla, la limpia para permitir reintentar. */
+export function loadIconData(): Promise<void> {
+  if (iconsLoaded()) return Promise.resolve();
+  if (!loadPromise) {
+    loadPromise = Promise.all([
+      fetch('/hugeicons/stroke.json').then((r) => r.json()),
+      fetch('/hugeicons/duotone.json').then((r) => r.json()),
+    ])
+      .then(([s, d]) => {
+        strokeCache = s as IconMap;
+        duotoneCache = d as IconMap;
+      })
+      .catch((e) => {
+        loadPromise = null; // permite reintentar
+        throw e;
+      });
+  }
+  return loadPromise;
+}
 
 export const ICON_NAMES: readonly string[] = [
   'AbacusIcon', 'AbsoluteIcon', 'AccelerationIcon', 'AccessIcon',
@@ -1166,9 +1197,9 @@ export const ICON_NAMES: readonly string[] = [
 ];
 
 export function getStrokeIcon(name: string): IconSvgElement | undefined {
-  return strokeIcons[name];
+  return strokeCache?.[name];
 }
 
 export function getDuotoneIcon(name: string): IconSvgElement | undefined {
-  return duotoneIcons[name];
+  return duotoneCache?.[name];
 }

@@ -1,5 +1,5 @@
 import { createElement, type SVGProps } from 'react';
-import type { IconSvgElement } from '@/lib/hugeicons/stroke';
+import type { IconSvgElement } from './iconCatalog';
 
 export interface HugeIconProps extends Omit<SVGProps<SVGSVGElement>, 'children'> {
   icon: IconSvgElement;
