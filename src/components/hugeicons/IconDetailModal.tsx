@@ -43,6 +43,22 @@ const DEFAULT_SIZE  = '48';
 const DEFAULT_COLOR_LIGHT = '#111827';
 const DEFAULT_COLOR_DARK  = '#F3F4F6';
 
+// El color elegido se RECUERDA entre aperturas del modal (localStorage) para no re-elegirlo
+// cada vez; Reset lo olvida y vuelve al color del tema. SSR-safe (guard `typeof window`).
+const COLOR_STORAGE_KEY = 'hugeicons-icon-color';
+function getStoredColor(): string | null {
+  if (typeof window === 'undefined') return null;
+  try { return localStorage.getItem(COLOR_STORAGE_KEY); } catch { return null; }
+}
+function storeColor(color: string): void {
+  if (typeof window === 'undefined') return;
+  try { localStorage.setItem(COLOR_STORAGE_KEY, color); } catch { /* storage no disponible */ }
+}
+function clearStoredColor(): void {
+  if (typeof window === 'undefined') return;
+  try { localStorage.removeItem(COLOR_STORAGE_KEY); } catch { /* storage no disponible */ }
+}
+
 export interface IconDetailModalProps {
   open: boolean;
   onClose: () => void;
@@ -88,7 +104,8 @@ export function IconDetailModal({ open, onClose, iconName, style, onStyleChange 
     if (!open) return;
     setStrokeWidth(DEFAULT_STROKE_WIDTH);
     setSize(DEFAULT_SIZE);
-    setColor(defaultColor);
+    // El color se MANTIENE entre aperturas: usa el último guardado (o el del tema si no hay).
+    setColor(getStoredColor() ?? defaultColor);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, iconName]);
 
@@ -106,10 +123,17 @@ export function IconDetailModal({ open, onClose, iconName, style, onStyleChange 
     }
   };
 
+  // Cambiar el color lo guarda para la próxima vez que se abra el modal.
+  const handleColorChange = (next: string) => {
+    setColor(next);
+    storeColor(next);
+  };
+
   const handleReset = () => {
     setStrokeWidth(DEFAULT_STROKE_WIDTH);
     setSize(DEFAULT_SIZE);
     setColor(defaultColor);
+    clearStoredColor();
   };
 
   const handleDownload = async (format: ExportFormat) => {
@@ -175,7 +199,7 @@ export function IconDetailModal({ open, onClose, iconName, style, onStyleChange 
         <div className="grid w-full grid-cols-[1fr_1fr_1fr_auto] gap-2">
           <Select value={strokeWidth} onChange={setStrokeWidth} options={STROKE_WIDTH_OPTIONS} size="md" />
           <Select value={size} onChange={setSize} options={SIZE_OPTIONS} size="md" />
-          <ColorPicker value={color} onChange={setColor} />
+          <ColorPicker value={color} onChange={handleColorChange} />
           <IconButton aria-label="Reset stroke width, size and color" variant="outlined" onClick={handleReset}>
             <Icon icon={PiArrowsClockwise} size={16} />
           </IconButton>
