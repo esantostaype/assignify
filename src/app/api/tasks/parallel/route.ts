@@ -95,17 +95,17 @@ export async function POST(req: Request) {
         )
       )
 
+      // Asignación MANUAL (override): NO se exige compatibilidad de cargo/tipo — el usuario
+      // eligió a dedo. Basta con que exista y esté activo. (La compatibilidad de rol solo
+      // rige la SUGERENCIA automática, no el override; ver assignment-ranking.)
       const validUsers: UserWithRoles[] = specificUsersResults.filter(
-        (user): user is NonNullable<typeof user> =>
-          user != null &&
-          user.active &&
-          user.roles.some(role => role.typeId === typeId)
+        (user): user is NonNullable<typeof user> => user != null && user.active
       ) as UserWithRoles[]
 
       if (validUsers.length === 0) {
         return NextResponse.json({
-          error: 'None of the specified users are compatible with this task type',
-          details: 'Make sure the users exist, are active, and have compatible roles',
+          error: 'None of the specified members are valid',
+          details: 'Make sure the members exist and are active in this workspace',
         }, { status: 400 })
       }
 

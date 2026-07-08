@@ -32,6 +32,21 @@ const OCCUPYING_CLICKUP_STATUSES: ActiveClickUpTask['status'][] = ['TO_DO', 'IN_
 
 const MS_PER_DAY = 1000 * 60 * 60 * 24;
 
+// Las vacaciones se guardan como fecha de calendario anclada a MEDIODÍA UTC (ver el POST de
+// vacaciones). Al compararlas contra el horario laboral (que empieza pasado el mediodía UTC)
+// hay que tomar el DÍA COMPLETO: inicio del día de la primera fecha y FIN del día de la
+// última; si no, el ÚLTIMO día de vacación no se cubre y una tarea se cuela en él.
+function startOfUtcDay(d: Date): Date {
+  const r = new Date(d);
+  r.setUTCHours(0, 0, 0, 0);
+  return r;
+}
+function endOfUtcDay(d: Date): Date {
+  const r = new Date(d);
+  r.setUTCHours(23, 59, 59, 999);
+  return r;
+}
+
 export interface ParallelInsertionResult {
   startDate: Date;
   deadline: Date;
@@ -83,10 +98,12 @@ async function getNextAvailableStartAfterVacations(
       taskDurationDays > 0 ? await calculateWorkingDeadline(availableDate, taskHours, workspaceId) : availableDate;
 
     for (const vacation of sortedVacations) {
-      const vacStart = new Date(vacation.startDate);
-      const vacEnd = new Date(vacation.endDate);
+      const vacStart = startOfUtcDay(new Date(vacation.startDate));
+      const vacEnd = endOfUtcDay(new Date(vacation.endDate));
       if (availableDate <= vacEnd && potentialTaskEnd >= vacStart) {
-        const dayAfter = new Date(vacEnd);
+        // Día siguiente al ÚLTIMO día de vacación, a medianoche → el diseñador reanuda ese
+        // día a la hora laboral (getNextAvailableStart lo ajusta, saltando finde/festivos).
+        const dayAfter = startOfUtcDay(new Date(vacation.endDate));
         dayAfter.setUTCDate(dayAfter.getUTCDate() + 1);
         availableDate = await getNextAvailableStart(dayAfter, workspaceId);
         adjusted = true;
@@ -121,8 +138,8 @@ async function applyVacationLogic(
 
   const conflicting: string[] = [];
   for (const vacation of upcomingVacations) {
-    const vacStart = new Date(vacation.startDate);
-    const vacEnd = new Date(vacation.endDate);
+    const vacStart = startOfUtcDay(new Date(vacation.startDate));
+    const vacEnd = endOfUtcDay(new Date(vacation.endDate));
     if (result.startDate <= vacEnd && result.deadline >= vacStart) {
       conflicting.push(`${vacStart.toISOString().split('T')[0]} → ${vacEnd.toISOString().split('T')[0]}`);
     }
