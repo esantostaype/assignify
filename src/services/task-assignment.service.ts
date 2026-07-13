@@ -29,6 +29,21 @@ const OVERLOAD_THRESHOLD_DAYS = 10;
 // ON_APPROVAL ya está entregado: no cuenta ni para carga ni para disponibilidad.
 const PENDING_CLICKUP_STATUSES: ActiveClickUpTask['status'][] = ['TO_DO', 'IN_PROGRESS'];
 
+// Las vacaciones se guardan como fecha de calendario anclada a MEDIODÍA UTC (ver el POST de
+// vacaciones) y el horario laboral empieza pasado el mediodía UTC; para compararlas hay que
+// tomar el DÍA COMPLETO, si no el ÚLTIMO día de vacación queda "descubierto" y el diseñador
+// aparece disponible (o se le agenda) dentro de sus vacaciones.
+function startOfUtcDay(d: Date): Date {
+  const r = new Date(d);
+  r.setUTCHours(0, 0, 0, 0);
+  return r;
+}
+function endOfUtcDay(d: Date): Date {
+  const r = new Date(d);
+  r.setUTCHours(23, 59, 59, 999);
+  return r;
+}
+
 function calculateWorkingDaysBetween(startDate: Date, endDate: Date, excludeVacations: UserVacation[] = []): number {
   if (startDate >= endDate) return 0;
 
@@ -93,13 +108,16 @@ async function getNextAvailableStartAfterVacations(
       : availableDate;
 
     for (const vacation of sortedVacations) {
-      const vacStart = new Date(vacation.startDate);
-      const vacEnd = new Date(vacation.endDate);
+      // Día COMPLETO (ver startOfUtcDay/endOfUtcDay): cubre el último día de vacación.
+      const vacStart = startOfUtcDay(new Date(vacation.startDate));
+      const vacEnd = endOfUtcDay(new Date(vacation.endDate));
 
       const hasConflict = availableDate <= vacEnd && potentialTaskEnd >= vacStart;
 
       if (hasConflict) {
-        const dayAfterVacation = new Date(vacEnd);
+        // Día siguiente al ÚLTIMO de vacación, a medianoche → se reanuda ese día a la hora
+        // laboral (getNextAvailableStart lo ajusta, saltando finde/festivos).
+        const dayAfterVacation = startOfUtcDay(new Date(vacation.endDate));
         dayAfterVacation.setUTCDate(dayAfterVacation.getUTCDate() + 1);
         const newAvailableDate = await getNextAvailableStart(dayAfterVacation, workspaceId);
 
@@ -262,7 +280,7 @@ async function getVacationAwareUserSlots(
     //   overloaded  → más de OVERLOAD_THRESHOLD_DAYS de trabajo pendiente.
     const now = new Date();
     const onVacationNow = upcomingVacations.some(
-      (v) => v.startDate <= now && v.endDate >= now
+      (v) => startOfUtcDay(new Date(v.startDate)) <= now && endOfUtcDay(new Date(v.endDate)) >= now
     );
     const shiftedByVacation = availableDate.getTime() !== baseAvailableDate.getTime();
     const hasVacationConflict = onVacationNow || shiftedByVacation;
