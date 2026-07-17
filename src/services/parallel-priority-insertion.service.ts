@@ -21,6 +21,7 @@ import { mapClickUpPriority } from '@/utils/clickup-status-mapping-utils';
 import { getAppSettings } from '@/services/app-settings.service';
 import { rescheduleClickUpTaskDates } from '@/services/clickup.service';
 import { isMovableLow, computeLowCascade, type MovableLow, type CascadeMove } from '@/services/low-cascade';
+import { resolvePriorityPlacement } from '@/services/priority-lanes';
 
 // Rango de prioridad: mayor número = más prioritaria.
 const PRIORITY_RANK: Record<Priority, number> = { LOW: 1, NORMAL: 2, HIGH: 3, URGENT: 4 };
@@ -204,30 +205,56 @@ export async function calculateParallelPriorityInsertion(
     .filter((t) => t.deadline >= todayStart);
 
   const rank = PRIORITY_RANK[priority];
-  // El "carril": tareas de prioridad IGUAL o MAYOR — la nueva se encola tras ellas.
-  const queueAhead = tasks.filter((t) => PRIORITY_RANK[t.priority] >= rank);
 
   let startDate: Date;
   let insertionReason: string;
   let parallelWith: ParallelInsertionResult['parallelWith'];
 
-  if (queueAhead.length > 0) {
-    // Tras la de deadline más lejano dentro del carril (la "última" en la cola).
-    const last = queueAhead.reduce((a, b) =>
-      new Date(a.deadline).getTime() >= new Date(b.deadline).getTime() ? a : b
-    );
-    startDate = await getNextAvailableStart(new Date(last.deadline), workspaceId);
-    insertionReason = `${priority}: en cola tras "${last.name}" (última de prioridad ≥ ${priority})`;
-    parallelWith = {
-      taskId: last.id,
-      taskName: last.name,
-      originalStartDate: new Date(last.startDate),
-    };
+  if (rank >= PRIORITY_RANK.HIGH) {
+    // HIGH/URGENT: se INSERTAN EN PARALELO a una tarea de la cola base (misma fecha de
+    // inicio), NO arrancan "de inmediato". La posición depende del nivel y de cuántas del
+    // mismo nivel ya tiene el diseñador (ver resolvePriorityPlacement en priority-lanes).
+    const placement = resolvePriorityPlacement(tasks, priority);
+    if (placement.mode === 'parallel') {
+      startDate = await getNextAvailableStart(new Date(placement.anchor.startDate), workspaceId);
+      insertionReason = `${priority}: en paralelo a "${placement.anchor.name}"`;
+      parallelWith = {
+        taskId: placement.anchor.id,
+        taskName: placement.anchor.name,
+        originalStartDate: new Date(placement.anchor.startDate),
+      };
+    } else if (placement.mode === 'after') {
+      // La cola base no tiene una tarea en esa posición → tras la última del diseñador.
+      startDate = await getNextAvailableStart(new Date(placement.anchor.deadline), workspaceId);
+      insertionReason = `${priority}: en cola tras "${placement.anchor.name}" (sin hueco en paralelo)`;
+      parallelWith = {
+        taskId: placement.anchor.id,
+        taskName: placement.anchor.name,
+        originalStartDate: new Date(placement.anchor.startDate),
+      };
+    } else {
+      startDate = await getNextAvailableStart(now, workspaceId);
+      insertionReason = `${priority}: empieza de inmediato (el diseñador no tiene tareas)`;
+    }
   } else {
-    // No hay nada de prioridad igual o mayor: empieza lo antes posible (en paralelo
-    // con las de menor prioridad, sin empujarlas).
-    startDate = await getNextAvailableStart(now, workspaceId);
-    insertionReason = `${priority}: empieza de inmediato (sin tareas de prioridad ≥ ${priority})`;
+    // NORMAL/LOW: modelo de CARRIL — tras la última tarea de prioridad IGUAL o MAYOR;
+    // corre EN PARALELO con las de menor prioridad, sin empujarlas.
+    const queueAhead = tasks.filter((t) => PRIORITY_RANK[t.priority] >= rank);
+    if (queueAhead.length > 0) {
+      const last = queueAhead.reduce((a, b) =>
+        new Date(a.deadline).getTime() >= new Date(b.deadline).getTime() ? a : b
+      );
+      startDate = await getNextAvailableStart(new Date(last.deadline), workspaceId);
+      insertionReason = `${priority}: en cola tras "${last.name}" (última de prioridad ≥ ${priority})`;
+      parallelWith = {
+        taskId: last.id,
+        taskName: last.name,
+        originalStartDate: new Date(last.startDate),
+      };
+    } else {
+      startDate = await getNextAvailableStart(now, workspaceId);
+      insertionReason = `${priority}: empieza de inmediato (sin tareas de prioridad ≥ ${priority})`;
+    }
   }
 
   const deadline = await calculateWorkingDeadline(startDate, durationDays * 8, workspaceId);
