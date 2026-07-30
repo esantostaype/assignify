@@ -6,7 +6,7 @@ import {
 } from 'react';
 import { createPortal } from 'react-dom';
 import { cn } from '@/lib/cn';
-import { Icon, PiCaretDown, PiPlus } from '@/lib/icons';
+import { Icon, PiCaretDown, PiPlus, PiX } from '@/lib/icons';
 import { FormField } from './FormField';
 
 export interface ColorPickerProps {
@@ -21,6 +21,10 @@ export interface ColorPickerProps {
   presets?: string[];
   /** Show the placeholder pill when no color is selected. */
   placeholder?: string;
+  /** When set, the user's "Saved colors" persist to `localStorage` under
+   *  this key so they survive reloads. Omit to keep saved colors in-memory
+   *  only (per-mount, the previous behaviour). */
+  storageKey?: string;
   disabled?: boolean;
   className?: string;
   id?: string;
@@ -79,12 +83,35 @@ function isValidHex(s: string): boolean {
   return /^#?[0-9A-Fa-f]{6}$/.test(s.trim());
 }
 
+// SSR-safe read/write of the persisted "Saved colors" list. Malformed or
+// missing storage degrades gracefully to an empty list.
+function readSavedColors(key: string): string[] {
+  if (typeof window === 'undefined') return [];
+  try {
+    const raw = window.localStorage.getItem(key);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? parsed.filter((c) => typeof c === 'string' && isValidHex(c)) : [];
+  } catch {
+    return [];
+  }
+}
+function writeSavedColors(key: string, colors: string[]): void {
+  if (typeof window === 'undefined') return;
+  try {
+    window.localStorage.setItem(key, JSON.stringify(colors));
+  } catch {
+    /* storage no disponible */
+  }
+}
+
 // component
 export function ColorPicker({
   value, defaultValue = '#000000', onChange,
   label, helper, error, required,
   presets = DEFAULT_PRESETS,
   placeholder = 'Select color',
+  storageKey,
   disabled, className, id,
 }: ColorPickerProps) {
   const autoId = useId();
@@ -94,7 +121,16 @@ export function ColorPicker({
   const current = isControlled ? value! : internal;
 
   const [open, setOpen] = useState(false);
-  const [saved, setSaved] = useState<string[]>([]);
+  // Saved colors — seeded from localStorage when `storageKey` is set so the
+  // list is consistent across reloads (reading in the initializer is safe: the
+  // swatch grid only renders inside the popover, which is client-only, so there
+  // is no SSR hydration mismatch).
+  const [saved, setSaved] = useState<string[]>(() => (storageKey ? readSavedColors(storageKey) : []));
+
+  // Persist on every change to the saved list.
+  useEffect(() => {
+    if (storageKey) writeSavedColors(storageKey, saved);
+  }, [saved, storageKey]);
   const rootRef = useRef<HTMLDivElement>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
   const popoverRef = useRef<HTMLDivElement>(null);
@@ -379,26 +415,57 @@ export function ColorPicker({
           <span className="text-[11px] font-semibold text-(--color-text-muted)">Saved colors:</span>
           <button
             type="button"
-            onClick={() => setSaved(prev => prev.includes(current) ? prev : [current, ...prev].slice(0, 14))}
+            onClick={() => {
+              if (!isValidHex(current)) return;
+              const hex = current.toUpperCase();
+              setSaved(prev => prev.some(c => c.toUpperCase() === hex) ? prev : [hex, ...prev].slice(0, 14));
+            }}
             className="inline-flex items-center gap-0.5 text-[11px] font-semibold text-primary-700 hover:text-primary-800"
           >
             <Icon icon={PiPlus} size={11} /> Add
           </button>
         </div>
         <div className="grid grid-cols-7 gap-1.5">
-          {[...saved, ...presets].slice(0, 14).map((c, i) => (
-            <button
-              key={`${c}-${i}`}
-              type="button"
-              aria-label={c}
-              onClick={() => set(c)}
-              className={cn(
-                'size-6 rounded-full border transition-transform hover:scale-110',
-                c.toUpperCase() === current.toUpperCase() ? 'border-neutral-700 ring-2 ring-neutral-300 ring-offset-1' : 'border-(--color-border-default)',
-              )}
-              style={{ background: c }}
-            />
+          {/* Saved swatches first (removable via hover ×), then presets that
+              aren't already saved — capped at 14 so the grid stays two rows. */}
+          {saved.slice(0, 14).map((c, i) => (
+            <div key={`saved-${c}-${i}`} className="group relative">
+              <button
+                type="button"
+                aria-label={c}
+                onClick={() => set(c)}
+                className={cn(
+                  'size-6 rounded-full border transition-transform hover:scale-110',
+                  c.toUpperCase() === current.toUpperCase() ? 'border-neutral-700 ring-2 ring-neutral-300 ring-offset-1' : 'border-(--color-border-default)',
+                )}
+                style={{ background: c }}
+              />
+              <button
+                type="button"
+                aria-label={`Remove ${c}`}
+                onClick={() => setSaved(prev => prev.filter(x => x.toUpperCase() !== c.toUpperCase()))}
+                className="absolute -right-1 -top-1 hidden size-3.5 items-center justify-center rounded-full border border-white bg-neutral-800 text-white shadow group-hover:flex"
+              >
+                <Icon icon={PiX} size={8} />
+              </button>
+            </div>
           ))}
+          {presets
+            .filter(p => !saved.some(s => s.toUpperCase() === p.toUpperCase()))
+            .slice(0, Math.max(0, 14 - saved.length))
+            .map((c, i) => (
+              <button
+                key={`preset-${c}-${i}`}
+                type="button"
+                aria-label={c}
+                onClick={() => set(c)}
+                className={cn(
+                  'size-6 rounded-full border transition-transform hover:scale-110',
+                  c.toUpperCase() === current.toUpperCase() ? 'border-neutral-700 ring-2 ring-neutral-300 ring-offset-1' : 'border-(--color-border-default)',
+                )}
+                style={{ background: c }}
+              />
+            ))}
         </div>
       </div>
     </div>,

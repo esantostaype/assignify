@@ -16,10 +16,7 @@ import { getStrokeIcon, getDuotoneIcon, type IconSvgElement } from './iconCatalo
 import { buildIconSvgMarkup, svgToPngBlob, downloadBlob, copyTextToClipboard, copyPngBlobToClipboard } from './iconExport';
 
 export type IconStyle = 'stroke' | 'duotone';
-/** A Download/Copy menu choice — just the export format.  (An "Outlined"
- *  third option was tried via an offline potrace re-trace of the stroke
- *  set; even at high fidelity too many icons came out visibly misshapen up
- *  close, so it was dropped — Stroke and Duotone are the only two styles.) */
+/** A Download/Copy menu choice — just the export format. */
 export type ExportFormat = 'svg' | 'png';
 
 const STROKE_WIDTH_OPTIONS = [
@@ -35,37 +32,41 @@ const SIZE_OPTIONS = ['16', '20', '24', '32', '48', '64', '96', '128'].map((n) =
 
 const DEFAULT_STROKE_WIDTH = '1';
 const DEFAULT_SIZE  = '48';
-// The default (un-touched-by-the-user) icon color has to follow the app's
-// theme — a fixed dark hex reads fine in light mode but disappears against
-// the modal's own dark-mode surface.  Matches `--color-text-strong` in each
-// theme.  Once the producer picks their own color via `ColorPicker` it's
-// respected as-is regardless of theme.
+// El color por defecto sigue el tema (un hex oscuro fijo desaparecería sobre la
+// superficie dark del modal). Coincide con `--color-text-strong` en cada tema.
 const DEFAULT_COLOR_LIGHT = '#111827';
 const DEFAULT_COLOR_DARK  = '#F3F4F6';
 
-// El color elegido se RECUERDA entre aperturas del modal (localStorage) para no re-elegirlo
-// cada vez; Reset lo olvida y vuelve al color del tema. SSR-safe (guard `typeof window`).
-const COLOR_STORAGE_KEY = 'hugeicons-icon-color';
-function getStoredColor(): string | null {
+// ── localStorage: recordamos color, tamaño, grosor y el formato de Download/Copy
+// entre aperturas del modal y entre recargas. SSR-safe (guard `typeof window`).
+const COLOR_KEY   = 'hugeicons-icon-color';
+const SIZE_KEY    = 'hugeicons-icon-size';
+const STROKE_KEY  = 'hugeicons-icon-stroke';
+const DOWNLOAD_FORMAT_KEY = 'hugeicons-download-format';
+const COPY_FORMAT_KEY     = 'hugeicons-copy-format';
+const SAVED_COLORS_KEY    = 'hugeicons-saved-colors';
+
+function lsGet(key: string): string | null {
   if (typeof window === 'undefined') return null;
-  try { return localStorage.getItem(COLOR_STORAGE_KEY); } catch { return null; }
+  try { return localStorage.getItem(key); } catch { return null; }
 }
-function storeColor(color: string): void {
+function lsSet(key: string, value: string): void {
   if (typeof window === 'undefined') return;
-  try { localStorage.setItem(COLOR_STORAGE_KEY, color); } catch { /* storage no disponible */ }
+  try { localStorage.setItem(key, value); } catch { /* storage no disponible */ }
 }
-function clearStoredColor(): void {
+function lsRemove(key: string): void {
   if (typeof window === 'undefined') return;
-  try { localStorage.removeItem(COLOR_STORAGE_KEY); } catch { /* storage no disponible */ }
+  try { localStorage.removeItem(key); } catch { /* storage no disponible */ }
 }
+
+const isSize   = (v: string | null): v is string => !!v && SIZE_OPTIONS.some((o) => o.value === v);
+const isStroke = (v: string | null): v is string => !!v && STROKE_WIDTH_OPTIONS.some((o) => o.value === v);
+const asFormat = (v: string | null): ExportFormat => (v === 'png' ? 'png' : 'svg');
 
 export interface IconDetailModalProps {
   open: boolean;
   onClose: () => void;
   iconName: string | null;
-  /** Controlled — the parent owns which style is active (it round-trips
-   *  this to the URL), so switching Stroke/Duotone inside the modal calls
-   *  `onStyleChange` rather than the modal tracking its own copy. */
   style: IconStyle;
   onStyleChange: (style: IconStyle) => void;
 }
@@ -75,11 +76,10 @@ function getStyleIcon(name: string, style: IconStyle): IconSvgElement | undefine
 }
 
 /**
- * Detail modal for a single catalog icon — large preview, a stroke-width /
- * size / color customization row (with a reset action), and Download / Copy
- * menu-buttons offering SVG and PNG.  Mirrors the reference Hugeicons
- * picker's controls using only existing design-system primitives
- * (`Button` + `Menu`, no bespoke split-button).
+ * Detail modal for a single catalog icon — preview + customization row
+ * (stroke width / size / color, todo recordado en localStorage) y botones
+ * Download / Copy tipo "split": el cuerpo ejecuta el formato recordado y la
+ * flechita abre el menú para elegir/cambiar SVG o PNG (también recordado).
  */
 export function IconDetailModal({ open, onClose, iconName, style, onStyleChange }: IconDetailModalProps) {
   const { theme } = useUiTheme();
@@ -88,24 +88,20 @@ export function IconDetailModal({ open, onClose, iconName, style, onStyleChange 
   const [strokeWidth, setStrokeWidth] = useState(DEFAULT_STROKE_WIDTH);
   const [size, setSize]   = useState(DEFAULT_SIZE);
   const [color, setColor] = useState(defaultColor);
-  // Labels the Download / Copy buttons with whatever format was picked
-  // last, so repeat exports read at a glance — mirrors the reference
-  // picker's persistent "SVG STROKED" button label.
-  const [downloadFormat, setDownloadFormat] = useState<ExportFormat>('svg');
-  const [copyFormat, setCopyFormat] = useState<ExportFormat>('svg');
+  // Formato recordado de Download / Copy (última elección del usuario).
+  const [downloadFormat, setDownloadFormat] = useState<ExportFormat>(() => asFormat(lsGet(DOWNLOAD_FORMAT_KEY)));
+  const [copyFormat, setCopyFormat] = useState<ExportFormat>(() => asFormat(lsGet(COPY_FORMAT_KEY)));
 
-  // Re-seed the customization controls whenever a NEW icon is opened, so it
-  // starts at the default weight/size/color rather than whatever was left
-  // over from the previously-viewed icon.  `style` itself is controlled by
-  // the parent and doesn't need re-seeding here.  Deliberately NOT keyed on
-  // `theme`/`defaultColor` — toggling dark mode while the modal is already
-  // open shouldn't stomp on a color the producer picked on purpose.
+  // Al abrir un icono, sembramos TODO desde lo recordado (color/tamaño/grosor) o
+  // los defaults si no hay nada guardado. Así el tamaño y grosor de la última vez
+  // se conservan (antes se reseteaban en cada apertura).
   useEffect(() => {
     if (!open) return;
-    setStrokeWidth(DEFAULT_STROKE_WIDTH);
-    setSize(DEFAULT_SIZE);
-    // El color se MANTIENE entre aperturas: usa el último guardado (o el del tema si no hay).
-    setColor(getStoredColor() ?? defaultColor);
+    const storedStroke = lsGet(STROKE_KEY);
+    const storedSize = lsGet(SIZE_KEY);
+    setStrokeWidth(isStroke(storedStroke) ? storedStroke : DEFAULT_STROKE_WIDTH);
+    setSize(isSize(storedSize) ? storedSize : DEFAULT_SIZE);
+    setColor(lsGet(COLOR_KEY) ?? defaultColor);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, iconName]);
 
@@ -123,21 +119,23 @@ export function IconDetailModal({ open, onClose, iconName, style, onStyleChange 
     }
   };
 
-  // Cambiar el color lo guarda para la próxima vez que se abra el modal.
-  const handleColorChange = (next: string) => {
-    setColor(next);
-    storeColor(next);
-  };
+  // Cada cambio del row de customización se RECUERDA para la próxima vez.
+  const handleColorChange = (next: string) => { setColor(next); lsSet(COLOR_KEY, next); };
+  const handleStrokeChange = (next: string) => { setStrokeWidth(next); lsSet(STROKE_KEY, next); };
+  const handleSizeChange = (next: string) => { setSize(next); lsSet(SIZE_KEY, next); };
 
   const handleReset = () => {
     setStrokeWidth(DEFAULT_STROKE_WIDTH);
     setSize(DEFAULT_SIZE);
     setColor(defaultColor);
-    clearStoredColor();
+    lsRemove(COLOR_KEY);
+    lsRemove(SIZE_KEY);
+    lsRemove(STROKE_KEY);
   };
 
   const handleDownload = async (format: ExportFormat) => {
     setDownloadFormat(format);
+    lsSet(DOWNLOAD_FORMAT_KEY, format);
     if (!data) return;
     const svg = buildIconSvgMarkup(data, { size: previewSize, strokeWidth, color });
     const base = `${iconName}-${style}`;
@@ -157,6 +155,7 @@ export function IconDetailModal({ open, onClose, iconName, style, onStyleChange 
 
   const handleCopyIcon = async (format: ExportFormat) => {
     setCopyFormat(format);
+    lsSet(COPY_FORMAT_KEY, format);
     if (!data) return;
     const svg = buildIconSvgMarkup(data, { size: previewSize, strokeWidth, color });
     try {
@@ -176,10 +175,6 @@ export function IconDetailModal({ open, onClose, iconName, style, onStyleChange 
     <Modal open={open} onClose={onClose} size="sm" title="Icon details">
       <div className="flex flex-col items-center gap-5">
         <div
-          // En dark el token `bg-neutral-100` casi no se distingue del
-          // fondo del propio Modal — se usa el mismo fondo que el input
-          // de archivos (`--color-surface-card`) solo en dark, light queda
-          // igual que antes.
           className="flex h-32 w-32 items-center justify-center rounded-2xl bg-neutral-100 dark:bg-(--color-surface-card)"
           style={{ color }}
         >
@@ -193,21 +188,17 @@ export function IconDetailModal({ open, onClose, iconName, style, onStyleChange 
           </IconButton>
         </div>
 
-        {/* Stroke width / size / color — restyles the live preview above AND
-            whatever gets downloaded/copied next.  Reset returns all three to
-            their defaults in one click. */}
+        {/* Stroke width / size / color — recordados en localStorage. Reset vuelve
+            los tres a su default y olvida lo guardado. */}
         <div className="grid w-full grid-cols-[1fr_1fr_1fr_auto] gap-2">
-          <Select value={strokeWidth} onChange={setStrokeWidth} options={STROKE_WIDTH_OPTIONS} size="md" />
-          <Select value={size} onChange={setSize} options={SIZE_OPTIONS} size="md" />
-          <ColorPicker value={color} onChange={handleColorChange} />
+          <Select value={strokeWidth} onChange={handleStrokeChange} options={STROKE_WIDTH_OPTIONS} size="md" />
+          <Select value={size} onChange={handleSizeChange} options={SIZE_OPTIONS} size="md" />
+          <ColorPicker value={color} onChange={handleColorChange} storageKey={SAVED_COLORS_KEY} />
           <IconButton aria-label="Reset stroke width, size and color" variant="outlined" onClick={handleReset}>
             <Icon icon={PiArrowsClockwise} size={16} />
           </IconButton>
         </div>
 
-        {/* Style (left) + Download/Copy (right) — switching Stroke/Duotone
-            here calls back to the parent page, which is what keeps the
-            URL's `?style=` in sync while this modal is open. */}
         <div className="flex w-full flex-wrap items-center justify-between gap-3">
           <Tabs variant="pills" size="md" defaultValue="stroke" value={style} onValueChange={(v) => onStyleChange(v as IconStyle)}>
             <TabList overflow="none">
@@ -217,40 +208,68 @@ export function IconDetailModal({ open, onClose, iconName, style, onStyleChange 
           </Tabs>
 
           <div className="flex items-center gap-2">
-            <Menu
-              placement="bottom-end"
-              items={[
-                { label: 'Download SVG', onClick: () => handleDownload('svg') },
-                { label: 'Download PNG', onClick: () => handleDownload('png') },
-              ] as MenuItem[]}
-              trigger={
-                <Button
-                  variant="filled"
-                  color="primary"
-                  startIcon={<Icon icon={PiDownloadSimple} />}
-                  endIcon={<Icon icon={PiCaretDown} size={12} />}
-                >
-                  {downloadFormat === 'png' ? 'Download PNG' : 'Download SVG'}
-                </Button>
-              }
-            />
-            <Menu
-              placement="bottom-end"
-              items={[
-                { label: 'Copy SVG', onClick: () => handleCopyIcon('svg') },
-                { label: 'Copy PNG', onClick: () => handleCopyIcon('png') },
-              ] as MenuItem[]}
-              trigger={
-                <Button
-                  variant="soft"
-                  color="primary"
-                  startIcon={<Icon icon={PiCopySimple} />}
-                  endIcon={<Icon icon={PiCaretDown} size={12} />}
-                >
-                  {copyFormat === 'png' ? 'Copy PNG' : 'Copy SVG'}
-                </Button>
-              }
-            />
+            {/* Split-button Download: el CUERPO descarga el formato recordado; la
+                FLECHITA (solo ella) abre el menú para elegir/cambiar SVG/PNG. */}
+            <div className="inline-flex overflow-hidden rounded-md">
+              <Button
+                variant="filled"
+                color="primary"
+                style={{ borderRadius: 0 }}
+                startIcon={<Icon icon={PiDownloadSimple} />}
+                onClick={() => handleDownload(downloadFormat)}
+              >
+                {downloadFormat === 'png' ? 'Download PNG' : 'Download SVG'}
+              </Button>
+              <Menu
+                placement="bottom-end"
+                items={[
+                  { label: 'Download SVG', onClick: () => handleDownload('svg') },
+                  { label: 'Download PNG', onClick: () => handleDownload('png') },
+                ] as MenuItem[]}
+                trigger={
+                  <Button
+                    variant="filled"
+                    color="primary"
+                    className="border-l border-primary-700/40"
+                    style={{ borderRadius: 0, paddingLeft: 8, paddingRight: 8 }}
+                    aria-label="Choose download format"
+                  >
+                    <Icon icon={PiCaretDown} size={12} />
+                  </Button>
+                }
+              />
+            </div>
+
+            {/* Split-button Copy: idéntica lógica. */}
+            <div className="inline-flex overflow-hidden rounded-md">
+              <Button
+                variant="soft"
+                color="primary"
+                style={{ borderRadius: 0 }}
+                startIcon={<Icon icon={PiCopySimple} />}
+                onClick={() => handleCopyIcon(copyFormat)}
+              >
+                {copyFormat === 'png' ? 'Copy PNG' : 'Copy SVG'}
+              </Button>
+              <Menu
+                placement="bottom-end"
+                items={[
+                  { label: 'Copy SVG', onClick: () => handleCopyIcon('svg') },
+                  { label: 'Copy PNG', onClick: () => handleCopyIcon('png') },
+                ] as MenuItem[]}
+                trigger={
+                  <Button
+                    variant="soft"
+                    color="primary"
+                    className="border-l border-primary-300/50"
+                    style={{ borderRadius: 0, paddingLeft: 8, paddingRight: 8 }}
+                    aria-label="Choose copy format"
+                  >
+                    <Icon icon={PiCaretDown} size={12} />
+                  </Button>
+                }
+              />
+            </div>
           </div>
         </div>
       </div>
