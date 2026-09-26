@@ -1,10 +1,14 @@
-import { Header, CreateTaskForm, BottomNav } from '@/components'
+import { BottomNav } from '@/components'
+import { Sidebar } from '@/components/Sidebar'
+import { SmoothScroll } from '@/components/SmoothScroll'
+import { CreateTaskDrawer } from '@/components/create-task/CreateTaskDrawer'
+import { Logo } from '@/components/Logo'
+import { UserMenu } from '@/components/UserMenu'
 import { Providers } from '../providers'
 
-// El panel de Create Task es FIJO a la derecha en desktop/laptop (lg+) y se OCULTA en
-// mobile/tablet, donde Create vive en su ruta /create (bottom nav — F3). `modal` es el slot
-// paralelo @modal: muestra Types/Lists como modal interceptado en desktop (o null vía
-// default.tsx cuando no hay ninguno).
+// Shell tipo dashboard: sidebar flush a la izquierda + contenido en un CONTENEDOR
+// flotante (inset 8px arriba/abajo/derecha, redondeado) sobre el bg del frame.
+// Create Task ya no es panel fijo: se abre como DRAWER (ver CreateTaskDrawer).
 export default function AppLayout({
   children,
   modal,
@@ -14,17 +18,28 @@ export default function AppLayout({
 }) {
   return (
     <Providers>
-      <main className="flex">
-        {/* pb SOLO en mobile (<lg) para que el contenido no quede tapado por el bottom nav
-            (fixed). En desktop no hay barra, así que sin padding (no corta el kanban). */}
-        <section className="flex-1 h-dvh overflow-y-auto flex flex-col max-lg:pb-20">
-          <Header />
-          {children}
-        </section>
-        <aside className="hidden h-dvh w-[28rem] shrink-0 overflow-y-auto border-l border-(--color-border-default) bg-(--color-surface-card) lg:block">
-          <CreateTaskForm />
-        </aside>
-      </main>
+      {/* Frame: un tono más oscuro (dark) / gris (light) que el contenido, para que el
+          panel flote en los 8px de aire. */}
+      <div className="flex h-dvh overflow-hidden bg-(--color-neutral-50)">
+        <Sidebar />
+        <div className="flex min-h-0 min-w-0 flex-1 flex-col">
+          {/* Top bar SOLO mobile (<lg): logo + avatar sobre el frame; el container continúa debajo. */}
+          <header className="flex h-14 shrink-0 items-center justify-between px-4 md:hidden">
+            <Logo width={120} height={34} className="h-8 w-auto" />
+            <UserMenu />
+          </header>
+          {/* Contenedor del contenido: aire alrededor (izquierda flush al sidebar en lg),
+              esquinas redondeadas, bg surface-app → las cards (surface-card) resaltan.
+              min-h-0: el section toma alto por flex-grow, sin esto la cadena h-full del
+              SmoothScroll no acota y el contenido no scrollea / se mete bajo el footer. */}
+          <section className="min-h-0 min-w-0 flex-1 p-3 max-md:pb-16 max-md:pt-0 md:pl-0">
+            <SmoothScroll className="rounded-2xl bg-(--color-surface-app)" contentClassName="flex h-full flex-col">
+              {children}
+            </SmoothScroll>
+          </section>
+        </div>
+      </div>
+      <CreateTaskDrawer />
       {modal}
       {/* Bottom nav: solo mobile/tablet (<lg). */}
       <BottomNav />

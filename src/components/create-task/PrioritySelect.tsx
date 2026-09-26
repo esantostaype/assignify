@@ -1,7 +1,8 @@
 import React from 'react'
-import { Select } from '@/components/ui'
-import { Typography } from '@/components/ui/typography'
-import { Icon, PiTarget } from '@/lib/icons'
+import { HugeiconsIcon } from '@hugeicons/react'
+import { Flag02Icon } from '@hugeicons/core-free-icons'
+import { cn } from '@/lib/utils'
+import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/shadcn/select'
 
 interface PrioritySelectProps {
   value: string
@@ -17,23 +18,24 @@ const PRIORITY_OPTIONS = [
   { value: 'URGENT', label: 'Urgent' },
 ]
 
-export const PrioritySelect: React.FC<PrioritySelectProps> = ({
-  value,
-  onChange,
-  touched,
-  error
-}) => (
+export const PrioritySelect: React.FC<PrioritySelectProps> = ({ value, onChange, touched, error }) => (
   <div>
-    <Typography variant="label" className="flex items-center gap-1.5 mb-1.5">
-      <Icon icon={PiTarget} size={18} />
+    <label className="mb-1.5 flex items-center gap-1.5 text-sm font-medium text-foreground">
+      <HugeiconsIcon icon={Flag02Icon} size={18} />
       Priority
-    </Typography>
-    <Select
-      value={value}
-      onChange={(val) => onChange(val)}
-      placeholder="Select priority"
-      options={PRIORITY_OPTIONS}
-      error={touched && error ? error : undefined}
-    />
-</div>
+    </label>
+    <Select value={value} onValueChange={onChange}>
+      <SelectTrigger className={cn(touched && error && 'ring-1 ring-destructive')}>
+        <SelectValue placeholder="Select priority" />
+      </SelectTrigger>
+      <SelectContent>
+        {PRIORITY_OPTIONS.map((o) => (
+          <SelectItem key={o.value} value={o.value}>
+            {o.label}
+          </SelectItem>
+        ))}
+      </SelectContent>
+    </Select>
+    {touched && error && <p className="mt-1 text-xs text-destructive">{error}</p>}
+  </div>
 )

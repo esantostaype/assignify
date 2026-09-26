@@ -5,7 +5,10 @@
 import { useState, useEffect } from 'react'
 import axios from 'axios'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { Button, Switch, DataTable, type DataTableColumn } from '@/components/ui'
+import { Button } from '@/components/shadcn/button'
+import { Switch } from '@/components/shadcn/switch'
+import { Spinner } from '@/components/shadcn/spinner'
+import { DataTable, type DataTableColumn } from '@/components/ui'
 import { hotToast as toast } from '@/lib/hotToast'
 import { taskDataKeys } from '@/hooks/useTaskData'
 
@@ -85,8 +88,7 @@ export function ListsSyncForm() {
         <div className="flex justify-end">
           <Switch
             checked={selected.has(l.id)}
-            onChange={() => toggle(l.id)}
-            size="sm"
+            onCheckedChange={() => toggle(l.id)}
             aria-label={`Make ${l.name} assignable`}
           />
         </div>
@@ -113,7 +115,8 @@ export function ListsSyncForm() {
       />
 
       <div className="flex justify-end">
-        <Button onClick={() => save.mutate([...selected])} loading={save.isPending} disabled={isLoading}>
+        <Button onClick={() => save.mutate([...selected])} disabled={isLoading || save.isPending}>
+          {save.isPending && <Spinner />}
           Save lists
         </Button>
       </div>

@@ -9,8 +9,12 @@
 // DAY (10:00–19:00) to the column width, so a 4h task fills ~half a column (not a full
 // day) and a full work day fills the column (minus a small padding).
 import React, { useMemo, useRef, useEffect, useState } from "react";
-import { Card, Tooltip, Skeleton, Avatar } from "@/components/ui";
-import { Icon, PiCalendarBlank } from "@/lib/icons";
+import { HugeiconsIcon } from "@hugeicons/react";
+import { Calendar03Icon } from "@hugeicons/core-free-icons";
+import { Card } from "@/components/shadcn/card";
+import { Skeleton } from "@/components/shadcn/skeleton";
+import { Avatar, AvatarImage, AvatarFallback } from "@/components/shadcn/avatar";
+import { TooltipProvider, TooltipRoot, TooltipTrigger, TooltipContent } from "@/components/shadcn/tooltip";
 import type { UserWorkload, PendingTaskBar } from "@/hooks/queries/useWorkload";
 import axios from "axios";
 
@@ -23,7 +27,6 @@ const HEADER_H = 38; // day-header row height
 const ROW_H = 52;
 const BAR_PAD = 2; // px inset of a work day inside its column (10:00 .. 19:00)
 // Local work-day bounds (hours) used to map a task's time to a position inside its day.
-// Inszone: 10:00–19:00 local. (If made fully multi-tenant, pass these from settings.)
 const WORK_START_H = 10;
 const WORK_END_H = 19;
 
@@ -44,12 +47,6 @@ const PRIORITY_LABEL: Record<PendingTaskBar["priority"], string> = {
   LOW: "Low",
 };
 
-// Diagonal stripes from a translucent COLOR (consistent in light & dark, unlike fixed
-// black). Painted per CONTIGUOUS block (not per day) so the pattern never breaks between
-// e.g. Saturday and Sunday. Each band uses its own hue.
-// Reparte tareas que SE SOLAPAN (corren en paralelo: p.ej. un High/Urgent sobre un Normal)
-// en "sub-carriles" apilados, para que las barras no queden una encima de otra. Cada lane es
-// la primera fila libre donde la tarea no se solapa con la anterior de esa fila.
 function allocLanes(items: { l: number; r: number }[]): { lane: number[]; count: number } {
   const order = items.map((it, i) => ({ i, l: it.l, r: it.r })).sort((a, b) => a.l - b.l);
   const ends: number[] = [];
@@ -72,9 +69,6 @@ const stripes = (rgba: string) =>
 const WEEKEND_STRIPES = stripes("rgba(148,163,184,0.20)"); // slate
 const HOLIDAY_STRIPES = stripes("rgba(239,68,68,0.18)"); // red
 const VACATION_STRIPES = stripes("rgba(245,158,11,0.32)"); // amber
-
-// Los feriados ya NO salen de un JSON: se leen de la DB del workspace (/api/holidays)
-// dentro del componente y se marcan visualmente. El motor también los respeta (H2).
 
 /** Local midnight of a date (drops the time → aligns with the day column). */
 function midnightLocal(d: Date): number {
@@ -243,9 +237,7 @@ export const CapacityTimeline: React.FC<CapacityTimelineProps> = ({ workload, lo
     return dayIdx * DAY_W + BAR_PAD + frac * (DAY_W - 2 * BAR_PAD);
   };
 
-  // Bandas de vacación CONTINUAS sobre todo el rango: incluyen sábados, domingos y
-  // feriados que caigan dentro (la vacación del 13 al 19 se ve completa, no recortada al
-  // viernes). Devuelve bloques contiguos de días dentro de las vacaciones.
+  // Bandas de vacación CONTINUAS sobre todo el rango (incluyen sáb/dom/feriados dentro).
   const vacationBlocks = (vacations: { startDate: string; endDate: string }[]): Block[] => {
     if (vacations.length === 0) return [];
     const inVac = (ts: number) =>
@@ -296,17 +288,15 @@ export const CapacityTimeline: React.FC<CapacityTimelineProps> = ({ workload, lo
 
   const header = (
     <div className="flex flex-wrap items-center justify-between gap-2">
-      {/* Mismo estilo que el título "Synced" de la lista de miembros (text-lg semibold).
-          La leyenda de prioridades va ABAJO del gantt (igual que en la guía). */}
-      <h2 className="text-lg font-semibold text-(--color-text-strong)">Team capacity</h2>
+      <h2 className="text-lg font-semibold text-foreground">Team capacity</h2>
     </div>
   );
 
-  // Leyenda de prioridades (va DENTRO del Card, al fondo, como en la guía).
+  // Leyenda de prioridades (va DENTRO del Card, al fondo).
   const legend = (
     <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 border-t border-(--color-border-default) px-3 py-2.5">
       {(["NORMAL", "LOW", "HIGH", "URGENT"] as PendingTaskBar["priority"][]).map((p) => (
-        <span key={p} className="inline-flex items-center gap-1.5 text-[11px] text-(--color-text-muted)">
+        <span key={p} className="inline-flex items-center gap-1.5 text-[11px] text-muted-foreground">
           <span className={`size-2.5 rounded-full ${PRIORITY_BAR[p]}`} />
           {PRIORITY_LABEL[p]}
         </span>
@@ -316,253 +306,266 @@ export const CapacityTimeline: React.FC<CapacityTimelineProps> = ({ workload, lo
 
   if (!loading && rows.length === 0) return null;
 
-  // Durante la carga: 3 filas en skeleton (null = placeholder). El RESTO del armazón
-  // (semanas, días, findes, "hoy", líneas) se pinta IGUAL porque no depende del workload;
-  // solo los nombres van en skeleton y todavía NO se dibujan barras.
   const displayRows: Array<(typeof rows)[number] | null> = loading ? [null, null, null] : rows;
 
-  // Vertical lines. HEADER (under the dates) = SOLID, full color. BODY (where the bars
-  // are) = DASHED at half opacity. Week dividers (Sunday) = SOLID, full color (both).
   const weekLine = "border-l border-(--color-border-default)";
   const bodyDayLine = "border-l border-dashed border-(--color-border-default)/50";
   const bodyLineOf = (d: DayCell) => (d.isWeekStart ? weekLine : bodyDayLine);
   const tracksH = displayRows.length * ROW_H;
 
   return (
-    <div className="space-y-3">
-      {header}
+    <TooltipProvider delayDuration={200}>
+      <div className="space-y-3">
+        {header}
 
-      <Card variant="outlined" padding="none" className="mt-3 flex flex-col overflow-hidden">
-        <div className="flex">
-        {/* Names column (fixed; doesn't scroll). Vertical separator = card border. */}
-        <div className="shrink-0 z-20 w-12 border-r border-(--color-border-default) md:w-[200px]">
-          {/* full-header spacer; the only horizontal line here sits ABOVE the rows
-              (not above the names). */}
-          <div style={{ height: WEEK_H + HEADER_H }} className="border-b border-(--color-border-default)" />
-          {displayRows.map((u, i) => (
-            <div
-              key={u?.id ?? `s${i}`}
-              className="flex items-center justify-center gap-2.5 border-b border-(--color-border-default) px-2 last:border-b-0 md:justify-start md:px-4"
-              style={{ height: ROW_H }}
-            >
-              {u ? (
-                <>
-                  {/* Foto de perfil (24px). En mobile es lo único que se muestra (sin nombre)
-                      para dejar más ancho al gantt. */}
-                  {(() => {
-                    const a = avatars?.get(u.email);
-                    return (
-                      <Avatar
-                        size="sm"
-                        src={a?.src}
-                        alt={u.name}
-                        style={a?.color ? { backgroundColor: a.color, color: "#fff" } : undefined}
-                      >
-                        {a?.initials ?? u.name.slice(0, 2).toUpperCase()}
-                      </Avatar>
-                    );
-                  })()}
-                  <div className="hidden min-w-0 md:block">
-                    <div className="truncate text-sm font-medium text-(--color-text-strong)" title={u.name}>
-                      {u.name}
-                    </div>
-                    <div className="truncate text-[11px] text-(--color-text-muted)">
-                      {u.level}
-                      {u.roles[0] ? ` · ${u.roles[0]}` : ""}
-                    </div>
-                  </div>
-                </>
-              ) : (
-                <>
-                  <Skeleton variant="circle" width={32} height={32} />
-                  <div className="hidden min-w-0 flex-1 md:block">
-                    <Skeleton variant="text" width="70%" />
-                    <Skeleton variant="text" width="45%" className="mt-1.5" />
-                  </div>
-                </>
-              )}
-            </div>
-          ))}
-        </div>
-
-        {/* Scrollable area: week row + day header + tracks. */}
-        <div
-          ref={scrollRef}
-          onMouseDown={onMouseDown}
-          className="no-scrollbar flex-1 cursor-grab select-none overflow-x-auto"
-        >
-          <div className="relative" style={{ width: trackW }}>
-            {/* Week-number row (line below = card border). */}
-            <div className="flex border-b border-(--color-border-default)" style={{ height: WEEK_H }}>
-              {weeks.map((w, i) => (
+        <Card className="mt-3 flex flex-col overflow-hidden">
+          <div className="flex">
+            {/* Names column (fixed; doesn't scroll). */}
+            <div className="z-20 w-12 shrink-0 border-r border-(--color-border-default) md:w-[200px]">
+              <div style={{ height: WEEK_H + HEADER_H }} className="border-b border-(--color-border-default)" />
+              {displayRows.map((u, i) => (
                 <div
-                  key={i}
-                  className="flex items-center overflow-hidden whitespace-nowrap border-l border-(--color-border-default)/50 px-1.5 text-[10px] font-medium text-(--color-text-muted)"
-                  style={{ width: w.len * DAY_W }}
+                  key={u?.id ?? `s${i}`}
+                  className="flex items-center justify-center gap-2.5 border-b border-(--color-border-default) px-2 last:border-b-0 md:justify-start md:px-4"
+                  style={{ height: ROW_H }}
                 >
-                  {w.label}
+                  {u ? (
+                    <>
+                      {(() => {
+                        const a = avatars?.get(u.email);
+                        return (
+                          <Avatar className="size-8">
+                            {a?.src && <AvatarImage src={a.src} alt={u.name} />}
+                            <AvatarFallback
+                              className="text-white"
+                              style={a?.color ? { backgroundColor: a.color } : undefined}
+                            >
+                              {a?.initials ?? u.name.slice(0, 2).toUpperCase()}
+                            </AvatarFallback>
+                          </Avatar>
+                        );
+                      })()}
+                      <div className="hidden min-w-0 md:block">
+                        <div className="truncate text-sm font-medium text-foreground" title={u.name}>
+                          {u.name}
+                        </div>
+                        <div className="truncate text-[11px] text-muted-foreground">
+                          {u.level}
+                          {u.roles[0] ? ` · ${u.roles[0]}` : ""}
+                        </div>
+                      </div>
+                    </>
+                  ) : (
+                    <>
+                      <Skeleton className="size-8 rounded-full" />
+                      <div className="hidden min-w-0 flex-1 md:block">
+                        <Skeleton className="h-3.5 w-[70%]" />
+                        <Skeleton className="mt-1.5 h-3 w-[45%]" />
+                      </div>
+                    </>
+                  )}
                 </div>
               ))}
             </div>
 
-            {/* Day header. Line below = above the rows (the one it had before). */}
-            <div className="flex border-b border-(--color-border-default)" style={{ height: HEADER_H }}>
-              {days.map((d, i) => {
-                const cell = (
-                  <div
-                    className={`flex h-full flex-col items-center justify-center text-[10px] leading-tight ${weekLine} ${
-                      d.isWeekend || d.holiday ? "text-(--color-text-muted)/50" : "text-(--color-text-muted)"
-                    }`}
-                    style={{
-                      width: DAY_W,
-                      // Mismo sombreado que el área de tracks → el header (incluido el número)
-                      // de un feriado/fin de semana lleva su fondo de rayas.
-                      backgroundImage: d.holiday ? HOLIDAY_STRIPES : d.isWeekend ? WEEKEND_STRIPES : undefined,
-                    }}
-                  >
-                    <span>{d.isFirstOfMonth ? d.monthLabel : d.weekday}</span>
-                    {d.isToday ? (
-                      <span className="mt-0.5 flex size-5 items-center justify-center rounded-full bg-error-500 text-[10px] font-semibold text-white">
-                        {d.dom}
-                      </span>
+            {/* Scrollable area: week row + day header + tracks. data-lenis-prevent para que
+                el scroll/drag horizontal no lo capture Lenis (que es vertical). */}
+            <div
+              ref={scrollRef}
+              data-lenis-prevent
+              onMouseDown={onMouseDown}
+              className="no-scrollbar flex-1 cursor-grab select-none overflow-x-auto"
+            >
+              <div className="relative" style={{ width: trackW }}>
+                {/* Week-number row. */}
+                <div className="flex border-b border-(--color-border-default)" style={{ height: WEEK_H }}>
+                  {weeks.map((w, i) => (
+                    <div
+                      key={i}
+                      className="flex items-center overflow-hidden whitespace-nowrap border-l border-(--color-border-default)/50 px-1.5 text-[10px] font-medium text-muted-foreground"
+                      style={{ width: w.len * DAY_W }}
+                    >
+                      {w.label}
+                    </div>
+                  ))}
+                </div>
+
+                {/* Day header. */}
+                <div className="flex border-b border-(--color-border-default)" style={{ height: HEADER_H }}>
+                  {days.map((d, i) => {
+                    const cell = (
+                      <div
+                        className={`flex h-full flex-col items-center justify-center text-[10px] leading-tight ${weekLine} ${
+                          d.isWeekend || d.holiday ? "text-muted-foreground/50" : "text-muted-foreground"
+                        }`}
+                        style={{
+                          width: DAY_W,
+                          backgroundImage: d.holiday ? HOLIDAY_STRIPES : d.isWeekend ? WEEKEND_STRIPES : undefined,
+                        }}
+                      >
+                        <span>{d.isFirstOfMonth ? d.monthLabel : d.weekday}</span>
+                        {d.isToday ? (
+                          <span className="mt-0.5 flex size-5 items-center justify-center rounded-full bg-error-500 text-[10px] font-semibold text-white">
+                            {d.dom}
+                          </span>
+                        ) : (
+                          <span className="mt-0.5 font-medium text-foreground">{d.dom}</span>
+                        )}
+                      </div>
+                    );
+                    return d.holiday ? (
+                      <TooltipRoot key={i}>
+                        <TooltipTrigger asChild>{cell}</TooltipTrigger>
+                        <TooltipContent>{`${d.holiday} · ${fmt(d.ts)}`}</TooltipContent>
+                      </TooltipRoot>
                     ) : (
-                      <span className="mt-0.5 font-medium text-(--color-text-default)">{d.dom}</span>
+                      <React.Fragment key={i}>{cell}</React.Fragment>
+                    );
+                  })}
+                </div>
+
+                {/* Tracks area: shading + grid lines + today + rows. */}
+                <div className="relative" style={{ minHeight: tracksH }}>
+                  {/* Shading (contiguous blocks). */}
+                  <div className="pointer-events-none absolute inset-0">
+                    {shades.map((b, i) => (
+                      <div
+                        key={i}
+                        className="absolute inset-y-0"
+                        style={{
+                          left: b.startIdx * DAY_W,
+                          width: b.len * DAY_W,
+                          backgroundImage: b.type === "holiday" ? HOLIDAY_STRIPES : WEEKEND_STRIPES,
+                        }}
+                      />
+                    ))}
+                  </div>
+
+                  {/* Grid lines. */}
+                  <div className="pointer-events-none absolute inset-0 flex">
+                    {days.map((d, i) => (
+                      <div key={i} className={`h-full ${bodyLineOf(d)}`} style={{ width: DAY_W }} />
+                    ))}
+                  </div>
+
+                  {/* Today line. */}
+                  <div
+                    className="pointer-events-none absolute inset-y-0 z-10 w-0.5 bg-error-500"
+                    style={{ left: todayOffset * DAY_W + DAY_W / 2 }}
+                  />
+
+                  {/* Zonas de hover de feriado (toda la columna). */}
+                  <div className="pointer-events-none absolute inset-0 z-20">
+                    {days.map((d, i) =>
+                      d.holiday ? (
+                        <TooltipRoot key={`ht${i}`}>
+                          <TooltipTrigger asChild>
+                            <div
+                              className="pointer-events-auto absolute inset-y-0"
+                              style={{ left: i * DAY_W, width: DAY_W }}
+                            />
+                          </TooltipTrigger>
+                          <TooltipContent>{`${d.holiday} · ${fmt(d.ts)}`}</TooltipContent>
+                        </TooltipRoot>
+                      ) : null
                     )}
                   </div>
-                );
-                return d.holiday ? (
-                  <Tooltip key={i} content={`${d.holiday} · ${fmt(d.ts)}`}>
-                    {cell}
-                  </Tooltip>
-                ) : (
-                  <React.Fragment key={i}>{cell}</React.Fragment>
-                );
-              })}
-            </div>
 
-            {/* Tracks area: shading (continuous) + grid lines + today + rows. */}
-            <div className="relative" style={{ minHeight: tracksH }}>
-              {/* Shading: contiguous blocks → continuous diagonals across the whole block. */}
-              <div className="pointer-events-none absolute inset-0">
-                {shades.map((b, i) => (
-                  <div
-                    key={i}
-                    className="absolute inset-y-0"
-                    style={{
-                      left: b.startIdx * DAY_W,
-                      width: b.len * DAY_W,
-                      backgroundImage: b.type === "holiday" ? HOLIDAY_STRIPES : WEEKEND_STRIPES,
-                    }}
-                  />
-                ))}
-              </div>
-
-              {/* Grid lines (above shading, below bars). */}
-              <div className="pointer-events-none absolute inset-0 flex">
-                {days.map((d, i) => (
-                  <div key={i} className={`h-full ${bodyLineOf(d)}`} style={{ width: DAY_W }} />
-                ))}
-              </div>
-
-              {/* Today line (centered on today's column). */}
-              <div
-                className="pointer-events-none absolute inset-y-0 z-10 w-0.5 bg-error-500"
-                style={{ left: todayOffset * DAY_W + DAY_W / 2 }}
-              />
-
-              {/* Zonas de hover de feriado: TODA la columna (no solo el número de arriba)
-                  muestra el tooltip con nombre + fecha. */}
-              <div className="pointer-events-none absolute inset-0 z-20">
-                {days.map((d, i) =>
-                  d.holiday ? (
-                    <Tooltip key={`ht${i}`} content={`${d.holiday} · ${fmt(d.ts)}`}>
-                      <div
-                        className="pointer-events-auto absolute inset-y-0"
-                        style={{ left: i * DAY_W, width: DAY_W }}
-                      />
-                    </Tooltip>
-                  ) : null
-                )}
-              </div>
-
-              {/* Rows: one per designer (en carga: filas vacías, sin barras). */}
-              {displayRows.map((u, i) => {
-                if (!u) return <div key={`s${i}`} className="relative border-b border-(--color-border-default) last:border-b-0" style={{ height: ROW_H }} />;
-                const vacs = [...(u.currentVacation ? [u.currentVacation] : []), ...u.upcomingVacations];
-                const vBlocks = vacationBlocks(vacs);
-                return (
-                  <div key={u.id} className="relative border-b border-(--color-border-default) last:border-b-0" style={{ height: ROW_H }}>
-                    {/* Bandas de vacación continuas (incluyen fines de semana y feriados). */}
-                    {vBlocks.map((b, i) => (
-                      <Tooltip key={`v${i}`} content={`Vacation · ${fmt(days[b.startIdx].ts)} – ${fmt(days[b.startIdx + b.len - 1].ts)}`}>
-                        <div
-                          className="absolute inset-y-0"
-                          style={{ left: b.startIdx * DAY_W, width: b.len * DAY_W, backgroundImage: VACATION_STRIPES }}
-                        />
-                      </Tooltip>
-                    ))}
-
-                    {/* Task bars over the WORK DAY (real duration). Las que SE SOLAPAN
-                        (paralelas: High/Urgent sobre Normal) se apilan en sub-carriles
-                        delgados separados 2px en vez de encimarse. */}
-                    {(() => {
-                      const bars = u.pendingTasks
-                        .map((t) => ({
-                          t,
-                          left: Math.max(0, xOfWork(t.startDate)),
-                          right: Math.min(trackW, xOfWork(t.dueDate)),
-                        }))
-                        .filter((b) => b.right > b.left);
-                      const { lane, count } = allocLanes(bars.map((b) => ({ l: b.left, r: b.right })));
-                      const GAP = 4; // separación entre barras paralelas (sub-carriles)
-                      const usableH = ROW_H - 12;
-                      const barH = Math.min(18, (usableH - (count - 1) * GAP) / count);
-                      const top0 = (ROW_H - (count * barH + (count - 1) * GAP)) / 2;
-                      return bars.map((b, idx) => (
-                        <Tooltip
-                          key={`t${idx}`}
-                          content={
-                            <span className="flex flex-col gap-0.5">
-                              <span className="font-semibold leading-tight">{b.t.name}</span>
-                              <span className="flex items-center gap-1.5 opacity-80">
-                                <Icon icon={PiCalendarBlank} size={12} />
-                                {rangeLabel(b.t.startDate, b.t.dueDate)}
-                              </span>
-                            </span>
-                          }
-                        >
-                          <div
-                            className={`absolute rounded ${PRIORITY_BAR[b.t.priority]}`}
-                            style={{
-                              left: b.left,
-                              width: Math.max(b.right - b.left, 6),
-                              top: top0 + lane[idx] * (barH + GAP),
-                              height: barH,
-                            }}
-                          />
-                        </Tooltip>
-                      ));
-                    })()}
-
-                    {/* "Frees up" marker (if it has a queue and falls inside the range). */}
-                    {u.taskCount > 0 && (() => {
-                      const x = xOfWork(u.availableFrom);
-                      if (x < 0 || x > trackW) return null;
+                  {/* Rows: one per designer. */}
+                  {displayRows.map((u, i) => {
+                    if (!u)
                       return (
-                        <Tooltip content={`Frees up · ${dateTimeLabel(u.availableFrom)}`}>
-                          <div className="absolute inset-y-0 z-10 w-0.5 bg-(--color-text-strong)" style={{ left: x }} />
-                        </Tooltip>
+                        <div
+                          key={`s${i}`}
+                          className="relative border-b border-(--color-border-default) last:border-b-0"
+                          style={{ height: ROW_H }}
+                        />
                       );
-                    })()}
-                  </div>
-                );
-              })}
+                    const vacs = [...(u.currentVacation ? [u.currentVacation] : []), ...u.upcomingVacations];
+                    const vBlocks = vacationBlocks(vacs);
+                    return (
+                      <div
+                        key={u.id}
+                        className="relative border-b border-(--color-border-default) last:border-b-0"
+                        style={{ height: ROW_H }}
+                      >
+                        {/* Bandas de vacación continuas. */}
+                        {vBlocks.map((b, i) => (
+                          <TooltipRoot key={`v${i}`}>
+                            <TooltipTrigger asChild>
+                              <div
+                                className="absolute inset-y-0"
+                                style={{ left: b.startIdx * DAY_W, width: b.len * DAY_W, backgroundImage: VACATION_STRIPES }}
+                              />
+                            </TooltipTrigger>
+                            <TooltipContent>{`Vacation · ${fmt(days[b.startIdx].ts)} – ${fmt(days[b.startIdx + b.len - 1].ts)}`}</TooltipContent>
+                          </TooltipRoot>
+                        ))}
+
+                        {/* Task bars over the WORK DAY (real duration), en sub-carriles si se solapan. */}
+                        {(() => {
+                          const bars = u.pendingTasks
+                            .map((t) => ({
+                              t,
+                              left: Math.max(0, xOfWork(t.startDate)),
+                              right: Math.min(trackW, xOfWork(t.dueDate)),
+                            }))
+                            .filter((b) => b.right > b.left);
+                          const { lane, count } = allocLanes(bars.map((b) => ({ l: b.left, r: b.right })));
+                          const GAP = 4;
+                          const usableH = ROW_H - 12;
+                          const barH = Math.min(18, (usableH - (count - 1) * GAP) / count);
+                          const top0 = (ROW_H - (count * barH + (count - 1) * GAP)) / 2;
+                          return bars.map((b, idx) => (
+                            <TooltipRoot key={`t${idx}`}>
+                              <TooltipTrigger asChild>
+                                <div
+                                  className={`absolute rounded ${PRIORITY_BAR[b.t.priority]}`}
+                                  style={{
+                                    left: b.left,
+                                    width: Math.max(b.right - b.left, 6),
+                                    top: top0 + lane[idx] * (barH + GAP),
+                                    height: barH,
+                                  }}
+                                />
+                              </TooltipTrigger>
+                              <TooltipContent>
+                                <span className="flex flex-col gap-0.5">
+                                  <span className="font-semibold leading-tight">{b.t.name}</span>
+                                  <span className="flex items-center gap-1.5 opacity-80">
+                                    <HugeiconsIcon icon={Calendar03Icon} size={12} />
+                                    {rangeLabel(b.t.startDate, b.t.dueDate)}
+                                  </span>
+                                </span>
+                              </TooltipContent>
+                            </TooltipRoot>
+                          ));
+                        })()}
+
+                        {/* "Frees up" marker. */}
+                        {u.taskCount > 0 &&
+                          (() => {
+                            const x = xOfWork(u.availableFrom);
+                            if (x < 0 || x > trackW) return null;
+                            return (
+                              <TooltipRoot>
+                                <TooltipTrigger asChild>
+                                  <div className="absolute inset-y-0 z-10 w-0.5 bg-(--color-text-strong)" style={{ left: x }} />
+                                </TooltipTrigger>
+                                <TooltipContent>{`Frees up · ${dateTimeLabel(u.availableFrom)}`}</TooltipContent>
+                              </TooltipRoot>
+                            );
+                          })()}
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
             </div>
           </div>
-        </div>
-        </div>
-        {legend}
-      </Card>
-    </div>
+          {legend}
+        </Card>
+      </div>
+    </TooltipProvider>
   );
 };

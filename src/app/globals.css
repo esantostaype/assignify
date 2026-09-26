@@ -30,18 +30,18 @@
   --color-primary-900: #164165;
   --color-primary-950: #002E4E;
 
-  /* ─── Brand: Neutral ─── */
-  --color-neutral-50:  #F9FAFB;
-  --color-neutral-100: #F3F4F6;
-  --color-neutral-200: #E5E7EB;
-  --color-neutral-300: #D1D5DC;
-  --color-neutral-400: #99A1AF;
-  --color-neutral-500: #6A7282;
-  --color-neutral-600: #4A5565;
-  --color-neutral-700: #364153;
-  --color-neutral-800: #1E2939;
-  --color-neutral-900: #101828;
-  --color-neutral-950: #020618;
+  /* ─── Brand: Neutral (zinc / near-black, tomado del reference) ─── */
+  --color-neutral-50:  #FAFAFA;
+  --color-neutral-100: #F4F4F5;
+  --color-neutral-200: #E4E4E7;
+  --color-neutral-300: #D4D4D8;
+  --color-neutral-400: #A1A1AA;
+  --color-neutral-500: #71717A;
+  --color-neutral-600: #52525B;
+  --color-neutral-700: #3F3F46;
+  --color-neutral-800: #27272A;
+  --color-neutral-900: #18181B;
+  --color-neutral-950: #09090B;
 
   /* ─── Semantic: Success ─── */
   --color-success-50:  #F0FDF4;
@@ -89,12 +89,14 @@
      The `data-theme="light"` and `data-theme="dark"` blocks at the bottom of
      this file override individual tokens to swap themes. */
 
-  /* Surfaces */
-  --color-surface-app:           var(--color-neutral-50);
+  /* Surfaces (LIGHT). Jerarquía: frame neutral-50 < panel/app neutral-100 < cards white.
+     `subtle` (inputs/selects) = neutral-200 para CONTRASTAR tanto sobre el panel
+     (neutral-100) como dentro de cards/modales (white). */
+  --color-surface-app:           var(--color-neutral-100);
   --color-surface-card:          #FFFFFF;
   --color-surface-raised:        #FFFFFF;
   --color-surface-muted:         var(--color-neutral-50);
-  --color-surface-subtle:        var(--color-neutral-100);
+  --color-surface-subtle:        var(--color-neutral-200);
   --color-surface-sidebar:       var(--color-neutral-800);
   --color-surface-sidebar-deep:  var(--color-neutral-900);
   --color-surface-sidebar-active: var(--color-neutral-950);
@@ -102,12 +104,13 @@
   --color-surface-header-brand:  var(--color-neutral-800);
   --color-surface-input:         #FFFFFF;
   --color-surface-input-active:  #FFFFFF;
-  --color-surface-hover:         var(--color-neutral-100);
+  --color-surface-hover:         var(--color-neutral-200);
 
-  /* Borders */
-  --color-border-default: var(--color-neutral-200);
-  --color-border-strong:  var(--color-neutral-300);
-  --color-border-muted:   var(--color-neutral-100);
+  /* Borders — hairlines sutiles: el look es SIN bordes, la separación viene del
+     contraste de superficie. Quedan casi imperceptibles. */
+  --color-border-default: rgba(9, 9, 11, 0.08);
+  --color-border-strong:  rgba(9, 9, 11, 0.12);
+  --color-border-muted:   rgba(9, 9, 11, 0.05);
 
   /* Skeleton — placeholder block tone + shimmer highlight band.
      Both tokens are TRANSLUCENT washes (not solid colors) so the
@@ -149,6 +152,41 @@
   --color-text-on-primary:       #FFFFFF;
   --color-text-on-sidebar:       #FFFFFF;
   --color-text-on-sidebar-muted: var(--color-neutral-400);
+}
+
+/* ─── Puente shadcn/ui → tokens del sistema ──────────────────────────────────
+   Mapea los nombres que usan los componentes de shadcn (bg-background, bg-card,
+   bg-primary, text-muted-foreground, border-border, ring-ring, …) a nuestros
+   tokens semánticos, que ya cambian solos con data-theme. Así shadcn hereda el
+   tema (dark near-black + acento azul) sin duplicar lógica. `inline` mantiene la
+   referencia var() para que resuelva por tema en el punto de uso. */
+@theme inline {
+  --color-background: var(--color-surface-app);
+  --color-foreground: var(--color-text-default);
+  --color-card: var(--color-surface-card);
+  --color-card-foreground: var(--color-text-strong);
+  --color-popover: var(--color-surface-raised);
+  --color-popover-foreground: var(--color-text-strong);
+  /* Accent FIJO = primary-500 (#6F8CC0) en light y dark (primary-500 es igual en ambos
+     bloques). Antes era primary-600, que la rampa dark invierte → cambiaba de tono. */
+  --color-primary: var(--color-primary-500);
+  --color-primary-foreground: #ffffff;
+  --color-secondary: var(--color-surface-subtle);
+  --color-secondary-foreground: var(--color-text-strong);
+  --color-muted: var(--color-surface-muted);
+  --color-muted-foreground: var(--color-text-muted);
+  --color-accent: var(--color-surface-hover);
+  --color-accent-foreground: var(--color-text-strong);
+  --color-destructive: var(--color-error-600);
+  --color-destructive-foreground: #ffffff;
+  --color-border: var(--color-border-default);
+  --color-input: var(--color-border-default);
+  --color-ring: var(--color-primary-500);
+
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
 }
 
 /* ─── Theme overrides ───────────────────────────────────────────────────────
@@ -206,17 +244,17 @@
   --color-primary-900: #E3EBF6;
   --color-primary-950: #F3F6FB;
 
-  --color-neutral-50:  #020618;
-  --color-neutral-100: #101828;
-  --color-neutral-200: #1E2939;
-  --color-neutral-300: #364153;
-  --color-neutral-400: #4A5565;
-  --color-neutral-500: #6A7282;
-  --color-neutral-600: #99A1AF;
-  --color-neutral-700: #D1D5DC;
-  --color-neutral-800: #E5E7EB;
-  --color-neutral-900: #F3F4F6;
-  --color-neutral-950: #F9FAFB;
+  --color-neutral-50:  #09090B;
+  --color-neutral-100: #0F0F11;
+  --color-neutral-200: #18181B;
+  --color-neutral-300: #232327;
+  --color-neutral-400: #3F3F46;
+  --color-neutral-500: #71717A;
+  --color-neutral-600: #A1A1AA;
+  --color-neutral-700: #D4D4D8;
+  --color-neutral-800: #E4E4E7;
+  --color-neutral-900: #F4F4F5;
+  --color-neutral-950: #FAFAFA;
 
   --color-success-50:  #032E15;
   --color-success-100: #0D542B;
@@ -273,15 +311,16 @@
   --color-surface-input-active:  var(--color-neutral-200);
   --color-surface-hover:         var(--color-neutral-300);
 
-  /* Borders sit one step lighter than surfaces so they remain visible. */
-  --color-border-default: var(--color-neutral-300);
-  --color-border-strong:  var(--color-neutral-400);
-  --color-border-muted:   var(--color-neutral-200);
+  /* Borderless: separación por CONTRASTE de superficie, no por líneas. Los
+     bordes quedan como hairlines translúcidos casi imperceptibles. */
+  --color-border-default: rgba(255, 255, 255, 0.06);
+  --color-border-strong:  rgba(255, 255, 255, 0.10);
+  --color-border-muted:   rgba(255, 255, 255, 0.04);
 
-  /* Text — the ramp inversion already flipped these.  Override only the
-     dimmer tones so they stay readable against a dark backdrop. */
-  --color-text-subtle:           var(--color-neutral-600);  /* #99A1AF */
-  --color-text-faint:            var(--color-neutral-500);  /* #6A7282 */
+  /* Text — legibilidad sobre el fondo near-black (muted un poco más claro). */
+  --color-text-muted:            var(--color-neutral-600);  /* #A1A1AA */
+  --color-text-subtle:           var(--color-neutral-500);  /* #71717A */
+  --color-text-faint:            var(--color-neutral-400);  /* #3F3F46 */
   --color-text-on-sidebar-muted: var(--color-neutral-600);
 
   /* In Dark the "on-light" wordmark should still read on a dark page bg. */
@@ -314,6 +353,7 @@
   }
 
   :root {
+    --radius: 0.625rem;
     --sidebar-width: 260px;
     --header-height: 80px;
     /* Mobile header is taller — two stacked rows (brand strip + page title). */
@@ -381,6 +421,34 @@
    scrolled by dragging / the wheel. */
 .no-scrollbar { scrollbar-width: none; }
 .no-scrollbar::-webkit-scrollbar { display: none; width: 0; height: 0; }
+
+/* ─── Scrollbar OVERLAY custom (SmoothScroll) ─────────────────────────────────
+   El scrollbar nativo se oculta (.no-scrollbar en el wrapper) → no ocupa espacio
+   ni trae flechas. Este thumb va en position:absolute sobre el contenido (no
+   desplaza el layout), color sutil, encima de todo. SmoothScroll togglea
+   `.is-visible` al scrollear o al acercar el mouse al borde derecho. */
+.smooth-thumb {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  width: 6px;
+  min-height: 28px;
+  border-radius: 9999px;
+  background: var(--color-scrollbar-thumb);
+  opacity: 0;
+  transition: opacity 220ms ease, background 150ms ease;
+  z-index: 50;
+  cursor: grab;
+  will-change: transform, height;
+}
+.smooth-thumb:hover,
+.smooth-thumb:active {
+  background: var(--color-scrollbar-thumb-hover);
+  cursor: grabbing;
+}
+.smooth-thumb.is-visible {
+  opacity: 1;
+}
 
 /* ─── Autofill de inputs ─────────────────────────────────────────────────────
    El autofill del navegador pinta su propio fondo (amarillo/azul) SOLO en el área

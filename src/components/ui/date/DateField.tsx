@@ -6,7 +6,8 @@ import {
 } from 'react';
 import { createPortal } from 'react-dom';
 import { cn } from '@/lib/cn';
-import { Icon, PiCalendarBlank, PiCaretDown } from '@/lib/icons';
+import { HugeiconsIcon } from '@hugeicons/react';
+import { Calendar03Icon, ArrowDown01Icon } from '@hugeicons/core-free-icons';
 import { FormField } from '@/components/ui/input/FormField';
 import { DatePicker, type DatePickerMode } from './DatePicker';
 
@@ -176,22 +177,14 @@ export function DateField({
     setOpen(false);
   };
 
-  // Background resolved ONCE so two `bg-*` utilities never stack —
-  // same rationale as Input's `bgCls`.
-  const bgCls = disabled ? 'bg-(--color-surface-subtle)' : SURFACE_REST;
-
+  // Trigger borderless (bg-secondary), igual que Input/Select shadcn.
   const triggerCls = cn(
-    'inline-flex items-center justify-between gap-2 rounded-md border',
+    'inline-flex items-center justify-between gap-2 rounded-md bg-secondary',
     'text-left transition-colors outline-none select-none',
     SIZE_CLS[size],
     fullWidth && 'w-full',
-    bgCls,
-    isError
-      ? 'border-error-500'
-      : open
-        ? 'border-primary-600'
-        : 'border-(--color-border-strong) hover:border-(--color-text-subtle)',
-    disabled && 'opacity-50 cursor-not-allowed',
+    isError ? 'ring-1 ring-destructive' : open ? 'ring-2 ring-primary/40' : 'hover:bg-primary/10',
+    disabled && 'cursor-not-allowed opacity-50',
     className,
   );
 
@@ -214,13 +207,13 @@ export function DateField({
         onClick={() => setOpen(o => !o)}
       >
         <span className="flex items-center gap-2 min-w-0 flex-1">
-          <Icon icon={PiCalendarBlank} size={size === 'sm' ? 14 : 16} className="text-(--color-text-subtle) shrink-0" />
+          <HugeiconsIcon icon={Calendar03Icon} size={size === 'sm' ? 14 : 16} className="shrink-0 text-(--color-text-subtle)" />
           <span className={cn('truncate', current ? 'text-(--color-text-strong)' : 'text-(--color-text-subtle)')}>
             {current ? fmt(current) : placeholderText}
           </span>
         </span>
-        <Icon
-          icon={PiCaretDown}
+        <HugeiconsIcon
+          icon={ArrowDown01Icon}
           size={14}
           className={cn('text-(--color-text-subtle) transition-transform', open && 'rotate-180')}
         />
@@ -253,7 +246,7 @@ export function DateField({
             min={min}
             max={max}
             pickerMode={pickerMode}
-            className="!border-solid !border-(--color-border-default) shadow-lg bg-(--color-surface-raised)"
+            className="bg-(--color-surface-raised) shadow-xl ring-1 ring-border"
           />
         </div>,
         document.body,

@@ -1,12 +1,14 @@
 'use client'
-// Filtro de "Assignees" para el tablero de Tasks: un Dropdown (mismo estilo que el menú del
-// avatar del header) con un buscador + la lista de miembros del team, cada uno con avatar y
-// checkbox (multi-selección). Controlado: el estado vive en el board (Tasks.tsx). Sin nada
-// seleccionado = se muestran TODAS las tareas.
+// Filtro de "Assignees" del tablero de Tasks: Popover de shadcn con buscador +
+// lista de miembros (avatar + check). Controlado desde Tasks.tsx. Sin selección =
+// se muestran TODAS las tareas.
 import { useMemo, useState } from 'react'
-import { Avatar, Checkbox, SearchInput } from '@/components/ui'
-import { Dropdown } from '@/components/Dropdown'
-import { Icon, PiUser, PiCaretDown } from '@/lib/icons'
+import { HugeiconsIcon } from '@hugeicons/react'
+import { UserMultiple02Icon, ArrowDown01Icon, Search01Icon, Tick02Icon } from '@hugeicons/core-free-icons'
+import { cn } from '@/lib/utils'
+import { Popover, PopoverTrigger, PopoverContent } from '@/components/shadcn/popover'
+import { Input } from '@/components/shadcn/input'
+import { Avatar, AvatarImage, AvatarFallback } from '@/components/shadcn/avatar'
 import { avatarColor } from '@/lib/avatarColor'
 
 export interface AssigneeOption {
@@ -33,7 +35,7 @@ export function AssigneeFilter({ users, selected, onChange }: AssigneeFilterProp
     return users.filter((u) => u.name.toLowerCase().includes(q) || u.email.toLowerCase().includes(q))
   }, [users, query])
 
-  // Resumen mostrado en el trigger: "All assignees" / el nombre (si 1) / "N assignees".
+  // Resumen del trigger: "All assignees" / el nombre (si 1) / "N assignees".
   const summary =
     selected.length === 0
       ? 'All assignees'
@@ -46,66 +48,79 @@ export function AssigneeFilter({ users, selected, onChange }: AssigneeFilterProp
   }
 
   return (
-    <Dropdown
-      align="left"
-      ariaLabel="Filter by assignee"
-      className="w-72"
-      trigger={
-        <span className="inline-flex h-8 items-center gap-1.5 rounded-md border border-(--color-border-default) bg-(--color-surface-card) px-2.5 text-sm text-(--color-text-default) transition-colors hover:border-(--color-text-subtle)">
-          <Icon icon={PiUser} size={15} className="text-(--color-text-muted)" />
+    <Popover>
+      <PopoverTrigger asChild>
+        <button
+          type="button"
+          className="flex h-9 items-center gap-2 rounded-md bg-secondary px-3 text-sm text-foreground outline-none transition-colors hover:bg-primary/10 focus-visible:ring-2 focus-visible:ring-primary/40"
+        >
+          <HugeiconsIcon icon={UserMultiple02Icon} size={16} className="opacity-70" />
           <span className="max-w-[9rem] truncate">{summary}</span>
-          <Icon icon={PiCaretDown} size={13} className="text-(--color-text-muted)" />
-        </span>
-      }
-    >
-      <div className="flex max-h-[24rem] flex-col">
-        <div className="flex items-center justify-between gap-2 px-3 pb-2 pt-3">
-          <p className="text-xs font-semibold uppercase tracking-wide text-(--color-text-muted)">Assignees</p>
+          <HugeiconsIcon icon={ArrowDown01Icon} size={16} className="opacity-60" />
+        </button>
+      </PopoverTrigger>
+      <PopoverContent align="start" className="w-72 p-0">
+        <div className="flex items-center justify-between px-3 pb-2 pt-3">
+          <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Assignees</p>
           {selected.length > 0 && (
             <button
               type="button"
               onClick={() => onChange([])}
-              className="text-xs font-medium text-primary-600 hover:text-primary-700"
+              className="text-xs font-medium text-primary transition-colors hover:text-primary/80"
             >
               Clear
             </button>
           )}
         </div>
         <div className="px-3 pb-2">
-          <SearchInput
-            size="sm"
-            placeholder="Search by name or email…"
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-          />
+          <div className="relative">
+            <HugeiconsIcon
+              icon={Search01Icon}
+              size={15}
+              className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground"
+            />
+            <Input
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder="Search by name or email…"
+              className="h-8 pl-8 text-xs"
+            />
+          </div>
         </div>
-        <div className="min-h-0 flex-1 overflow-y-auto px-1.5 pb-2">
+        <div className="no-scrollbar max-h-72 min-h-0 overflow-y-auto px-1.5 pb-2">
           {filtered.length === 0 ? (
-            <p className="px-2.5 py-4 text-center text-xs text-(--color-text-muted)">No members found</p>
+            <p className="px-2.5 py-4 text-center text-xs text-muted-foreground">No members found</p>
           ) : (
-            filtered.map((u) => (
-              <button
-                key={u.clickupId}
-                type="button"
-                onClick={() => toggle(u.clickupId)}
-                className="flex w-full items-center gap-2.5 rounded-md px-2.5 py-1.5 text-left transition-colors hover:bg-(--color-text-muted)/[0.07]"
-              >
-                <Avatar
-                  src={u.profilePicture || undefined}
-                  size="xs"
-                  style={{ backgroundColor: avatarColor(u.color, u.clickupId), color: '#fff' }}
+            filtered.map((u) => {
+              const on = selected.includes(u.clickupId)
+              return (
+                <button
+                  key={u.clickupId}
+                  type="button"
+                  onClick={() => toggle(u.clickupId)}
+                  className="flex w-full items-center gap-2.5 rounded-md px-2.5 py-1.5 text-left transition-colors hover:bg-accent"
                 >
-                  {u.initials}
-                </Avatar>
-                <span className="min-w-0 flex-1 truncate text-sm text-(--color-text-default)">{u.name}</span>
-                <span className="pointer-events-none shrink-0">
-                  <Checkbox size="sm" checked={selected.includes(u.clickupId)} readOnly />
-                </span>
-              </button>
-            ))
+                  <Avatar className="size-6">
+                    {u.profilePicture && <AvatarImage src={u.profilePicture} alt={u.name} />}
+                    <AvatarFallback className="text-[10px] text-white" style={{ backgroundColor: avatarColor(u.color, u.clickupId) }}>
+                      {u.initials}
+                    </AvatarFallback>
+                  </Avatar>
+                  <span className="min-w-0 flex-1 truncate text-sm text-foreground">{u.name}</span>
+                  <span
+                    className={cn(
+                      'flex size-4 shrink-0 items-center justify-center rounded border border-border',
+                      on && 'border-primary bg-primary'
+                    )}
+                  >
+                    {on && <HugeiconsIcon icon={Tick02Icon} size={12} className="text-primary-foreground" />}
+                  </span>
+                </button>
+              )
+            })
           )}
         </div>
-      </div>
-    </Dropdown>
+      </PopoverContent>
+    </Popover>
   )
 }

@@ -1,32 +1,24 @@
 'use client'
-// Editor de miembro. Patrón Save/Discard (como /payroll/vp de la intranet): TODO
-// lo que se toca —nivel, activo/inactivo, roles (añadir/quitar/primario) y
-// vacaciones (añadir/quitar)— se acumula en estado LOCAL y se aplica de golpe con
-// "Save Changes". Al cerrar con cambios sin guardar aparece "Discard Changes".
-// "Remove from team" es destructivo y va aparte (su propia confirmación, no por Save).
+// Editor de miembro. Patrón Save/Discard: TODO lo que se toca —nivel, activo/inactivo,
+// roles (añadir/quitar/primario) y vacaciones (añadir/quitar)— se acumula en estado
+// LOCAL y se aplica de golpe con "Save Changes". Al cerrar con cambios sin guardar
+// aparece "Discard Changes". "Remove from team" es destructivo y va aparte.
 import React, { useState, useEffect, useRef } from 'react'
 import axios from 'axios'
 import { hotToast as toast } from '@/lib/hotToast'
 import { useQueryClient } from '@tanstack/react-query'
-import { UserRoleRow } from './UserRoleRow'
+import { HugeiconsIcon } from '@hugeicons/react'
+import { UserIcon, Calendar03Icon, Medal02Icon, UserCheck01Icon, Delete02Icon } from '@hugeicons/core-free-icons'
 import { AddRoleForm } from './AddRoleForm'
 import { AddVacationForm } from './AddVacationForm'
-import { Icon, PiUser, PiCalendarBlank, PiMedal, PiUserCheck, PiTrash } from '@/lib/icons'
 import { useUserDetails, useTaskTypes, userKeys } from '@/hooks/queries/useUsers'
 import { workloadKeys } from '@/hooks/queries/useWorkload'
-import {
-  Alert,
-  Select,
-  Switch,
-  Button,
-  Modal,
-  IconButton,
-  DiscardChangesDialog,
-  DeleteConfirmDialog,
-  DataTable,
-  type SelectOption,
-  type DataTableColumn,
-} from '@/components/ui'
+import { Button } from '@/components/shadcn/button'
+import { Switch } from '@/components/shadcn/switch'
+import { Tooltip } from '@/components/shadcn/tooltip'
+import { Alert } from '@/components/shadcn/alert'
+import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/shadcn/select'
+import { Modal, DiscardChangesDialog, DeleteConfirmDialog, DataTable, type DataTableColumn } from '@/components/ui'
 
 type UserLevel = 'JUNIOR' | 'MID' | 'SENIOR'
 
@@ -34,6 +26,13 @@ interface VacationItem {
   id: number
   startDate: string
   endDate: string
+}
+
+interface RoleRow {
+  id: number
+  typeId: number
+  type: { name: string }
+  isPrimary: boolean
 }
 
 interface PendingRole {
@@ -56,7 +55,7 @@ const serverErrorMessage = (error: unknown, fallback: string): string => {
   return fallback
 }
 
-const LEVEL_OPTIONS: SelectOption<UserLevel>[] = [
+const LEVEL_OPTIONS: { value: UserLevel; label: string }[] = [
   { value: 'JUNIOR', label: 'Junior' },
   { value: 'MID', label: 'Mid' },
   { value: 'SENIOR', label: 'Senior' },
@@ -196,15 +195,62 @@ export const UserEditModal: React.FC<UserEditModalProps> = ({ open, userId, user
       expandedBare: true,
       cell: (v) => (
         <div className="flex justify-end">
-          <IconButton
+          <Button
             aria-label="Remove vacation"
-            size="sm"
-            color="error"
+            size="icon-sm"
             variant="soft"
+            className="bg-destructive/15 text-destructive hover:bg-destructive/20"
             onClick={() => deleteVacation(v.id)}
           >
-            <Icon icon={PiTrash} size={16} />
-          </IconButton>
+            <HugeiconsIcon icon={Delete02Icon} size={16} />
+          </Button>
+        </div>
+      ),
+    },
+  ]
+
+  const roleColumns: DataTableColumn<RoleRow>[] = [
+    {
+      key: 'type',
+      header: 'Type',
+      accessor: (r) => r.type.name,
+      skeleton: 'text',
+      cell: (r) => r.type.name,
+    },
+    {
+      key: 'primary',
+      header: 'Primary',
+      skeleton: 'chip',
+      cell: (r) => (
+        <Tooltip content={r.isPrimary ? 'Unset as primary role' : 'Set as primary role'}>
+          <span className="inline-flex">
+            <Switch
+              aria-label={r.isPrimary ? 'Unset as primary role' : 'Set as primary role'}
+              checked={r.isPrimary}
+              onCheckedChange={() => togglePrimary(r.id, !r.isPrimary)}
+            />
+          </span>
+        </Tooltip>
+      ),
+    },
+    {
+      key: 'actions',
+      header: '',
+      align: 'right',
+      width: 72,
+      skeleton: 'actions',
+      expandedBare: true,
+      cell: (r) => (
+        <div className="flex justify-end">
+          <Button
+            aria-label="Remove role"
+            size="icon-sm"
+            variant="soft"
+            className="bg-destructive/15 text-destructive hover:bg-destructive/20"
+            onClick={() => deleteRole(r.id)}
+          >
+            <HugeiconsIcon icon={Delete02Icon} size={16} />
+          </Button>
         </div>
       ),
     },
@@ -305,17 +351,17 @@ export const UserEditModal: React.FC<UserEditModalProps> = ({ open, userId, user
         size="lg"
         footer={
           <>
-            <Button variant="ghost" color="neutral" onClick={attemptClose} disabled={saving}>
+            <Button variant="ghost" onClick={attemptClose} disabled={saving}>
               Cancel
             </Button>
-            <Button color="primary" onClick={handleSave} disabled={!hasChanges || saving || loadingUser} loading={saving}>
-              Save Changes
+            <Button onClick={handleSave} disabled={!hasChanges || saving || loadingUser}>
+              {saving ? 'Saving…' : 'Save Changes'}
             </Button>
           </>
         }
       >
         {loadError ? (
-          <Alert tone="error" variant="soft">
+          <Alert tone="error">
             <div>
               <strong>Error loading data.</strong> Please close and try again.
             </div>
@@ -325,18 +371,26 @@ export const UserEditModal: React.FC<UserEditModalProps> = ({ open, userId, user
             {/* Level */}
             <div>
               <h3 className="mb-2 flex items-center gap-2 text-lg font-medium text-(--color-text-strong)">
-                <Icon icon={PiMedal} size={20} />
+                <HugeiconsIcon icon={Medal02Icon} size={20} />
                 Level
               </h3>
               <div className="max-w-[16rem]">
-                <Select<UserLevel>
-                  options={LEVEL_OPTIONS}
+                <Select
                   value={effectiveLevel}
-                  onChange={(value) => setPendingLevel(value)}
+                  onValueChange={(v) => setPendingLevel(v as UserLevel)}
                   disabled={loadingUser}
-                  placeholder={loadingUser ? 'Loading...' : 'Select level'}
-                  size="sm"
-                />
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder={loadingUser ? 'Loading...' : 'Select level'} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {LEVEL_OPTIONS.map((o) => (
+                      <SelectItem key={o.value} value={o.value}>
+                        {o.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
               <p className="mt-1.5 text-sm text-(--color-text-subtle)">
                 Drives auto-assignment escalation (Jr → Mid → Sr).
@@ -348,44 +402,20 @@ export const UserEditModal: React.FC<UserEditModalProps> = ({ open, userId, user
             {/* Roles */}
             <div>
               <h3 className="mb-2 flex items-center gap-2 text-lg font-medium text-(--color-text-strong)">
-                <Icon icon={PiUser} size={20} />
+                <HugeiconsIcon icon={UserIcon} size={20} />
                 User Roles
               </h3>
-              <div className="mb-4 overflow-hidden rounded-lg border border-(--color-border-default)">
-                <table className="w-full">
-                  <thead className="bg-(--color-surface-hover)">
-                    <tr>
-                      <th className="p-2 text-left text-sm font-medium text-(--color-text-muted) first:pl-4 last:pr-4">Type</th>
-                      <th className="p-2 text-left text-sm font-medium text-(--color-text-muted) first:pl-4 last:pr-4">Primary</th>
-                      <th className="w-[5rem] p-2 text-left text-sm font-medium text-(--color-text-muted) first:pl-4 last:pr-4">Actions</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {visibleRoles.map((role) => (
-                      <UserRoleRow
-                        key={role.id}
-                        role={role}
-                        onDelete={deleteRole}
-                        onTogglePrimary={togglePrimary}
-                        loading={loadingUser}
-                      />
-                    ))}
-                    {!loadingUser && visibleRoles.length === 0 && (
-                      <tr>
-                        <td colSpan={3} className="px-3 py-4 text-center text-(--color-text-subtle)">
-                          No roles assigned
-                        </td>
-                      </tr>
-                    )}
-                    {loadingUser && (
-                      <tr>
-                        <td colSpan={3} className="px-3 py-4 text-center text-(--color-text-subtle)">
-                          Loading roles...
-                        </td>
-                      </tr>
-                    )}
-                  </tbody>
-                </table>
+              <div className="mb-4">
+                <DataTable<RoleRow>
+                  data={visibleRoles}
+                  columns={roleColumns}
+                  rowKey={(r) => r.id}
+                  loading={loadingUser}
+                  showSearch={false}
+                  hidePageSizePicker
+                  skeletonRowCount={2}
+                  emptyState="No roles assigned"
+                />
               </div>
 
               <AddRoleForm
@@ -402,7 +432,7 @@ export const UserEditModal: React.FC<UserEditModalProps> = ({ open, userId, user
             {/* Vacations */}
             <div>
               <h3 className="mb-2 flex items-center gap-2 text-lg font-medium text-(--color-text-strong)">
-                <Icon icon={PiCalendarBlank} size={20} />
+                <HugeiconsIcon icon={Calendar03Icon} size={20} />
                 Vacations
               </h3>
               <div className="mb-4">
@@ -426,12 +456,12 @@ export const UserEditModal: React.FC<UserEditModalProps> = ({ open, userId, user
             {/* Membership */}
             <div>
               <h3 className="mb-2 flex items-center gap-2 text-lg font-medium text-(--color-text-strong)">
-                <Icon icon={PiUserCheck} size={20} />
+                <HugeiconsIcon icon={UserCheck01Icon} size={20} />
                 Membership
               </h3>
 
               {/* Activo / inactivo con switch */}
-              <div className="flex items-center justify-between gap-4 rounded-lg border border-(--color-border-default) px-3.5 py-3">
+              <div className="flex items-center justify-between gap-4 rounded-lg bg-(--color-surface-subtle) px-3.5 py-3">
                 <div>
                   <p className="font-medium text-(--color-text-strong)">
                     {effectiveActive ? 'Active' : 'Inactive'}
@@ -444,13 +474,13 @@ export const UserEditModal: React.FC<UserEditModalProps> = ({ open, userId, user
                   aria-label={effectiveActive ? 'Deactivate member' : 'Activate member'}
                   checked={effectiveActive}
                   // Si el switch vuelve al valor del servidor, deja de contar como cambio.
-                  onChange={(e) => setPendingActive(e.target.checked === user?.active ? null : e.target.checked)}
+                  onCheckedChange={(checked) => setPendingActive(checked === user?.active ? null : checked)}
                   disabled={loadingUser}
                 />
               </div>
 
               {/* Quitar del equipo (destructivo) como alerta */}
-              <Alert tone="error" variant="soft" align="center" className="mt-3">
+              <Alert tone="error" align="center" className="mt-3">
                 <div className="flex items-center justify-between gap-4">
                   <div>
                     <p className="font-semibold">Remove from team</p>
@@ -460,15 +490,13 @@ export const UserEditModal: React.FC<UserEditModalProps> = ({ open, userId, user
                   </div>
                   <Button
                     variant="soft"
-                    color="error"
                     size="sm"
-                    className="shrink-0"
-                    startIcon={<Icon icon={PiTrash} size={16} />}
+                    className="shrink-0 bg-destructive/15 text-destructive hover:bg-destructive/20"
                     onClick={() => setConfirmingRemove(true)}
                     disabled={loadingUser || removing}
-                    loading={removing}
                   >
-                    Remove
+                    <HugeiconsIcon icon={Delete02Icon} size={16} />
+                    {removing ? 'Removing…' : 'Remove'}
                   </Button>
                 </div>
               </Alert>

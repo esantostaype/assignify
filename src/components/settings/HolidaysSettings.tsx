@@ -2,10 +2,6 @@
 "use client";
 import React, { useEffect, useRef, useState } from "react";
 import {
-  Button,
-  Input,
-  Select,
-  Switch,
   DataTable,
   actionsColumn,
   Modal,
@@ -14,7 +10,13 @@ import {
   DeleteConfirmDialog,
   type DataTableColumn,
 } from "@/components/ui";
-import { Icon, PiPlus, PiDownloadSimple, PiUploadSimple } from "@/lib/icons";
+import { Button } from "@/components/shadcn/button";
+import { Input } from "@/components/shadcn/input";
+import { Switch } from "@/components/shadcn/switch";
+import { Spinner } from "@/components/shadcn/spinner";
+import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "@/components/shadcn/select";
+import { HugeiconsIcon } from "@hugeicons/react";
+import { Add01Icon, Download04Icon, Upload04Icon } from "@hugeicons/core-free-icons";
 import axios from "axios";
 import { hotToast as toast } from "@/lib/hotToast";
 
@@ -264,32 +266,16 @@ export const HolidaysSettings: React.FC = () => {
         emptyState="No holidays yet. Add one or import a CSV."
         toolbarBottom={
           <>
-            <Button
-              size="sm"
-              variant="soft"
-              color="primary"
-              startIcon={<Icon icon={PiPlus} size={16} />}
-              onClick={openCreate}
-            >
+            <Button size="sm" variant="soft" onClick={openCreate}>
+              <HugeiconsIcon icon={Add01Icon} size={16} />
               Add holiday
             </Button>
-            <Button
-              size="sm"
-              variant="outlined"
-              color="neutral"
-              startIcon={<Icon icon={PiDownloadSimple} size={16} />}
-              onClick={downloadTemplate}
-            >
+            <Button size="sm" variant="outline" onClick={downloadTemplate}>
+              <HugeiconsIcon icon={Download04Icon} size={16} />
               Template
             </Button>
-            <Button
-              size="sm"
-              variant="outlined"
-              color="neutral"
-              startIcon={<Icon icon={PiUploadSimple} size={16} />}
-              onClick={() => fileInputRef.current?.click()}
-              loading={importing}
-            >
+            <Button size="sm" variant="outline" onClick={() => fileInputRef.current?.click()} disabled={importing}>
+              {importing ? <Spinner /> : <HugeiconsIcon icon={Upload04Icon} size={16} />}
               Import CSV
             </Button>
             <input
@@ -311,10 +297,11 @@ export const HolidaysSettings: React.FC = () => {
         title={form?.id == null ? "Add holiday" : "Edit holiday"}
         footer={
           <>
-            <Button variant="soft" color="neutral" onClick={closeModal} disabled={saving}>
+            <Button variant="ghost" onClick={closeModal} disabled={saving}>
               Cancel
             </Button>
-            <Button onClick={saveForm} loading={saving}>
+            <Button onClick={saveForm} disabled={saving}>
+              {saving && <Spinner />}
               Save
             </Button>
           </>
@@ -324,7 +311,6 @@ export const HolidaysSettings: React.FC = () => {
           <div className="flex flex-col gap-4">
             <FormField label="Name">
               <Input
-                size="md"
                 value={form.name}
                 autoFocus
                 onChange={(e) => setForm({ ...form, name: e.target.value })}
@@ -336,16 +322,21 @@ export const HolidaysSettings: React.FC = () => {
 
             <div className="grid grid-cols-2 gap-4">
               <FormField label="Month">
-                <Select
-                  size="md"
-                  value={form.month}
-                  onChange={(val) => setForm({ ...form, month: val })}
-                  options={MONTH_OPTIONS}
-                />
+                <Select value={form.month} onValueChange={(val) => setForm({ ...form, month: val })}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {MONTH_OPTIONS.map((o) => (
+                      <SelectItem key={o.value} value={o.value}>
+                        {o.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </FormField>
               <FormField label="Day">
                 <Input
-                  size="md"
                   value={form.day}
                   inputMode="numeric"
                   onChange={(e) => setForm({ ...form, day: e.target.value })}
@@ -359,23 +350,28 @@ export const HolidaysSettings: React.FC = () => {
             <FormField label="Repeats" helper="On = every year. Off = a single date.">
               <div className="flex items-center gap-3">
                 <Switch
-                  size="sm"
                   checked={form.year === ""}
-                  onChange={(e) =>
-                    setForm({ ...form, year: e.target.checked ? "" : String(CURRENT_YEAR) })
+                  onCheckedChange={(checked) =>
+                    setForm({ ...form, year: checked ? "" : String(CURRENT_YEAR) })
                   }
                   aria-label="Repeats every year"
                 />
                 {form.year === "" ? (
-                  <span className="text-sm text-(--color-text-muted)">Every year</span>
+                  <span className="text-sm text-muted-foreground">Every year</span>
                 ) : (
                   <div className="w-32">
-                    <Select
-                      size="md"
-                      value={form.year}
-                      onChange={(val) => setForm({ ...form, year: val })}
-                      options={YEAR_OPTIONS}
-                    />
+                    <Select value={form.year} onValueChange={(val) => setForm({ ...form, year: val })}>
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {YEAR_OPTIONS.map((o) => (
+                          <SelectItem key={o.value} value={o.value}>
+                            {o.label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
                   </div>
                 )}
               </div>

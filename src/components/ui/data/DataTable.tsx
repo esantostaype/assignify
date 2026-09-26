@@ -646,9 +646,9 @@ export function DataTable<T>({
         className={cn('w-full', className)}
       >
         {/* Desktop — horizontal totals table */}
-        <div className="hidden xl:block rounded-lg border border-(--color-border-strong) bg-(--color-surface-card) overflow-hidden">
+        <div className="hidden xl:block rounded-lg bg-(--color-surface-card) overflow-hidden">
           <table className="w-full border-collapse text-sm table-fixed">
-            <thead className="bg-(--color-surface-card) border-b border-neutral-300">
+            <thead className="bg-(--color-surface-card) border-b border-border">
               {/* No `h-*` floor on the row — the variant is a compact
                   summary, so the `HEADER_CLS` `py-3` alone defines the
                   natural header height (≈ 37 px).  Consumers that
@@ -725,7 +725,7 @@ export function DataTable<T>({
       ref={containerRef}
       data-component="DataTable"
       className={cn(
-        'flex flex-col rounded-lg border border-(--color-border-strong) bg-(--color-surface-card) overflow-hidden',
+        'flex flex-col rounded-lg bg-(--color-surface-card) overflow-hidden',
         className,
       )}
     >
@@ -817,7 +817,7 @@ export function DataTable<T>({
               // divider stays visible when the header pins to the top.
               useVerticalScroll && scrollMode!.stickyHeader
                 ? 'sticky top-0 z-10 shadow-[0_1px_0_var(--color-neutral-300)]'
-                : 'border-b border-neutral-300',
+                : 'border-b border-border',
             )}
           >
             {/* 48 px floor on the header row.  `min-height` on `<tr>`
@@ -845,7 +845,7 @@ export function DataTable<T>({
                       col.align === 'center' && 'text-center',
                       col.align === 'right'  && 'text-right',
                       (verticalDividers && idx > 0) && 'border-l border-l-(--color-border-default)',
-                      isGroupBoundary(col, idx, visibleColumns) && 'border-l border-l-neutral-300',
+                      isGroupBoundary(col, idx, visibleColumns) && 'border-l border-l-border',
                       sortable && 'group cursor-pointer select-none',
                       pinCellCls(col, 'head'),
                       col.headerClassName,
@@ -895,9 +895,7 @@ export function DataTable<T>({
               // mirror the real cells' intrinsic heights) so the table
               // doesn't snap when real data lands.
               Array.from({ length: Math.max(1, skeletonRowCount ?? pageSize) }).map((_, rowIdx) => {
-                const baseRowBg = rowIdx % 2 === 0
-                  ? 'bg-(--color-surface-muted)'
-                  : 'bg-(--color-surface-card)';
+                const baseRowBg = rowIdx % 2 === 0 ? 'bg-neutral-500/[0.06] dark:bg-white/[0.02]' : '';
                 return (
                   <tr
                     key={`__skeleton-${rowIdx}`}
@@ -910,7 +908,6 @@ export function DataTable<T>({
                       // height on table cells acts as a minimum
                       // row-track height in CSS-2.1 table layout.
                       '[&>td]:h-12',
-                      rowIdx > 0 && 'border-t border-(--color-border-default)',
                       baseRowBg,
                     )}
                   >
@@ -922,7 +919,7 @@ export function DataTable<T>({
                           'px-3 py-2.5 align-middle',
                           nowrap && 'whitespace-nowrap',
                           (verticalDividers && idx > 0) && 'border-l border-l-(--color-border-default)',
-                          isGroupBoundary(col, idx, visibleColumns) && 'border-l border-l-neutral-300',
+                          isGroupBoundary(col, idx, visibleColumns) && 'border-l border-l-border',
                           pinCellCls(col, 'body'),
                           col.cellClassName,
                         )}
@@ -949,7 +946,7 @@ export function DataTable<T>({
                 const expanded  = expandedKeys.has(key);
                 const showPanel = hasExpand && expanded;
                 // Zebra: odd index neutral-50, even white. Hover/expanded aa~ primary-50.
-                const baseRowBg = rowIdx % 2 === 0 ? 'bg-(--color-surface-muted)' : 'bg-(--color-surface-card)';
+                const baseRowBg = rowIdx % 2 === 0 ? 'bg-neutral-500/[0.06] dark:bg-white/[0.02]' : '';
                 const consumerRowProps = rowProps?.(row, rowIdx);
                 const { className: consumerRowClass, ...restRowProps } = consumerRowProps ?? {};
                 // Section grouping — emit a banded full-width row whenever the
@@ -970,8 +967,8 @@ export function DataTable<T>({
                             // same white surface + bottom border as the real
                             // table header (`<thead>`).
                             'px-3 py-3 text-center text-[11px] font-bold uppercase tracking-[0.04em] leading-[1.2] text-primary-950',
-                            'bg-(--color-surface-card) border-b border-neutral-300',
-                            rowIdx > 0 && 'border-t border-neutral-300',
+                            'bg-(--color-surface-card) border-b border-border',
+                            rowIdx > 0 && 'border-t border-border',
                           )}
                         >
                           {section}
@@ -993,8 +990,7 @@ export function DataTable<T>({
                         // row.  Cells with extra content can still
                         // grow past 48 px naturally.
                         '[&>td]:h-12',
-                        rowIdx > 0 && 'border-t border-(--color-border-default)',
-                        showPanel ? 'bg-primary-50' : `${baseRowBg} hover:bg-primary-50`,
+                        showPanel ? 'bg-primary/10' : `${baseRowBg} hover:bg-primary/10`,
                         // Consumer-supplied overrides come LAST so
                         // their utility classes (e.g. selected-row
                         // `bg-primary-100`) win the Tailwind cascade
@@ -1025,7 +1021,7 @@ export function DataTable<T>({
                             col.align === 'center' && 'text-center',
                             col.align === 'right'  && 'text-right',
                             (verticalDividers && idx > 0) && 'border-l border-l-(--color-border-default)',
-                            isGroupBoundary(col, idx, visibleColumns) && 'border-l border-l-neutral-300',
+                            isGroupBoundary(col, idx, visibleColumns) && 'border-l border-l-border',
                             pinCellCls(col, 'body'),
                             col.cellClassName,
                           )}
@@ -1037,7 +1033,7 @@ export function DataTable<T>({
                     </tr>
 
                     {hasExpand && (
-                      <tr className={cn(expanded ? 'bg-primary-50' : baseRowBg)}>
+                      <tr className={cn(expanded ? 'bg-primary/10' : baseRowBg)}>
                         <td colSpan={totalCols} className="p-0">
                           <div
                             className={cn(
@@ -1105,7 +1101,7 @@ export function DataTable<T>({
                 // box-shadow stands in for border-top when pinned to bottom.
                 useVerticalScroll && scrollMode!.stickyFooter
                   ? 'sticky bottom-0 z-10 shadow-[0_-1px_0_var(--color-neutral-300)]'
-                  : 'border-t border-neutral-300',
+                  : 'border-t border-border',
               )}
             >
               {footer}

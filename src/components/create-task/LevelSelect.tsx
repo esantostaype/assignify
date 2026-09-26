@@ -1,7 +1,8 @@
 import React from 'react'
-import { Select } from '@/components/ui'
-import { Typography } from '@/components/ui/typography'
-import { Icon, PiMedal } from '@/lib/icons'
+import { HugeiconsIcon } from '@hugeicons/react'
+import { Medal02Icon } from '@hugeicons/core-free-icons'
+import { cn } from '@/lib/utils'
+import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/shadcn/select'
 
 interface LevelSelectProps {
   value: string
@@ -10,31 +11,31 @@ interface LevelSelectProps {
   error?: string
 }
 
-// Nivel solicitado para la tarea. NO se persiste en la tarea: solo decide a qué
-// diseñador (Jr/Mid/Sr) se escala la asignación automática.
+// Nivel solicitado. NO se persiste: solo decide a qué diseñador (Jr/Mid/Sr) escala la asignación.
 const LEVEL_OPTIONS = [
   { value: 'JUNIOR', label: 'Junior' },
   { value: 'MID', label: 'Mid' },
   { value: 'SENIOR', label: 'Senior' },
 ]
 
-export const LevelSelect: React.FC<LevelSelectProps> = ({
-  value,
-  onChange,
-  touched,
-  error,
-}) => (
+export const LevelSelect: React.FC<LevelSelectProps> = ({ value, onChange, touched, error }) => (
   <div>
-    <Typography variant="label" className="flex items-center gap-1.5 mb-1.5">
-      <Icon icon={PiMedal} size={18} />
+    <label className="mb-1.5 flex items-center gap-1.5 text-sm font-medium text-foreground">
+      <HugeiconsIcon icon={Medal02Icon} size={18} />
       Level
-    </Typography>
-    <Select
-      value={value}
-      onChange={(val) => onChange(val)}
-      placeholder="Select level"
-      options={LEVEL_OPTIONS}
-      error={touched && error ? error : undefined}
-    />
+    </label>
+    <Select value={value} onValueChange={onChange}>
+      <SelectTrigger className={cn(touched && error && 'ring-1 ring-destructive')}>
+        <SelectValue placeholder="Select level" />
+      </SelectTrigger>
+      <SelectContent>
+        {LEVEL_OPTIONS.map((o) => (
+          <SelectItem key={o.value} value={o.value}>
+            {o.label}
+          </SelectItem>
+        ))}
+      </SelectContent>
+    </Select>
+    {touched && error && <p className="mt-1 text-xs text-destructive">{error}</p>}
   </div>
 )

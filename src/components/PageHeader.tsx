@@ -1,31 +1,27 @@
 import type { ReactNode } from 'react'
 
-// Cabecera unificada de página: título a la izquierda + (opcional) buscador/acciones a la
-// derecha. Sticky justo debajo del Header global (top-16) con borde inferior. Úsala en cada
-// vista de nivel superior (Tasks, Team, …) para que TODAS se vean igual. Settings queda
-// exento porque tiene su propio layout de tabs.
-//
-// No es un `template.tsx` de Next a propósito: cada página necesita su propio título y su
-// propio buscador (la lógica de filtrado es distinta en cada una), así que un componente
-// compartido —usado en una línea por página— evita repetir el markup sin acoplar el buscador.
+// Cabecera unificada de página (base: el header de Reports): título + descripción
+// debajo a la izquierda, y a la derecha todos los selects/filtros/acciones. Sticky
+// arriba del content, sin borde (mismo surface-app). Úsala en TODAS las vistas.
 export function PageHeader({
   title,
+  description,
   actions,
-  children,
 }: {
   title: ReactNode
-  /** Acciones/filtros que van JUNTO al título (a su derecha). */
+  /** Texto secundario debajo del título. */
+  description?: ReactNode
+  /** Selects, filtros, botones — se alinean a la derecha. */
   actions?: ReactNode
-  children?: ReactNode
 }) {
   return (
-    <div className="sticky top-16 z-50 border-b border-(--color-border-default) bg-(--color-surface-header)">
-      <div className="flex items-center justify-between gap-4 p-4">
-        <div className="flex min-w-0 items-center gap-3">
-          <h1 className="flex items-center gap-2 text-xl text-(--color-text-strong)">{title}</h1>
-          {actions}
+    <div className="sticky top-0 z-30 bg-(--color-surface-app)">
+      <div className="flex flex-col gap-3 px-4 py-4 md:px-6 lg:flex-row lg:items-center lg:justify-between">
+        <div className="min-w-0">
+          <h1 className="flex items-center gap-2 text-xl font-semibold text-(--color-text-strong)">{title}</h1>
+          {description && <p className="mt-0.5 text-sm text-muted-foreground">{description}</p>}
         </div>
-        {children != null && <div className="w-full max-w-sm">{children}</div>}
+        {actions && <div className="flex flex-wrap items-center gap-2">{actions}</div>}
       </div>
     </div>
   )

@@ -1,46 +1,32 @@
 'use client'
-// Toggle de tema como pill de 2 segmentos (Light | Dark), respaldado por el tema
-// real de la app (UiThemeProvider). El segmento activo se eleva con fondo blanco.
-import { cn } from '@/lib/cn'
+// Toggle de tema como pills — MISMO componente que las demás pills de la app
+// (shadcn ToggleGroup). Iconos hugeicons.
+import { HugeiconsIcon } from '@hugeicons/react'
+import { Sun03Icon, Moon02Icon } from '@hugeicons/core-free-icons'
+import { ToggleGroup, ToggleGroupItem } from '@/components/shadcn/toggle-group'
 import { useUiTheme } from '@/providers/UiThemeProvider'
-import { Icon, PiSun, PiMoon } from '@/lib/icons'
 
-const OPTIONS = [
-  { id: 'light', label: 'Light', icon: PiSun },
-  { id: 'dark', label: 'Dark', icon: PiMoon },
-] as const
-
-export function ThemeToggle() {
+export function ThemeToggle({ className }: { className?: string }) {
   const { theme, setTheme } = useUiTheme()
 
   return (
-    <div
-      role="radiogroup"
+    <ToggleGroup
+      type="single"
+      value={theme}
+      onValueChange={(v) => {
+        if (v === 'light' || v === 'dark') setTheme(v)
+      }}
       aria-label="Theme"
-      className="inline-flex items-center gap-0.5 rounded-full border border-(--color-border-default) bg-(--color-surface-subtle) p-0.5"
+      className={className}
     >
-      {OPTIONS.map((o) => {
-        const active = theme === o.id
-        return (
-          <button
-            key={o.id}
-            type="button"
-            role="radio"
-            aria-checked={active}
-            aria-label={o.label}
-            onClick={() => setTheme(o.id)}
-            className={cn(
-              'inline-flex h-7 items-center gap-1.5 rounded-full px-3 text-xs font-semibold transition-colors',
-              active
-                ? 'bg-(--color-surface-card) text-(--color-text-strong) shadow-sm'
-                : 'text-(--color-text-muted) hover:text-(--color-text-default)',
-            )}
-          >
-            <Icon icon={o.icon} size={14} />
-            {o.label}
-          </button>
-        )
-      })}
-    </div>
+      <ToggleGroupItem value="light" aria-label="Light">
+        <HugeiconsIcon icon={Sun03Icon} size={14} />
+        Light
+      </ToggleGroupItem>
+      <ToggleGroupItem value="dark" aria-label="Dark">
+        <HugeiconsIcon icon={Moon02Icon} size={14} />
+        Dark
+      </ToggleGroupItem>
+    </ToggleGroup>
   )
 }

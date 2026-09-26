@@ -7,13 +7,18 @@ interface TeamHeaderProps {
   onSearchChange: (value: string) => void
 }
 
-// Franja superior del Team: título + buscador, vía la cabecera unificada (PageHeader).
-// Los botones Select Available / Sync viven en la cabecera de la sección
-// "Available to sync" (ver UsersList).
+// Cabecera del Team vía la cabecera unificada (PageHeader): título + descripción +
+// buscador a la derecha. Las acciones de sync viven en la sección "Available to sync".
 export const TeamHeader: React.FC<TeamHeaderProps> = ({ searchValue, onSearchChange }) => {
   return (
-    <PageHeader title="Team">
-      <SearchBar value={searchValue} onChange={onSearchChange} />
-    </PageHeader>
+    <PageHeader
+      title="Team"
+      description="Sync designers from ClickUp and manage their capacity."
+      actions={
+        <div className="w-full sm:w-64">
+          <SearchBar value={searchValue} onChange={onSearchChange} />
+        </div>
+      }
+    />
   )
 }

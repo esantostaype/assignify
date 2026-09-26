@@ -1,6 +1,7 @@
 import React from 'react';
-import { Input } from '@/components/ui';
-import { Icon, PiMagnifyingGlass } from '@/lib/icons';
+import { HugeiconsIcon } from '@hugeicons/react';
+import { Search01Icon } from '@hugeicons/core-free-icons';
+import { Input } from '@/components/shadcn/input';
 
 interface SearchBarProps {
   value: string;
@@ -12,18 +13,21 @@ interface SearchBarProps {
 export const SearchBar: React.FC<SearchBarProps> = ({
   value,
   onChange,
-  placeholder = "Search by Name or Email...",
-  className = ''
+  placeholder = 'Search by Name or Email...',
+  className = '',
 }) => {
   return (
     <div className={`relative ${className}`}>
+      <HugeiconsIcon
+        icon={Search01Icon}
+        size={16}
+        className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground"
+      />
       <Input
         value={value}
         onChange={(event) => onChange(event.target.value)}
         placeholder={placeholder}
-        startAdornment={<Icon icon={PiMagnifyingGlass} size={16} />}
-        size="sm"
-        fullWidth
+        className="pl-9"
       />
     </div>
   );

@@ -2,9 +2,10 @@
 
 import React from 'react'
 import { useFormikContext } from 'formik'
-import { Input } from '@/components/ui'
-import { Typography } from '@/components/ui/typography'
-import { Icon, PiClock } from '@/lib/icons'
+import { HugeiconsIcon } from '@hugeicons/react'
+import { Clock01Icon } from '@hugeicons/core-free-icons'
+import { cn } from '@/lib/utils'
+import { Input } from '@/components/shadcn/input'
 import { FormValues } from '@/interfaces'
 import { formatDuration, unitToDays, type DurationUnit } from '@/utils/duration-utils'
 
@@ -13,9 +14,7 @@ interface DurationFieldProps {
   error?: string
   onDurationComplete?: (duration: string) => void
   onDurationChange?: (duration: string) => void
-  // Duración por defecto del tier seleccionado (EN LA UNIDAD del workspace).
   tierDuration?: number
-  // Unidad de duración del workspace (días/horas/minutos). El valor del campo está en ESTA unidad.
   unit?: DurationUnit
 }
 
@@ -47,14 +46,10 @@ export const DurationField: React.FC<DurationFieldProps> = ({
     }
   }, [values.durationDays, hasManualEdit, localInputValue])
 
-  // Resetear el flag de edición manual cuando cambia el tier.
   React.useEffect(() => {
     setHasManualEdit(false)
   }, [values.tierId])
 
-  // La duración SIEMPRE viene del tier (instantáneo) o es manual: nunca se
-  // "calcula". Por eso no hay estado de carga aquí (lo que tardaba era la
-  // sugerencia de diseñador, no la duración).
   const getStatusIndicator = () => {
     if (isApplyingAutomatic) return { text: '(Applying...)', color: 'var(--color-primary-400)' }
     if (hasManualEdit) return { text: '(Manual)', color: 'var(--color-warning-500)' }
@@ -66,9 +61,7 @@ export const DurationField: React.FC<DurationFieldProps> = ({
 
   const statusIndicator = getStatusIndicator()
 
-  // Texto de ayuda mostrado bajo el campo (vía la prop `helper` del Input de ui).
-  // Mismo contenido que antes mostraba <TextFieldHelp>: duración efectiva por
-  // usuario cuando hay varios asignados, o duración total cuando hay uno solo.
+  // Texto de ayuda: duración efectiva por usuario (parallel) o total.
   let durationHelper: React.ReactNode = null
   if (numberOfAssignees > 1 && originalDuration > 0) {
     durationHelper = (
@@ -110,15 +103,13 @@ export const DurationField: React.FC<DurationFieldProps> = ({
 
   return (
     <div>
-      <Typography variant="label" className="flex items-center gap-1.5 mb-1.5">
-        <Icon icon={PiClock} size={18} />
+      <label className="mb-1.5 flex items-center gap-1.5 text-sm font-medium text-foreground">
+        <HugeiconsIcon icon={Clock01Icon} size={18} />
         Duration
         {statusIndicator && (
-          <span style={{ color: statusIndicator.color, marginLeft: '4px' }}>
-            {statusIndicator.text}
-          </span>
+          <span style={{ color: statusIndicator.color, marginLeft: '4px' }}>{statusIndicator.text}</span>
         )}
-      </Typography>
+      </label>
 
       <Input
         name="durationDays"
@@ -127,10 +118,14 @@ export const DurationField: React.FC<DurationFieldProps> = ({
         onChange={handleInputChange}
         onBlur={handleBlur}
         placeholder={`Duration in ${unit}`}
-        error={touched && error ? error : undefined}
-        helper={durationHelper}
         step={0.1}
+        className={cn(touched && error && 'ring-1 ring-destructive')}
       />
+      {touched && error ? (
+        <p className="mt-1 text-xs text-destructive">{error}</p>
+      ) : durationHelper ? (
+        <p className="mt-1 text-xs text-muted-foreground">{durationHelper}</p>
+      ) : null}
     </div>
   )
 }

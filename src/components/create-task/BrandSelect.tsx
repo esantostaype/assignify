@@ -1,8 +1,9 @@
 import React from "react";
-import { Select } from "@/components/ui";
-import { Typography } from "@/components/ui/typography";
+import { HugeiconsIcon } from "@hugeicons/react";
+import { Folder01Icon } from "@hugeicons/core-free-icons";
+import { cn } from "@/lib/utils";
+import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "@/components/shadcn/select";
 import { Brand } from "@/interfaces";
-import { Icon, PiTag } from "@/lib/icons";
 
 interface BrandSelectProps {
   brands: Brand[];
@@ -22,17 +23,22 @@ export const BrandSelect: React.FC<BrandSelectProps> = ({
   loading = false,
 }) => (
   <div>
-    <Typography variant="label" className="flex items-center gap-1.5 mb-1.5">
-      <Icon icon={PiTag} size={18} />
+    <label className="mb-1.5 flex items-center gap-1.5 text-sm font-medium text-foreground">
+      <HugeiconsIcon icon={Folder01Icon} size={18} />
       List
-    </Typography>
-    <Select
-      value={value}
-      onChange={(val) => onChange(val)}
-      placeholder={loading ? "Loading lists..." : "Select a list"}
-      disabled={loading}
-      error={touched && error ? error : undefined}
-      options={brands.map((brand) => ({ value: brand.id, label: brand.name }))}
-    />
+    </label>
+    <Select value={value} onValueChange={onChange} disabled={loading}>
+      <SelectTrigger className={cn(touched && error && "ring-1 ring-destructive")}>
+        <SelectValue placeholder={loading ? "Loading lists..." : "Select a list"} />
+      </SelectTrigger>
+      <SelectContent>
+        {brands.map((brand) => (
+          <SelectItem key={brand.id} value={brand.id}>
+            {brand.name}
+          </SelectItem>
+        ))}
+      </SelectContent>
+    </Select>
+    {touched && error && <p className="mt-1 text-xs text-destructive">{error}</p>}
   </div>
 );

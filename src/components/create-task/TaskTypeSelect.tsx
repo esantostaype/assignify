@@ -1,8 +1,9 @@
 "use client";
 import React from "react";
-import { Select } from "@/components/ui";
-import { Typography } from "@/components/ui/typography";
-import { Icon, PiSquaresFour } from "@/lib/icons";
+import { HugeiconsIcon } from "@hugeicons/react";
+import { GridViewIcon } from "@hugeicons/core-free-icons";
+import { cn } from "@/lib/utils";
+import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "@/components/shadcn/select";
 import { TaskType } from "@/interfaces";
 
 interface TaskTypeSelectProps {
@@ -14,9 +15,7 @@ interface TaskTypeSelectProps {
   loading?: boolean;
 }
 
-// [SaaS] Tipos de tarea PROPIOS del workspace (ya no el switch hardcodeado
-// UX/UI|Graphic). Cada inquilino define los suyos: Digital/Traditional,
-// FrontEnd/Backend, etc. Se cargan de /api/types (scopeado por workspace).
+// [SaaS] Tipos de tarea PROPIOS del workspace (cargados de /api/types).
 export const TaskTypeSelect: React.FC<TaskTypeSelectProps> = ({
   types,
   value,
@@ -26,23 +25,23 @@ export const TaskTypeSelect: React.FC<TaskTypeSelectProps> = ({
   loading = false,
 }) => (
   <div>
-    <Typography variant="label" className="flex items-center gap-1.5 mb-1.5">
-      <Icon icon={PiSquaresFour} size={18} />
+    <label className="mb-1.5 flex items-center gap-1.5 text-sm font-medium text-foreground">
+      <HugeiconsIcon icon={GridViewIcon} size={18} />
       Task Type
-    </Typography>
-    <Select
-      placeholder={loading ? "Loading types..." : "Select a task type"}
-      // '' (no undefined) para que el Select siga CONTROLADO al limpiar: con undefined
-      // pasa a no-controlado y conserva el tipo viejo tras resetear el formulario.
-      value={value ?? ''}
-      onChange={(val) => onChange(val)}
-      disabled={loading}
-      error={touched && error ? error : undefined}
-      options={types.map((t) => ({
-        value: t.id.toString(),
-        label: t.name,
-        searchValue: t.name,
-      }))}
-    />
+    </label>
+    {/* value '' (no undefined) para que siga CONTROLADO al limpiar el formulario. */}
+    <Select value={value ?? ""} onValueChange={onChange} disabled={loading}>
+      <SelectTrigger className={cn(touched && error && "ring-1 ring-destructive")}>
+        <SelectValue placeholder={loading ? "Loading types..." : "Select a task type"} />
+      </SelectTrigger>
+      <SelectContent>
+        {types.map((t) => (
+          <SelectItem key={t.id} value={t.id.toString()}>
+            {t.name}
+          </SelectItem>
+        ))}
+      </SelectContent>
+    </Select>
+    {touched && error && <p className="mt-1 text-xs text-destructive">{error}</p>}
   </div>
 );

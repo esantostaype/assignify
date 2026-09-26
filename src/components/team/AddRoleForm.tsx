@@ -1,7 +1,9 @@
 import React, { useState } from 'react';
-import { Button, Select, type SelectOption } from '@/components/ui';
-import { Switch } from '@/components/ui/choice/Switch';
-import { Icon, PiPlus } from '@/lib/icons';
+import { HugeiconsIcon } from '@hugeicons/react';
+import { Add01Icon } from '@hugeicons/core-free-icons';
+import { Button } from '@/components/shadcn/button';
+import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/shadcn/select';
+import { Switch } from '@/components/shadcn/switch';
 
 interface AddRoleFormProps {
   taskTypes: Array<{ id: number; name: string }>;
@@ -35,46 +37,39 @@ export const AddRoleForm: React.FC<AddRoleFormProps> = ({
 
   const allAssigned = !loadingTypes && taskTypes.length > 0 && available.length === 0;
 
-  const typeOptions: SelectOption[] =
-    loadingTypes && taskTypes.length === 0
-      ? [{ value: '', label: 'Loading types...', disabled: true }]
-      : available.map((type) => ({ value: type.id.toString(), label: type.name }));
-
   return (
-    <div className="mt-3 space-y-2">
+    <div className="mt-3 space-y-3">
       <div className="flex items-end gap-2">
         <div className="flex-1">
-          <Select
-            label="Role Type"
-            options={typeOptions}
-            value={typeId}
-            onChange={(value) => setTypeId(value)}
-            placeholder={allAssigned ? 'All roles already added' : 'Select role type'}
-            disabled={loadingTypes || allAssigned}
-            size="sm"
-          />
+          <label className="mb-1.5 block text-sm font-medium text-foreground">Role Type</label>
+          <Select value={typeId} onValueChange={setTypeId} disabled={loadingTypes || allAssigned}>
+            <SelectTrigger>
+              <SelectValue
+                placeholder={
+                  allAssigned ? 'All roles already added' : loadingTypes ? 'Loading types...' : 'Select role type'
+                }
+              />
+            </SelectTrigger>
+            <SelectContent>
+              {available.map((type) => (
+                <SelectItem key={type.id} value={type.id.toString()}>
+                  {type.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         </div>
 
-        <Button
-          variant="filled"
-          color="primary"
-          startIcon={<Icon icon={PiPlus} size={16} />}
-          onClick={handleAdd}
-          disabled={!typeId || loadingTypes}
-          loading={loading}
-          size="sm"
-        >
+        <Button onClick={handleAdd} disabled={!typeId || loadingTypes}>
+          <HugeiconsIcon icon={Add01Icon} size={16} />
           Add Role
         </Button>
       </div>
 
-      <Switch
-        size="sm"
-        label="Primary role"
-        checked={isPrimary}
-        onChange={(e) => setIsPrimary(e.target.checked)}
-        disabled={loading}
-      />
+      <label className="flex w-fit items-center gap-2 text-sm text-foreground">
+        <Switch checked={isPrimary} onCheckedChange={setIsPrimary} disabled={loading} />
+        Primary role
+      </label>
     </div>
   );
 };

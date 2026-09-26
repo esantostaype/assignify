@@ -1,8 +1,9 @@
-﻿'use client';
+'use client';
 
 import { useMemo, useState } from 'react';
 import { cn } from '@/lib/cn';
-import { Icon, PiCaretLeft, PiCaretRight, PiCaretDown } from '@/lib/icons';
+import { HugeiconsIcon } from '@hugeicons/react';
+import { ArrowLeft01Icon, ArrowRight01Icon, ArrowDown01Icon } from '@hugeicons/core-free-icons';
 
 const WEEKDAYS_SHORT = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'] as const;
 const MONTH_NAMES = [
@@ -17,27 +18,17 @@ const MONTH_NAMES_SHORT = [
 export type DatePickerMode = 'date' | 'month';
 
 export interface DatePickerProps {
-  /** Selected date (controlled). */
   value?: Date | null;
   onChange?: (date: Date) => void;
-  /** Initial month shown - defaults to today or `value`. */
   defaultViewDate?: Date;
-  /** Disable selection of dates outside [min, max]. */
   min?: Date;
   max?: Date;
-  /** `date` (default) picks a specific day. `month` skips the day grid: the
-   *  user picks year + month and the value snaps to the 1st of that month. */
   pickerMode?: DatePickerMode;
   className?: string;
 }
 
 type Mode = 'days' | 'months' | 'years';
 
-/**
- * Full-featured calendar matching Form.pdf - click the month name to switch
- * to - month-grid, click the year to switch to - year-grid, click - day to
- * select it. Chevrons cycle the unit shown by the current mode.
- */
 export function DatePicker({
   value, onChange,
   defaultViewDate, min, max,
@@ -53,7 +44,6 @@ export function DatePicker({
 
   const cells = useMemo(() => buildMonthGrid(view), [view]);
 
-  // aa navigation 
   const cycle = (delta: number) => {
     if (mode === 'days')   setView(v => new Date(v.getFullYear(), v.getMonth() + delta, 1));
     if (mode === 'months') setView(v => new Date(v.getFullYear() + delta, v.getMonth(), 1));
@@ -64,8 +54,6 @@ export function DatePicker({
     const next = new Date(view.getFullYear(), m, 1);
     setView(next);
     if (monthOnly) {
-      // In month-only mode the month grid IS the selection step — emit the
-      // value (snapped to the 1st of the month) and stay in months view.
       onChange?.(next);
     } else {
       setMode('days');
@@ -81,66 +69,56 @@ export function DatePicker({
 
   const outOfRange = (d: Date) => (min && d < startOfDay(min)) || (max && d > startOfDay(max));
 
-  // Range of years shown in `years` mode (current view year - 5)
   const yearRange = useMemo(() => {
     const center = view.getFullYear();
     const start = center - 5;
     return Array.from({ length: 12 }, (_, i) => start + i);
   }, [view]);
 
+  const navBtn = 'rounded-md p-1 text-(--color-text-muted) transition-colors hover:bg-accent hover:text-foreground';
+
   return (
-    <div data-component="DatePicker" className={cn('inline-block rounded-lg border border-dashed border-primary-400 bg-(--color-surface-card) p-3 w-[260px]', className)}>
+    <div data-component="DatePicker" className={cn('inline-block w-[260px] rounded-lg bg-(--color-surface-card) p-3', className)}>
       {/* header */}
       <div className="mb-2 flex items-center justify-between px-1">
-        <button
-          type="button"
-          aria-label="Previous"
-          onClick={() => cycle(-1)}
-          className="rounded p-1 text-(--color-text-muted) hover:bg-(--color-surface-subtle)"
-        >
-          <Icon icon={PiCaretLeft} size={14} />
+        <button type="button" aria-label="Previous" onClick={() => cycle(-1)} className={navBtn}>
+          <HugeiconsIcon icon={ArrowLeft01Icon} size={16} />
         </button>
 
         <span className="flex items-center gap-1 text-xs font-semibold text-(--color-text-default)">
           {mode === 'years' ? (
             <span className="px-1">
-              {yearRange[0]} a {yearRange[yearRange.length - 1]}
+              {yearRange[0]} – {yearRange[yearRange.length - 1]}
             </span>
           ) : (
             <>
               <button
                 type="button"
                 onClick={() => setMode(mode === 'months' ? 'days' : 'months')}
-                className="inline-flex items-center gap-0.5 rounded px-1 py-0.5 hover:bg-(--color-surface-subtle)"
+                className="inline-flex items-center gap-0.5 rounded px-1 py-0.5 transition-colors hover:bg-accent"
               >
                 {MONTH_NAMES[view.getMonth()]}
-                <Icon icon={PiCaretDown} size={12} className="text-(--color-text-subtle)" />
+                <HugeiconsIcon icon={ArrowDown01Icon} size={12} className="text-(--color-text-subtle)" />
               </button>
               <button
                 type="button"
                 onClick={() => setMode('years')}
-                className="inline-flex items-center gap-0.5 rounded px-1 py-0.5 hover:bg-(--color-surface-subtle)"
+                className="inline-flex items-center gap-0.5 rounded px-1 py-0.5 transition-colors hover:bg-accent"
               >
                 {view.getFullYear()}
-                <Icon icon={PiCaretDown} size={12} className="text-(--color-text-subtle)" />
+                <HugeiconsIcon icon={ArrowDown01Icon} size={12} className="text-(--color-text-subtle)" />
               </button>
             </>
           )}
         </span>
 
-        <button
-          type="button"
-          aria-label="Next"
-          onClick={() => cycle(1)}
-          className="rounded p-1 text-(--color-text-muted) hover:bg-(--color-surface-subtle)"
-        >
-          <Icon icon={PiCaretRight} size={14} />
+        <button type="button" aria-label="Next" onClick={() => cycle(1)} className={navBtn}>
+          <HugeiconsIcon icon={ArrowRight01Icon} size={16} />
         </button>
       </div>
 
       {mode === 'days' && (
         <>
-          {/* weekday row */}
           <div className="grid grid-cols-7 gap-0.5 px-0.5">
             {WEEKDAYS_SHORT.map(w => (
               <span key={w} className="text-center text-[10px] font-semibold uppercase tracking-wide text-(--color-text-subtle)">
@@ -149,7 +127,6 @@ export function DatePicker({
             ))}
           </div>
 
-          {/* days */}
           <div className="mt-1 grid grid-cols-7 gap-0.5 px-0.5">
             {cells.map((cell, idx) => {
               const selected = isSameDay(value ?? null, cell.date);
@@ -162,12 +139,12 @@ export function DatePicker({
                   aria-pressed={selected}
                   onClick={() => onChange?.(cell.date)}
                   className={cn(
-                    'h-7 w-7 mx-auto rounded-full text-[11px] font-medium transition-colors',
-                    'disabled:opacity-40 disabled:cursor-not-allowed',
+                    'mx-auto h-7 w-7 rounded-full text-[11px] font-medium transition-colors',
+                    'disabled:cursor-not-allowed disabled:opacity-40',
                     cell.muted ? 'text-(--color-text-faint)' : 'text-(--color-text-default)',
                     selected
-                      ? 'bg-primary-600 text-white hover:bg-primary-700'
-                      : 'hover:bg-primary-50 hover:text-primary-700',
+                      ? 'bg-primary text-primary-foreground hover:bg-primary/90'
+                      : 'hover:bg-primary/10 hover:text-primary',
                   )}
                 >
                   {cell.date.getDate()}
@@ -191,10 +168,10 @@ export function DatePicker({
                 aria-pressed={selected}
                 onClick={() => pickMonth(i)}
                 className={cn(
-                  'h-9 rounded text-xs font-semibold transition-colors',
+                  'h-9 rounded-md text-xs font-semibold transition-colors',
                   selected
-                    ? 'bg-primary-600 text-white'
-                    : 'bg-(--color-surface-card) text-(--color-text-muted) hover:bg-primary-50 hover:text-primary-700',
+                    ? 'bg-primary text-primary-foreground'
+                    : 'text-(--color-text-muted) hover:bg-primary/10 hover:text-primary',
                 )}
               >
                 {m}
@@ -215,10 +192,10 @@ export function DatePicker({
                 aria-pressed={selected}
                 onClick={() => pickYear(y)}
                 className={cn(
-                  'h-9 rounded text-xs font-semibold transition-colors',
+                  'h-9 rounded-md text-xs font-semibold transition-colors',
                   selected
-                    ? 'bg-primary-600 text-white'
-                    : 'bg-(--color-surface-card) text-(--color-text-muted) hover:bg-primary-50 hover:text-primary-700',
+                    ? 'bg-primary text-primary-foreground'
+                    : 'text-(--color-text-muted) hover:bg-primary/10 hover:text-primary',
                 )}
               >
                 {y}
@@ -231,20 +208,19 @@ export function DatePicker({
   );
 }
 
-// aa helpers 
 function startOfDay(d: Date) {
   return new Date(d.getFullYear(), d.getMonth(), d.getDate());
 }
 
 interface Cell { date: Date; muted: boolean; }
 
-/** Build - 6 "a7 month grid, Monday-first, with leading/trailing days flagged as muted. */
+/** Build a 6×7 month grid, Monday-first, with leading/trailing days flagged as muted. */
 function buildMonthGrid(viewDate: Date): Cell[] {
   const year = viewDate.getFullYear();
   const month = viewDate.getMonth();
   const firstOfMonth = new Date(year, month, 1);
   const jsDay = firstOfMonth.getDay();
-  const leading = (jsDay + 6) % 7; // shift to Mon-first
+  const leading = (jsDay + 6) % 7;
 
   const cells: Cell[] = [];
   for (let i = 0; i < 42; i++) {

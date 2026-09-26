@@ -1,8 +1,12 @@
 "use client";
 import React, { useState } from "react";
+import { HugeiconsIcon } from "@hugeicons/react";
+import { ArrowUp01Icon, ArrowDown01Icon, Task01Icon } from "@hugeicons/core-free-icons";
 import { TaskCard } from "./TaskCard";
-import { Icon, PiListChecks, PiArrowUp, PiArrowDown } from "@/lib/icons";
 import { TaskCardSkeleton } from "./TaskCardSkeleton";
+import { Badge } from "@/components/shadcn/badge";
+import { Skeleton } from "@/components/shadcn/skeleton";
+import { SmoothScroll } from "@/components/SmoothScroll";
 import {
   mapClickUpStatusToLocal,
   mapLocalStatusToColumn,
@@ -44,9 +48,8 @@ interface TasksListProps {
 type SortDir = "asc" | "desc";
 
 export const TasksList: React.FC<TasksListProps> = ({ tasks, loading = false }) => {
-  // Orden por columna (por fecha de entrega). Default: ON APPROVAL muestra las más
-  // NUEVAS arriba (desc); las demás, las que vencen ANTES arriba (asc). El icono del
-  // título lo alterna, al estilo de las columnas ordenables de un DataTable.
+  // Orden por columna (fecha de entrega). Default: ON APPROVAL muestra las más
+  // nuevas arriba (desc); las demás, las que vencen antes arriba (asc).
   const [order, setOrder] = useState<Record<string, SortDir>>(() => {
     const init: Record<string, SortDir> = {};
     getColumnOrder().forEach((c) => {
@@ -78,27 +81,30 @@ export const TasksList: React.FC<TasksListProps> = ({ tasks, loading = false }) 
 
   if (loading) {
     return (
-      <div className="flex flex-1 min-h-0 gap-4 overflow-x-auto">
+      <div className="flex min-h-0 flex-1 gap-4 overflow-x-auto">
         {columnOrder.map((column, index) => (
-          <div key={column} className="flex flex-[0_0_280px] flex-col overflow-y-auto relative pr-2">
-            <div className="sticky top-0 pb-2 flex items-center justify-between z-20 bg-neutral-100">
-              {/* Mismo tamaño/estructura que con datos (text-sm + badge) para que el
-                  header no "salte" al cargar. */}
-              <h2 className="font-semibold text-sm">{column}</h2>
-              <span className="h-6 w-7 rounded-full bg-(--color-surface-hover) animate-pulse" />
-            </div>
-            <div className="flex-1 space-y-2">
-              <TaskCardSkeleton />
-              <TaskCardSkeleton />
-              {index === 0 && <TaskCardSkeleton />}
-            </div>
+          <div key={column} className="flex flex-[0_0_280px] flex-col">
+            <SmoothScroll preventParentLenis className="flex-1">
+              <div className="pr-2">
+                <div className="sticky top-0 z-20 flex items-center justify-between bg-(--color-surface-app) pb-2">
+                  {/* Misma estructura que con datos (text-sm + badge) para que el header no "salte". */}
+                  <h2 className="text-sm font-semibold">{column}</h2>
+                  <Skeleton className="h-6 w-7 rounded-full" />
+                </div>
+                <div className="space-y-2">
+                  <TaskCardSkeleton />
+                  <TaskCardSkeleton />
+                  {index === 0 && <TaskCardSkeleton />}
+                </div>
+              </div>
+            </SmoothScroll>
           </div>
         ))}
       </div>
     );
   }
 
-  // Excluir completadas y agrupar por columna (el ORDEN se aplica al renderizar).
+  // Excluir completadas y agrupar por columna (el orden se aplica al renderizar).
   const grouped = tasks.reduce((acc, task) => {
     const column = mapStatusToColumn(task.status);
     if (column) {
@@ -112,50 +118,54 @@ export const TasksList: React.FC<TasksListProps> = ({ tasks, loading = false }) 
 
   if (activeCount === 0) {
     return (
-      <div className="h-full flex items-center justify-center">
-        <div className="text-center">
-          <Icon icon={PiListChecks} size={48} className="mx-auto mb-4 text-(--color-text-subtle)" />
-          <h3 className="text-2xl font-medium mb-2">No active tasks</h3>
-          <p className="text-(--color-text-subtle)">Active ClickUp tasks will appear here.</p>
+      <div className="flex h-full items-center justify-center">
+        <div className="flex flex-col items-center text-center">
+          <div className="mb-4 grid size-12 place-items-center rounded-full bg-primary/10 text-primary">
+            <HugeiconsIcon icon={Task01Icon} size={24} />
+          </div>
+          <h3 className="mb-1 text-lg font-semibold text-foreground">No active tasks</h3>
+          <p className="text-sm text-muted-foreground">Active ClickUp tasks will appear here.</p>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="flex flex-1 min-h-0 gap-4 overflow-x-auto">
+    <div className="flex min-h-0 flex-1 gap-4 overflow-x-auto">
       {columnOrder.map((column) => {
         const dir = order[column] ?? "asc";
         const list = sortTasks(grouped[column] || [], dir);
         return (
-          <div key={column} className="flex flex-[0_0_280px] flex-col overflow-y-auto relative pr-2">
-            <div className="sticky top-0 pb-2 bg-neutral-100 flex items-center justify-between z-20">
-              <div className="flex items-center gap-1.5">
-                <h2 className="font-semibold text-sm">{column}</h2>
-                {/* Sort por fecha de entrega (alterna asc/desc), como en un DataTable. */}
-                <button
-                  type="button"
-                  onClick={() => toggleOrder(column)}
-                  title={dir === "asc" ? "Earliest due first — click for latest" : "Latest due first — click for earliest"}
-                  aria-label="Sort by due date"
-                  className="rounded p-0.5 text-(--color-text-muted) transition-colors hover:bg-(--color-surface-hover) hover:text-(--color-text-strong)"
-                >
-                  <Icon icon={dir === "asc" ? PiArrowUp : PiArrowDown} size={14} />
-                </button>
-              </div>
-              <span className="bg-(--color-surface-header) text-primary-600 text-xs px-2 py-1 rounded-full">
-                {list.length}
-              </span>
-            </div>
-            <div className="flex-1 space-y-2">
-              {list.length ? (
-                list.map((task) => <TaskCard key={task.clickupId} task={task} />)
-              ) : (
-                <div className="text-center text-(--color-text-muted) text-sm py-8">
-                  No {column.toLowerCase()} tasks
+          <div key={column} className="flex flex-[0_0_280px] flex-col">
+            <SmoothScroll preventParentLenis className="flex-1">
+              <div className="pr-2">
+                <div className="sticky top-0 z-20 flex items-center justify-between bg-(--color-surface-app) pb-2">
+                  <div className="flex items-center gap-1.5">
+                    <h2 className="text-sm font-semibold">{column}</h2>
+                    {/* Sort por fecha de entrega (alterna asc/desc), como en un DataTable. */}
+                    <button
+                      type="button"
+                      onClick={() => toggleOrder(column)}
+                      title={dir === "asc" ? "Earliest due first — click for latest" : "Latest due first — click for earliest"}
+                      aria-label="Sort by due date"
+                      className="rounded p-0.5 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+                    >
+                      <HugeiconsIcon icon={dir === "asc" ? ArrowUp01Icon : ArrowDown01Icon} size={14} />
+                    </button>
+                  </div>
+                  <Badge variant="default">{list.length}</Badge>
                 </div>
-              )}
-            </div>
+                <div className="space-y-2">
+                  {list.length ? (
+                    list.map((task) => <TaskCard key={task.clickupId} task={task} />)
+                  ) : (
+                    <div className="py-8 text-center text-sm text-muted-foreground">
+                      No {column.toLowerCase()} tasks
+                    </div>
+                  )}
+                </div>
+              </div>
+            </SmoothScroll>
           </div>
         );
       })}

@@ -6,7 +6,7 @@ import { PageHeader } from '@/components/PageHeader'
 export default function TypesPage() {
   return (
     <div className="flex flex-col">
-      <PageHeader title="Task Types" />
+      <PageHeader title="Task Types" description="Define the task types used across this workspace." />
       <div className="p-4 md:p-6">
         <div className="mx-auto w-full max-w-2xl">
           <TaskTypesForm />

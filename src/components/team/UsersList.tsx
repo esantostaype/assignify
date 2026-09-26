@@ -1,8 +1,10 @@
 import React, { useMemo } from "react";
-import { Button } from "@/components/ui";
+import { HugeiconsIcon } from "@hugeicons/react";
+import { FileSearchIcon, CheckmarkSquare01Icon, ArrowReloadHorizontalIcon } from "@hugeicons/core-free-icons";
+import { cn } from "@/lib/utils";
+import { Button } from "@/components/shadcn/button";
 import { UserCard } from "./UserCard";
 import { SyncedMemberCard, type MemberUser } from "./SyncedMemberCard";
-import { Icon, PiFileMagnifyingGlass, PiCheckSquare, PiArrowsClockwise } from "@/lib/icons";
 import { MemberCardSkeleton } from "./MemberCardSkeleton";
 import { UserCardSkeleton } from "./UserCardSkeleton";
 import type { UserWorkload } from "@/hooks/queries/useWorkload";
@@ -16,8 +18,7 @@ interface UsersListProps {
   /** Carga de trabajo de los diseñadores sincronizados (cruzada por id). */
   workload?: UserWorkload[];
   workloadLoading?: boolean;
-  // Acciones de sync (antes en el header del Team): ahora viven en la cabecera
-  // de la sección "Available to sync".
+  // Acciones de sync: viven en la cabecera de la sección "Available to sync".
   selectedCount: number;
   availableCount: number;
   allAvailableSelected: boolean;
@@ -48,22 +49,14 @@ export const UsersList: React.FC<UsersListProps> = ({
     return map;
   }, [workload]);
 
-  const syncedUsers = useMemo(
-    () => users.filter((u) => u.existsInLocal),
-    [users]
-  );
-  const availableUsers = useMemo(
-    () => users.filter((u) => !u.existsInLocal),
-    [users]
-  );
+  const syncedUsers = useMemo(() => users.filter((u) => u.existsInLocal), [users]);
+  const availableUsers = useMemo(() => users.filter((u) => !u.existsInLocal), [users]);
 
   if (loading) {
     return (
       <div className="flex flex-col gap-8">
         <section>
-          <h2 className="mb-3 text-lg font-semibold text-(--color-text-strong)">
-            Synced
-          </h2>
+          <h2 className="mb-3 text-lg font-semibold text-foreground">Synced</h2>
           <div className="grid grid-cols-1 gap-4 md:grid-cols-1 lg:grid-cols-2 xl:grid-cols-3">
             <MemberCardSkeleton />
             <MemberCardSkeleton />
@@ -71,9 +64,7 @@ export const UsersList: React.FC<UsersListProps> = ({
           </div>
         </section>
         <section>
-          <h2 className="mb-3 text-lg font-semibold text-(--color-text-strong)">
-            Available to sync
-          </h2>
+          <h2 className="mb-3 text-lg font-semibold text-foreground">Available to sync</h2>
           <div className="grid grid-cols-[repeat(auto-fill,minmax(260px,1fr))] gap-3">
             <UserCardSkeleton />
             <UserCardSkeleton />
@@ -87,17 +78,13 @@ export const UsersList: React.FC<UsersListProps> = ({
 
   if (users.length === 0) {
     return (
-      <div className="h-full flex items-center justify-center py-12">
-        <div className="text-center">
-          <Icon
-            icon={PiFileMagnifyingGlass}
-            size={48}
-            className="mx-auto mb-4 text-(--color-text-subtle)"
-          />
-          <h3 className="text-2xl font-medium mb-2">No users found</h3>
-          <p className="text-(--color-text-subtle)">
-            Check ClickUp API configuration or try refreshing
-          </p>
+      <div className="flex h-full items-center justify-center py-12">
+        <div className="flex flex-col items-center text-center">
+          <div className="mb-4 grid size-12 place-items-center rounded-full bg-primary/10 text-primary">
+            <HugeiconsIcon icon={FileSearchIcon} size={24} />
+          </div>
+          <h3 className="mb-1 text-lg font-semibold text-foreground">No users found</h3>
+          <p className="text-sm text-muted-foreground">Check ClickUp API configuration or try refreshing</p>
         </div>
       </div>
     );
@@ -107,16 +94,12 @@ export const UsersList: React.FC<UsersListProps> = ({
     <div className="flex flex-col gap-8">
       {/* ── Diseñadores sincronizados (tarjeta completa con carga) ── */}
       <section>
-        <h2 className="mb-3 text-lg font-semibold text-(--color-text-strong)">
+        <h2 className="mb-3 text-lg font-semibold text-foreground">
           Synced
-          <span className="ml-2 text-sm font-normal text-(--color-text-muted)">
-            {syncedUsers.length}
-          </span>
+          <span className="ml-2 text-sm font-normal text-muted-foreground">{syncedUsers.length}</span>
         </h2>
         {syncedUsers.length === 0 ? (
-          <p className="text-sm text-(--color-text-muted)">
-            No synced members yet.
-          </p>
+          <p className="text-sm text-muted-foreground">No synced members yet.</p>
         ) : (
           <div className="grid grid-cols-1 gap-4 md:grid-cols-1 lg:grid-cols-2 xl:grid-cols-3">
             {syncedUsers.map((user) => (
@@ -136,31 +119,17 @@ export const UsersList: React.FC<UsersListProps> = ({
       {availableUsers.length > 0 && (
         <section>
           <div className="mb-3 flex items-center justify-between gap-4">
-            <h2 className="text-lg font-semibold text-(--color-text-strong)">
+            <h2 className="text-lg font-semibold text-foreground">
               Available to sync
-              <span className="ml-2 text-sm font-normal text-(--color-text-muted)">
-                {availableUsers.length}
-              </span>
+              <span className="ml-2 text-sm font-normal text-muted-foreground">{availableUsers.length}</span>
             </h2>
             <div className="flex gap-2">
-              <Button
-                variant="soft"
-                size="sm"
-                startIcon={<Icon icon={PiCheckSquare} size={16} />}
-                onClick={onSelectAll}
-                disabled={availableCount === 0}
-              >
+              <Button variant="soft" size="sm" onClick={onSelectAll} disabled={availableCount === 0}>
+                <HugeiconsIcon icon={CheckmarkSquare01Icon} size={16} />
                 {allAvailableSelected ? "Deselect" : "Select"} Available
               </Button>
-              <Button
-                variant="filled"
-                color="primary"
-                size="sm"
-                startIcon={<Icon icon={PiArrowsClockwise} size={16} />}
-                onClick={onSync}
-                disabled={selectedCount === 0}
-                loading={syncing}
-              >
+              <Button size="sm" onClick={onSync} disabled={selectedCount === 0 || syncing}>
+                <HugeiconsIcon icon={ArrowReloadHorizontalIcon} size={16} className={cn(syncing && "animate-spin")} />
                 Sync ({selectedCount})
               </Button>
             </div>

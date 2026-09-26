@@ -1,9 +1,11 @@
 /* eslint-disable @typescript-eslint/no-unused-vars */
 // src/components/team/AddVacationForm.tsx - ENHANCED VERSION
 import React, { useState, useEffect } from 'react';
-import { Button, Alert } from '@/components/ui';
+import { HugeiconsIcon } from '@hugeicons/react';
+import { Add01Icon, Alert01Icon } from '@hugeicons/core-free-icons';
+import { Button } from '@/components/shadcn/button';
+import { Alert } from '@/components/shadcn/alert';
 import { DateField } from '@/components/ui/date/DateField';
-import { Icon, PiPlus, PiWarning } from '@/lib/icons';
 
 /**
  * Las vacaciones son fechas de calendario; el padre (y el endpoint) esperan
@@ -212,15 +214,8 @@ export const AddVacationForm: React.FC<AddVacationFormProps> = ({
           />
         </div>
 
-        <Button
-          variant="filled"
-          color="primary"
-          startIcon={<Icon icon={PiPlus} size={16} />}
-          onClick={handleAdd}
-          disabled={!isFormValid() || loading}
-          loading={loading}
-          size="sm"
-        >
+        <Button size="sm" onClick={handleAdd} disabled={!isFormValid() || loading}>
+          <HugeiconsIcon icon={Add01Icon} size={16} />
           Add Vacation
         </Button>
       </div>
@@ -229,8 +224,7 @@ export const AddVacationForm: React.FC<AddVacationFormProps> = ({
       {conflictInfo.hasConflict && (
         <Alert
           tone={conflictInfo.conflictType === 'overlap' ? 'error' : 'warning'}
-          variant="soft"
-          icon={PiWarning}
+          icon={Alert01Icon}
           iconSize={20}
         >
           <div>
@@ -276,7 +270,7 @@ export const AddVacationForm: React.FC<AddVacationFormProps> = ({
 
       {/* ✅ Validation message for invalid date range */}
       {startDate && endDate && new Date(startDate) >= new Date(endDate) && (
-        <Alert tone="error" variant="soft">
+        <Alert tone="error">
           End date must be after start date
         </Alert>
       )}

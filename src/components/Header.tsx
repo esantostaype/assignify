@@ -1,5 +1,5 @@
 'use client'
-import { Queue01Icon, SwatchIcon, UserGroup03Icon, Folder01Icon } from '@hugeicons/core-free-icons'
+import { Queue01Icon, SwatchIcon, UserGroup03Icon, Folder01Icon, Analytics01Icon } from '@hugeicons/core-free-icons'
 import { NavItem } from '@/components'
 import { WorkspaceSwitcher } from '@/components/WorkspaceSwitcher'
 import { UserMenu } from '@/components/UserMenu'
@@ -14,6 +14,7 @@ export const Header = () => {
     { href: '/team', label: 'Team', icon: UserGroup03Icon },
     { href: '/types', label: 'Types', icon: SwatchIcon },
     { href: '/lists', label: 'Lists', icon: Folder01Icon },
+    { href: '/reports', label: 'Reports', icon: Analytics01Icon },
   ]
 
   return (

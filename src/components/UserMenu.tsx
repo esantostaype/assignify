@@ -1,11 +1,13 @@
 'use client'
 // Badge del usuario logueado (foto de ClickUp) que abre un dropdown con su identidad y
 // las acciones de cuenta: Dark mode (switch), Profile (→ ClickUp), Settings y Sign out.
-// Settings vive AQUÍ (ya no en el nav principal del Header).
 import { useState } from 'react'
 import Link from 'next/link'
-import { Avatar, AlertDialog, Switch } from '@/components/ui'
-import { Icon, PiSignOut, PiUser, PiGear, PiMoon } from '@/lib/icons'
+import { HugeiconsIcon } from '@hugeicons/react'
+import { Logout01Icon, UserIcon, Settings01Icon, Moon02Icon } from '@hugeicons/core-free-icons'
+import { AlertDialog } from '@/components/ui'
+import { Avatar, AvatarImage, AvatarFallback } from '@/components/shadcn/avatar'
+import { Switch } from '@/components/shadcn/switch'
 import { useAuth } from '@/contexts/AuthContext'
 import { useUiTheme } from '@/providers/UiThemeProvider'
 import { useWorkspaces } from '@/hooks/queries/useWorkspaces'
@@ -22,7 +24,6 @@ export const UserMenu = () => {
 
   const label = user.name ?? user.email
   const initials = label.slice(0, 2).toUpperCase()
-  // Perfil del usuario en ClickUp (su workspace activo); fallback a la raíz de ClickUp.
   const clickupProfileUrl = ws?.activeId
     ? `https://app.clickup.com/${ws.activeId}/settings/profile`
     : 'https://app.clickup.com'
@@ -31,10 +32,8 @@ export const UserMenu = () => {
     Promise.resolve(logout()).catch((error) => console.error('Logout failed:', error))
   }
 
-  // Hover con esquinas redondeadas y MÁS TENUE; el wrapper px-1.5 le da margen lateral
-  // para que el hover no toque los bordes del panel.
   const itemCls =
-    'flex w-full items-center gap-2.5 rounded-md px-2.5 py-2 text-left text-sm font-medium text-(--color-text-default) transition-colors hover:bg-(--color-text-muted)/[0.07]'
+    'flex w-full items-center gap-2.5 rounded-md px-2.5 py-2 text-left text-sm font-medium text-foreground transition-colors hover:bg-accent'
 
   return (
     <>
@@ -43,52 +42,54 @@ export const UserMenu = () => {
         ariaLabel="User menu"
         triggerClassName="rounded-full ring-2 ring-transparent transition hover:ring-(--color-border-default)"
         className="w-64"
-        trigger={<Avatar src={user.image} size="sm">{initials}</Avatar>}
+        trigger={
+          <Avatar className="size-9">
+            {user.image && <AvatarImage src={user.image} alt={label} />}
+            <AvatarFallback>{initials}</AvatarFallback>
+          </Avatar>
+        }
       >
         {(close) => (
           <div className="flex flex-col py-1">
             {/* Identidad */}
             <div className="flex items-center gap-3 px-3 pb-3 pt-2">
-              <Avatar src={user.image} size="md">{initials}</Avatar>
+              <Avatar className="size-10">
+                {user.image && <AvatarImage src={user.image} alt={label} />}
+                <AvatarFallback>{initials}</AvatarFallback>
+              </Avatar>
               <div className="min-w-0">
-                {user.name && (
-                  <p className="truncate text-sm font-semibold text-(--color-text-strong)">{user.name}</p>
-                )}
-                <p className="truncate text-xs text-neutral-600">{user.email}</p>
+                {user.name && <p className="truncate text-sm font-semibold text-foreground">{user.name}</p>}
+                <p className="truncate text-xs text-muted-foreground">{user.email}</p>
               </div>
             </div>
 
-            <div className="my-1 border-t border-neutral-200" />
+            <div className="my-1 border-t border-border" />
 
-            {/* Acciones (margen lateral via px-1.5 → el hover no toca los bordes) */}
+            {/* Acciones */}
             <div className="flex flex-col gap-0.5 px-1.5">
               {/* Dark mode (switch) */}
               <div className="flex items-center justify-between gap-2 px-2.5 py-2">
-                <span className="flex items-center gap-2.5 text-sm font-medium text-(--color-text-default)">
-                  <Icon icon={PiMoon} size={16} />
+                <span className="flex items-center gap-2.5 text-sm font-medium text-foreground">
+                  <HugeiconsIcon icon={Moon02Icon} size={16} />
                   Dark mode
                 </span>
-                <Switch
-                  size="sm"
-                  checked={theme === 'dark'}
-                  onChange={(e) => setTheme(e.target.checked ? 'dark' : 'light')}
-                />
+                <Switch checked={theme === 'dark'} onCheckedChange={(checked) => setTheme(checked ? 'dark' : 'light')} />
               </div>
 
-              {/* Profile → ClickUp (pestaña nueva) */}
+              {/* Profile → ClickUp */}
               <a href={clickupProfileUrl} target="_blank" rel="noopener noreferrer" onClick={close} className={itemCls}>
-                <Icon icon={PiUser} size={16} />
+                <HugeiconsIcon icon={UserIcon} size={16} />
                 Profile
               </a>
 
-              {/* Settings → página */}
+              {/* Settings */}
               <Link href="/settings" onClick={close} className={itemCls}>
-                <Icon icon={PiGear} size={16} />
+                <HugeiconsIcon icon={Settings01Icon} size={16} />
                 Settings
               </Link>
             </div>
 
-            <div className="my-1 border-t border-neutral-200" />
+            <div className="my-1 border-t border-border" />
 
             {/* Sign out */}
             <div className="px-1.5 pb-0.5">
@@ -98,9 +99,9 @@ export const UserMenu = () => {
                   close()
                   setLogoutOpen(true)
                 }}
-                className={cn(itemCls, 'text-error-600 hover:bg-error-500/10')}
+                className={cn(itemCls, 'text-destructive hover:bg-destructive/10')}
               >
-                <Icon icon={PiSignOut} size={16} />
+                <HugeiconsIcon icon={Logout01Icon} size={16} />
                 Sign out
               </button>
             </div>

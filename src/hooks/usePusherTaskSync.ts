@@ -9,6 +9,7 @@ import { useQueryClient } from '@tanstack/react-query'
 import { taskKeys } from '@/hooks/queries/useTasks'
 import { workloadKeys } from '@/hooks/queries/useWorkload'
 import { userKeys } from '@/hooks/queries/useUsers'
+import { reportKeys } from '@/hooks/queries/useTasksReport'
 import { requestNotificationPermission, notifyTaskChange } from '@/utils/notifications'
 import { useWorkspaces } from '@/hooks/queries/useWorkspaces'
 
@@ -62,9 +63,11 @@ export const usePusherTaskSync = () => {
         taskName = data?.clickupTasks?.find((t) => t.clickupId === payload.taskId)?.name
       }
 
-      // El kanban y el panel "Carga del equipo" leen en vivo → re-pedir queries.
+      // El kanban, el panel "Carga del equipo" y el reporte de Demand leen en vivo →
+      // re-pedir queries (si están montadas se repintan al instante, como el timeline).
       queryClient.invalidateQueries({ queryKey: taskKeys.clickup() })
       queryClient.invalidateQueries({ queryKey: workloadKeys.all })
+      queryClient.invalidateQueries({ queryKey: reportKeys.demand() })
 
       // Avisa al formulario de crear tarea (si está abierto) para que recalcule la
       // sugerencia: si otro usuario acaba de asignar/crear, el motor debe reflejarlo.

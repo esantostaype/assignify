@@ -3,29 +3,26 @@
 /* eslint-disable react/no-unescaped-entities */
 "use client";
 import React, { useState, useEffect, useRef } from "react";
-import {
-  Button,
-  Input,
-  Switch,
-  IconButton,
-  Progress,
-  Alert,
-  Spinner,
-  BrandLoader,
-  AlertDialog,
-  Select,
-  FormField,
-} from "@/components/ui";
+import { BrandLoader, AlertDialog, FormField } from "@/components/ui";
+import { Button } from "@/components/shadcn/button";
+import { Input } from "@/components/shadcn/input";
+import { Switch } from "@/components/shadcn/switch";
+import { Alert } from "@/components/shadcn/alert";
+import { Spinner } from "@/components/shadcn/spinner";
+import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "@/components/shadcn/select";
 import { cn } from "@/lib/cn";
 import { HugeiconsIcon } from "@hugeicons/react";
-import { Clock01Icon, Target02Icon, CheckmarkCircle01Icon, Layers01Icon, Calendar03Icon } from "@hugeicons/core-free-icons";
 import {
-  Icon,
-  PiDownloadSimple,
-  PiWarning,
-  PiArrowsClockwise,
-  PiCaretDown,
-} from "@/lib/icons";
+  Clock01Icon,
+  Target02Icon,
+  CheckmarkCircle01Icon,
+  Layers01Icon,
+  Calendar03Icon,
+  FloppyDiskIcon,
+  Alert01Icon,
+  ArrowReloadHorizontalIcon,
+  ArrowDown01Icon,
+} from "@hugeicons/core-free-icons";
 import {
   useSettings,
   useUpdateSettings,
@@ -326,11 +323,20 @@ export const SettingsForm: React.FC = () => {
     if (setting.key === "utc_offset_hours") {
       return (
         <Select
-          size={size}
           value={currentValue.toString()}
-          onChange={(val) => handleSettingChange(setting.category, setting.key, parseInt(val, 10))}
-          options={TIMEZONE_OPTIONS}
-        />
+          onValueChange={(val) => handleSettingChange(setting.category, setting.key, parseInt(val, 10))}
+        >
+          <SelectTrigger>
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            {TIMEZONE_OPTIONS.map((o) => (
+              <SelectItem key={o.value} value={o.value}>
+                {o.label}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
       );
     }
 
@@ -339,14 +345,7 @@ export const SettingsForm: React.FC = () => {
         return (
           <Switch
             checked={Boolean(currentValue)}
-            onChange={(event) =>
-              handleSettingChange(
-                setting.category,
-                setting.key,
-                event.target.checked
-              )
-            }
-            size={size}
+            onCheckedChange={(checked) => handleSettingChange(setting.category, setting.key, checked)}
           />
         );
 
@@ -364,29 +363,21 @@ export const SettingsForm: React.FC = () => {
             min={setting.minValue}
             max={setting.maxValue}
             step={setting.key.includes("duration") ? 0.1 : 1}
-            size={size}
-            className={`w-full${hasChanged ? " border-warning-500" : ""}`}
+            className={cn("w-full", hasChanged && "ring-1 ring-warning-500")}
           />
         );
 
       default:
         // For tier_info, do not render an input
-        if (setting.key === 'tier_info') {
+        if (setting.key === "tier_info") {
           return null;
         }
 
         return (
           <Input
             value={currentValue.toString()}
-            onChange={(event) =>
-              handleSettingChange(
-                setting.category,
-                setting.key,
-                event.target.value
-              )
-            }
-            size={size}
-            className={`w-full${hasChanged ? " border-warning-500" : ""}`}
+            onChange={(event) => handleSettingChange(setting.category, setting.key, event.target.value)}
+            className={cn("w-full", hasChanged && "ring-1 ring-warning-500")}
           />
         );
     }
@@ -427,10 +418,10 @@ export const SettingsForm: React.FC = () => {
 
   if (error) {
     return (
-      <div className="max-w-6xl mx-auto">
-        <Alert tone="error" variant="soft" icon={null}>
+      <div className="mx-auto max-w-6xl">
+        <Alert tone="error">
           <div className="text-sm font-medium">Failed to load settings</div>
-          <div className="text-xs mt-1">
+          <div className="mt-1 text-xs">
             {error instanceof Error ? error.message : "Unknown error occurred"}
           </div>
         </Alert>
@@ -440,8 +431,8 @@ export const SettingsForm: React.FC = () => {
 
   if (!settingsData?.settings) {
     return (
-      <div className="max-w-6xl mx-auto">
-        <Alert tone="info" variant="soft" icon={null}>
+      <div className="mx-auto max-w-6xl">
+        <Alert tone="default">
           <span>No settings available</span>
         </Alert>
       </div>
@@ -484,7 +475,7 @@ export const SettingsForm: React.FC = () => {
               <HugeiconsIcon icon={activeInfo.icon} size={18} strokeWidth={1.5} className="shrink-0" />
               <span className="truncate text-sm font-medium text-(--color-text-strong)">{activeInfo.label}</span>
             </span>
-            <Icon icon={PiCaretDown} size={14} className={cn("shrink-0 transition-transform", navOpen && "rotate-180")} />
+            <HugeiconsIcon icon={ArrowDown01Icon} size={14} className={cn("shrink-0 transition-transform", navOpen && "rotate-180")} />
           </button>
           {navOpen && (
             <div
@@ -559,16 +550,27 @@ export const SettingsForm: React.FC = () => {
                   <span className="text-sm text-(--color-text-muted)">Duration unit</span>
                   <div className="w-40">
                     <Select
-                      size="sm"
                       value={unit}
-                      onChange={(val) => handleUnitChange(val as DurationUnit)}
+                      onValueChange={(val) => handleUnitChange(val as DurationUnit)}
                       disabled={loadingTiers || savingUnit}
-                      options={DURATION_UNITS.map((u) => ({ value: u, label: u[0].toUpperCase() + u.slice(1) }))}
-                    />
+                    >
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {DURATION_UNITS.map((u) => (
+                          <SelectItem key={u} value={u}>
+                            {u[0].toUpperCase() + u.slice(1)}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
                   </div>
                 </div>
                 {loadingTiers ? (
-                  <Progress />
+                  <div className="flex justify-center py-4">
+                    <Spinner className="text-primary" />
+                  </div>
                 ) : (
                   <div className="grid grid-cols-2 gap-x-6 gap-y-5 sm:grid-cols-3">
                     {tiers.map((tier) => {
@@ -585,8 +587,7 @@ export const SettingsForm: React.FC = () => {
                             }}
                             min={unit === "minutes" ? 1 : 0.1}
                             step={unit === "days" ? 0.1 : 1}
-                            size="md"
-                            className={hasChanged ? "border-warning-500" : ""}
+                            className={cn(hasChanged && "ring-1 ring-warning-500")}
                           />
                         </FormField>
                       );
@@ -621,36 +622,37 @@ export const SettingsForm: React.FC = () => {
           {activeTab !== "holidays" && (
           <>
           <div className="mt-4 flex items-center justify-between gap-3">
-            <IconButton
+            <Button
               aria-label="Reset settings to defaults"
-              variant="outlined"
-              color="error"
+              variant="outline"
+              size="icon"
+              className="border-destructive/40 text-destructive hover:bg-destructive/10"
               onClick={() => setShowResetDialog(true)}
               disabled={resetSettingsMutation.isPending}
             >
               {resetSettingsMutation.isPending ? (
-                <Spinner colorClassName="" />
+                <Spinner />
               ) : (
-                <Icon icon={PiArrowsClockwise} size={16} />
+                <HugeiconsIcon icon={ArrowReloadHorizontalIcon} size={16} />
               )}
-            </IconButton>
+            </Button>
             <Button
-              startIcon={<Icon icon={PiDownloadSimple} size={16} />}
               onClick={handleSave}
-              disabled={!hasChanges}
-              loading={updateSettingsMutation.isPending || savingTiers}
-              color={hasChanges ? "warning" : "primary"}
+              disabled={!hasChanges || updateSettingsMutation.isPending || savingTiers}
+              className={cn(hasChanges && "bg-warning-500 text-white hover:bg-warning-500/90")}
             >
+              {updateSettingsMutation.isPending || savingTiers ? (
+                <Spinner />
+              ) : (
+                <HugeiconsIcon icon={FloppyDiskIcon} size={16} />
+              )}
               {hasChanges ? "Save Changes" : "No Changes"}
             </Button>
           </div>
 
           {hasChanges && (
-            <Alert tone="warning" variant="soft" icon={null} className="mt-4">
-              <div className="flex items-center gap-2">
-                <Icon icon={PiWarning} size={16} />
-                <span className="text-sm">You have unsaved changes. Don&apos;t forget to save.</span>
-              </div>
+            <Alert tone="warning" icon={Alert01Icon} align="center" className="mt-4">
+              <span className="text-sm">You have unsaved changes. Don&apos;t forget to save.</span>
             </Alert>
           )}
           </>

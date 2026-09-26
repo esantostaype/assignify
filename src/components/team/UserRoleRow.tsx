@@ -1,11 +1,12 @@
 // src/components/team/UserRoleRow.tsx
 // Fila de rol dentro del editor de miembro. El borrado es DIRECTO (solo marca el
-// cambio en el formulario; se confirma al pulsar Save y se revierte con Discard),
-// por eso ya no lleva un diálogo de confirmación propio.
+// cambio en el formulario; se confirma al pulsar Save y se revierte con Discard).
 import React from "react";
-import { IconButton, Tooltip } from "@/components/ui";
-import { Switch } from "@/components/ui/choice/Switch";
-import { Icon, PiTrash } from "@/lib/icons";
+import { HugeiconsIcon } from "@hugeicons/react";
+import { Delete02Icon } from "@hugeicons/core-free-icons";
+import { Button } from "@/components/shadcn/button";
+import { Switch } from "@/components/shadcn/switch";
+import { Tooltip } from "@/components/shadcn/tooltip";
 
 interface UserRoleRowProps {
   role: {
@@ -37,10 +38,9 @@ export const UserRoleRow: React.FC<UserRoleRowProps> = ({
         ) : (
           <Tooltip content={role.isPrimary ? "Unset as primary role" : "Set as primary role"}>
             <Switch
-              size="sm"
               aria-label={role.isPrimary ? "Unset as primary role" : "Set as primary role"}
               checked={role.isPrimary}
-              onChange={() => onTogglePrimary(role.id, !role.isPrimary)}
+              onCheckedChange={() => onTogglePrimary(role.id, !role.isPrimary)}
               disabled={togglingPrimary}
             />
           </Tooltip>
@@ -50,16 +50,16 @@ export const UserRoleRow: React.FC<UserRoleRowProps> = ({
         {loading ? (
           "Loading..."
         ) : (
-          <IconButton
+          <Button
             aria-label="Remove role"
-            size="sm"
-            color="error"
+            size="icon-sm"
             variant="soft"
+            className="bg-destructive/15 text-destructive hover:bg-destructive/20"
             onClick={() => onDelete(role.id)}
             disabled={deleting}
           >
-            <Icon icon={PiTrash} size={16} />
-          </IconButton>
+            <HugeiconsIcon icon={Delete02Icon} size={16} />
+          </Button>
         )}
       </td>
     </tr>

@@ -1,13 +1,13 @@
 /* eslint-disable react/no-unescaped-entities */
-/* eslint-disable @typescript-eslint/no-unused-vars */
 /* eslint-disable @typescript-eslint/no-explicit-any */
 "use client";
 import React, { useState, useEffect } from "react";
-import {
-  Button, Input, IconButton, Typography, Spinner, DeleteConfirmDialog,
-  DataTable, type DataTableColumn,
-} from "@/components/ui";
-import { Icon, PiPlus, PiTrash } from "@/lib/icons";
+import { HugeiconsIcon } from "@hugeicons/react";
+import { Add01Icon, Delete02Icon } from "@hugeicons/core-free-icons";
+import { Button } from "@/components/shadcn/button";
+import { Input } from "@/components/shadcn/input";
+import { Spinner } from "@/components/shadcn/spinner";
+import { DeleteConfirmDialog, DataTable, type DataTableColumn } from "@/components/ui";
 import { useTaskDataInvalidation } from "@/hooks/useTaskData";
 import axios from "axios";
 import { hotToast as toast } from "@/lib/hotToast";
@@ -48,35 +48,22 @@ export const TaskTypesForm: React.FC = () => {
     fetchTypes();
   }, []);
 
-  // Iniciar edición
   const startEditing = (type: TaskType) => {
     setEditingId(type.id);
     setEditingName(type.name);
   };
 
-  // Cancelar edición
   const cancelEditing = () => {
     setEditingId(null);
     setEditingName("");
   };
 
-  // Guardar edición
   const saveEdit = async () => {
     if (!editingId || !editingName.trim()) return;
-
     try {
       setSaving(true);
-      await axios.patch(`/api/types/${editingId}`, {
-        name: editingName.trim(),
-      });
-
-      // Actualizar localmente
-      setTypes((prev) =>
-        prev.map((type) =>
-          type.id === editingId ? { ...type, name: editingName.trim() } : type
-        )
-      );
-
+      await axios.patch(`/api/types/${editingId}`, { name: editingName.trim() });
+      setTypes((prev) => prev.map((type) => (type.id === editingId ? { ...type, name: editingName.trim() } : type)));
       setEditingId(null);
       setEditingName("");
       invalidateAll();
@@ -89,68 +76,53 @@ export const TaskTypesForm: React.FC = () => {
     }
   };
 
-  // Agregar nuevo type
   const addNewType = async () => {
     if (!newTypeName.trim()) return;
-
     try {
       setSaving(true);
-      const response = await axios.post("/api/types", {
-        name: newTypeName.trim(),
-      });
-
+      const response = await axios.post("/api/types", { name: newTypeName.trim() });
       setTypes((prev) => [...prev, response.data]);
       setNewTypeName("");
       invalidateAll();
       toast.success({ title: "Task type created successfully", description: "Added to the list." });
     } catch (error: any) {
       console.error("Error creating type:", error);
-      const errorMessage =
-        error.response?.data?.error || "Error creating task type";
+      const errorMessage = error.response?.data?.error || "Error creating task type";
       toast.error({ title: "Couldn't create task type", description: errorMessage });
     } finally {
       setSaving(false);
     }
   };
 
-  // Eliminar type
-  const deleteType = async (typeId: number, typeName: string) => {
+  const deleteType = async (typeId: number, _typeName: string) => {
     try {
       setDeleting(typeId);
       await axios.delete(`/api/types/${typeId}`);
-
       setTypes((prev) => prev.filter((type) => type.id !== typeId));
       invalidateAll();
       toast.success({ title: "Task type deleted successfully", description: "Removed from the list." });
     } catch (error: any) {
       console.error("Error deleting type:", error);
-      const errorMessage =
-        error.response?.data?.error || "Error deleting task type";
+      const errorMessage = error.response?.data?.error || "Error deleting task type";
       toast.error({ title: "Couldn't delete task type", description: errorMessage });
     } finally {
       setDeleting(null);
     }
   };
 
-  // Description copy reflects whether the type has dependent categories.
-  const deleteDescription = (type: TaskType) => `Are you sure you want to delete the task type "${type.name}"? This action cannot be undone.`
+  const deleteDescription = (type: TaskType) =>
+    `Are you sure you want to delete the task type "${type.name}"? This action cannot be undone.`;
 
-
-  // Handle key press
   const handleKeyPress = (e: React.KeyboardEvent) => {
     if (e.key === "Enter") {
-      if (editingId) {
-        saveEdit();
-      } else {
-        addNewType();
-      }
+      if (editingId) saveEdit();
+      else addNewType();
     } else if (e.key === "Escape") {
       cancelEditing();
     }
   };
 
-  // Columnas del DataTable. La edición del nombre sigue siendo inline (click → input);
-  // el DataTable aporta búsqueda, paginación y auto-hide por ancho del contenedor.
+  // Columnas del DataTable. La edición del nombre sigue siendo inline (click → input).
   const columns: DataTableColumn<TaskType>[] = [
     {
       key: "name",
@@ -165,13 +137,12 @@ export const TaskTypesForm: React.FC = () => {
             onKeyDown={handleKeyPress}
             onBlur={saveEdit}
             autoFocus
-            size="sm"
-            className="w-full max-w-xs"
+            className="h-8 w-full max-w-xs"
           />
         ) : (
           <span
             onClick={() => startEditing(type)}
-            className="cursor-pointer hover:text-primary-600 transition-colors"
+            className="cursor-pointer transition-colors hover:text-primary"
             title="Click to edit"
           >
             {type.name}
@@ -187,16 +158,16 @@ export const TaskTypesForm: React.FC = () => {
       expandedBare: true,
       cell: (type) => (
         <div className="flex justify-end">
-          <IconButton
+          <Button
             aria-label="Delete task type"
-            size="sm"
-            color="error"
+            size="icon-sm"
             variant="soft"
+            className="bg-destructive/15 text-destructive hover:bg-destructive/20"
             onClick={() => setPendingDelete(type)}
             disabled={editingId === type.id || deleting === type.id}
           >
-            {deleting === type.id ? <Spinner colorClassName="" /> : <Icon icon={PiTrash} size={16} />}
-          </IconButton>
+            {deleting === type.id ? <Spinner /> : <HugeiconsIcon icon={Delete02Icon} size={16} />}
+          </Button>
         </div>
       ),
     },
@@ -218,26 +189,21 @@ export const TaskTypesForm: React.FC = () => {
 
         {/* Add New Type */}
         <div>
-          <Typography variant="label" as="label">Add New Task Type</Typography>
-          <div className="flex gap-2 mt-1.5">
+          <label className="text-sm font-medium text-foreground">Add New Task Type</label>
+          <div className="mt-1.5 flex gap-2">
             <Input
               placeholder="Enter task type name..."
               value={newTypeName}
               onChange={(e) => setNewTypeName(e.target.value)}
               onKeyDown={handleKeyPress}
-              size="md"
               className="flex-1"
               disabled={loading || saving || editingId !== null}
             />
             <Button
-              startIcon={<Icon icon={PiPlus} size={16} />}
               onClick={addNewType}
-              disabled={
-                loading || !newTypeName.trim() || saving || editingId !== null
-              }
-              loading={saving && !editingId}
-              color="primary"
+              disabled={loading || !newTypeName.trim() || saving || editingId !== null}
             >
+              {saving && !editingId ? <Spinner /> : <HugeiconsIcon icon={Add01Icon} size={16} />}
               Add Type
             </Button>
           </div>

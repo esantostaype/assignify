@@ -12,7 +12,8 @@ import React, {
 } from "react";
 import axios from "axios";
 import { Formik, Form, useFormikContext } from "formik";
-import { Button, Typography, BrandLoader } from "@/components/ui";
+import { BrandLoader } from "@/components/ui";
+import { Button } from "@/components/shadcn/button";
 import { hotToast as toast } from "@/lib/hotToast";
 import { useQueryClient } from "@tanstack/react-query";
 
@@ -451,18 +452,15 @@ export const CreateTaskForm: FC<{ onCreated?: () => void }> = ({ onCreated }) =>
 
               <Button
                 type="submit"
-                fullWidth
                 disabled={loading || isSubmitting || (brands.length === 0 && !dataLoading)}
                 size="lg"
-                className="mt-4"
+                className="mt-4 w-full"
               >
                 {isSubmitting ? "Creating..." : "Create Task"}
               </Button>
 
               {brands.length === 0 && !dataLoading && (
-                <Typography variant="caption" color="warning-600" className="text-center">
-                  No active brands available
-                </Typography>
+                <p className="text-center text-xs text-warning-600">No active brands available</p>
               )}
             </Form>
           );

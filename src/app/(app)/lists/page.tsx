@@ -6,7 +6,7 @@ import { PageHeader } from '@/components/PageHeader'
 export default function ListsPage() {
   return (
     <div className="flex flex-col">
-      <PageHeader title="Assignable Lists" />
+      <PageHeader title="Assignable Lists" description="Choose which ClickUp lists can receive tasks." />
       <div className="p-4 md:p-6">
         <div className="mx-auto w-full max-w-2xl">
           <ListsSyncForm />

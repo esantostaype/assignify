@@ -1,11 +1,13 @@
-﻿'use client';
+﻿/* eslint-disable @typescript-eslint/no-unused-vars */
+'use client';
 
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 import { cn } from '@/lib/cn';
-import { Icon, PiX } from '@/lib/icons';
-import { IconButton } from '@/components/ui/button';
+import { HugeiconsIcon } from '@hugeicons/react';
+import { Cancel01Icon } from '@hugeicons/core-free-icons';
 import { Typography } from '@/components/ui/typography';
+import { SmoothScroll } from '@/components/SmoothScroll';
 import { lockBodyScroll, unlockBodyScroll } from '@/lib/scrollLock';
 
 export type ModalSize = 'sm' | 'md' | 'lg' | 'xl' | '2xl' | 'full';
@@ -275,7 +277,9 @@ export function Modal({
       <div
         ref={dialogRef}
         className={cn(
-          'relative w-full bg-(--color-surface-raised) dark:bg-neutral-100 dark:border dark:border-neutral-200 text-(--color-text-default) flex flex-col will-change-transform',
+          // Borderless. Light: white. Dark: surface-app (#0F0F11), así los elementos
+          // internos (cards/inputs/tablas) contrastan en ambos temas.
+          'relative w-full bg-white dark:bg-(--color-surface-app) text-(--color-text-default) flex flex-col will-change-transform',
           // Full screen on mobile (page-like) for route-intercepted modals; otherwise a
           // centered, rounded, shadowed card capped at SIZE[size]. Mobile keeps the tighter
           // rounded-lg, tablet+ the expressive rounded-2xl.
@@ -304,15 +308,17 @@ export function Modal({
               'absolute z-10',
               closeButtonOffset === 'corner' ? 'top-1 right-1' : 'top-2 right-2 md:top-4 md:right-4',
             )}>
-              <IconButton
+              <button
+                type="button"
                 aria-label="Close"
-                size={effectiveSize}
-                shape="circle"
-                variant={closeButtonVariant}
                 onClick={onClose}
+                className={cn(
+                  'grid place-items-center rounded-full text-(--color-text-muted) transition-colors hover:bg-primary/10 hover:text-primary',
+                  effectiveSize === 'sm' ? 'size-8' : 'size-10',
+                )}
               >
-                <Icon icon={PiX} size={effectiveSize === 'sm' ? 14 : 16} />
-              </IconButton>
+                <HugeiconsIcon icon={Cancel01Icon} size={effectiveSize === 'sm' ? 14 : 16} />
+              </button>
             </div>
           );
         })()}
@@ -353,9 +359,9 @@ export function Modal({
           )}
 
           {children && (
-            <div className={cn('flex-1 overflow-auto', d.mode === 'sections' && d.body)}>
-              {children}
-            </div>
+            <SmoothScroll className="min-h-0 flex-1">
+              <div className={cn(d.mode === 'sections' && d.body)}>{children}</div>
+            </SmoothScroll>
           )}
 
           {footer && (

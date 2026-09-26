@@ -2,18 +2,15 @@
 import React, { useState, useMemo, useEffect, useRef } from "react";
 import { useSession } from "next-auth/react";
 import { hotToast as toast } from "@/lib/hotToast";
+import { HugeiconsIcon } from "@hugeicons/react";
+import { Search01Icon, RefreshIcon, Alert01Icon } from "@hugeicons/core-free-icons";
 import { TasksList } from "./TaskList";
 import { AssigneeFilter, type AssigneeOption } from "./AssigneeFilter";
 import { useClickUpTasks, useRefreshTasks } from "@/hooks/queries/useTasks";
 import { useClickUpUsers } from "@/hooks/queries/useUsers";
 import { PageHeader } from "@/components/PageHeader";
-import { Input, Button, EmptyState } from "@/components/ui";
-import {
-  Icon,
-  PiArrowsClockwise,
-  PiMagnifyingGlass,
-  PiListChecks,
-} from "@/lib/icons";
+import { Input } from "@/components/shadcn/input";
+import { Button } from "@/components/shadcn/button";
 
 export const TasksSync: React.FC = () => {
   const [search, setSearch] = useState("");
@@ -39,8 +36,8 @@ export const TasksSync: React.FC = () => {
     [usersData]
   );
 
-  // Por defecto el filtro arranca con el usuario LOGUEADO seleccionado (una sola vez, cuando
-  // ya llegaron su id y la lista del team). Si su id no está en el team, se deja "todas".
+  // Por defecto el filtro arranca con el usuario LOGUEADO seleccionado (una sola vez,
+  // cuando ya llegaron su id y la lista del team). Si su id no está en el team, "todas".
   const seeded = useRef(false);
   useEffect(() => {
     if (seeded.current) return;
@@ -67,40 +64,50 @@ export const TasksSync: React.FC = () => {
 
   if (tasksError) {
     return (
-      <div className="flex h-full items-center justify-center">
-        <EmptyState
-          icon={PiListChecks}
-          title="Failed to load data"
-          description={tasksError.message || "Unknown error"}
-          action={
-            <Button variant="soft" startIcon={<Icon icon={PiArrowsClockwise} />} onClick={() => refreshTasks()}>
-              Retry
-            </Button>
-          }
-        />
+      <div className="flex h-full items-center justify-center p-6">
+        <div className="flex max-w-sm flex-col items-center text-center">
+          <div className="mb-4 grid size-12 place-items-center rounded-full bg-destructive/15 text-destructive">
+            <HugeiconsIcon icon={Alert01Icon} size={24} />
+          </div>
+          <h3 className="text-lg font-semibold text-foreground">Failed to load data</h3>
+          <p className="mt-1 text-sm text-muted-foreground">{tasksError.message || "Unknown error"}</p>
+          <Button variant="secondary" className="mt-4 gap-2" onClick={() => refreshTasks()}>
+            <HugeiconsIcon icon={RefreshIcon} size={16} />
+            Retry
+          </Button>
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="flex flex-1 flex-col min-h-0">
-      {/* Cabecera unificada (título + filtro de asignados + buscador). El refresco lo cubre
-          el realtime/webhook; el tema vive en el menú de usuario del header. */}
+    <div className="flex min-h-0 flex-1 flex-col">
+      {/* Cabecera unificada (título + filtro de asignados + buscador). El refresco lo
+          cubre el realtime/webhook; el tema vive en el sidebar. */}
       <PageHeader
         title="Tasks"
-        actions={<AssigneeFilter users={users} selected={assigneeIds} onChange={setAssigneeIds} />}
-      >
-        <Input
-          size="sm"
-          fullWidth
-          placeholder="Search tasks..."
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          startAdornment={<Icon icon={PiMagnifyingGlass} size={16} />}
-        />
-      </PageHeader>
+        description="Live tasks from ClickUp — grouped by status."
+        actions={
+          <>
+            <AssigneeFilter users={users} selected={assigneeIds} onChange={setAssigneeIds} />
+            <div className="relative w-full sm:w-64">
+              <HugeiconsIcon
+                icon={Search01Icon}
+                size={16}
+                className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground"
+              />
+              <Input
+                placeholder="Search tasks..."
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                className="pl-9"
+              />
+            </div>
+          </>
+        }
+      />
 
-      <div className="flex flex-1 flex-col p-4 md:p-6 min-h-0">
+      <div className="flex min-h-0 flex-1 flex-col p-4 md:p-6">
         <TasksList tasks={tasks} loading={loadingTasks} />
       </div>
     </div>
