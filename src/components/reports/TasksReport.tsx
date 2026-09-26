@@ -210,15 +210,22 @@ function ReportSkeleton() {
       </div>
       <Card className="p-5">
         <Skeleton className="mb-4 h-4 w-40" />
-        {/* Mismas barras finas (máx 34px) y separación que el gráfico real: cada barra
-            centrada en una columna igual, y con el mismo margen lateral del área de plot. */}
-        <div className="flex h-[340px] items-end pl-[46px] pr-[24px] pb-[28px]">
+        {/* Imita el gráfico real: barras finas (máx 34px) con la misma separación, un
+            número simulado ARRIBA de cada barra y la etiqueta de mes simulada DEBAJO. */}
+        <div className="flex pl-[46px] pr-[24px]">
           {Array.from({ length: MAX_MONTHS }).map((_, i) => (
-            <div key={i} className="flex flex-1 items-end justify-center">
-              <Skeleton
-                className="w-full max-w-[34px] rounded-t-md"
-                style={{ height: `${52 + ((i * 43) % 45)}%` }}
-              />
+            <div key={i} className="flex flex-1 flex-col items-center">
+              {/* zona de plot (altura fija → el % de la barra resuelve): el número va
+                  pegado arriba de la barra y sube con ella; la barra al fondo */}
+              <div className="flex h-[300px] w-full flex-col items-center justify-end">
+                <Skeleton className="mb-1.5 h-3 w-7 rounded" />
+                <Skeleton
+                  className="w-full max-w-[34px] rounded-t-md"
+                  style={{ height: `${40 + ((i * 47) % 46)}%` }}
+                />
+              </div>
+              {/* etiqueta de mes (eje X) */}
+              <Skeleton className="mt-3 h-3 w-14 rounded" />
             </div>
           ))}
         </div>
