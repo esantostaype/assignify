@@ -1,5 +1,5 @@
 // src/hooks/queries/useTasksReport.ts
-import { useQuery } from '@tanstack/react-query'
+import { useQuery, keepPreviousData } from '@tanstack/react-query'
 import axios from 'axios'
 
 // ─── Tipos de series ─────────────────────────────────────────────────────────
@@ -53,11 +53,19 @@ export interface DemandSeries {
   from: string | null
   to: string | null
   truncated: boolean
+  lists: ReportListOption[]
+}
+
+export interface ReportListOption {
+  id: string
+  name: string
+  tasks: number
 }
 
 // ─── Filtros ─────────────────────────────────────────────────────────────────
 export interface ReportFilters {
   assigneeIds?: string[]
+  listIds?: string[]
   from?: number | null
   to?: number | null
 }
@@ -65,6 +73,7 @@ export interface ReportFilters {
 function qs(f?: ReportFilters): string {
   const p = new URLSearchParams()
   if (f?.assigneeIds?.length) p.set('assignees', f.assigneeIds.join(','))
+  if (f?.listIds?.length) p.set('lists', f.listIds.join(','))
   if (f?.from != null) p.set('from', String(f.from))
   if (f?.to != null) p.set('to', String(f.to))
   const s = p.toString()
@@ -72,7 +81,7 @@ function qs(f?: ReportFilters): string {
 }
 
 function filterKey(f?: ReportFilters) {
-  return [f?.assigneeIds?.slice().sort() ?? [], f?.from ?? null, f?.to ?? null] as const
+  return [f?.assigneeIds?.slice().sort() ?? [], f?.listIds?.slice().sort() ?? [], f?.from ?? null, f?.to ?? null] as const
 }
 
 export const reportKeys = {
@@ -106,6 +115,7 @@ export const useDemandReport = (filters?: ReportFilters, enabled = true) =>
       (await axios.get(`/api/reports/demand${qs(filters)}`)).data,
     enabled,
     staleTime: 5 * 60 * 1000,
+    placeholderData: keepPreviousData,
   })
 
 // ─── Miembros del equipo (para el filtro por personas) ───────────────────────

@@ -16,11 +16,13 @@ export async function GET(request: Request) {
   const sp = new URL(request.url).searchParams
   const assignees = sp.get('assignees')
   const assigneeIds = assignees ? assignees.split(',').filter(Boolean) : null
+  const lists = sp.get('lists')
+  const listIds = lists ? lists.split(',').filter(Boolean) : null
   const from = sp.get('from') ? Number(sp.get('from')) : null
   const to = sp.get('to') ? Number(sp.get('to')) : null
 
   try {
-    const series = await fetchWorkloadSeries({ token, teamId, assigneeIds, from, to })
+    const series = await fetchWorkloadSeries({ token, teamId, assigneeIds, listIds, from, to })
     return NextResponse.json(series)
   } catch (error) {
     return NextResponse.json(

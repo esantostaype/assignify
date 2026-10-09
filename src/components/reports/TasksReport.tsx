@@ -20,6 +20,7 @@ import { Button } from '@/components/shadcn/button'
 import { Badge } from '@/components/shadcn/badge'
 import { Skeleton } from '@/components/shadcn/skeleton'
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/shadcn/select'
+import { MultiSelect } from '@/components/shadcn/multi-select'
 import { ReportChart } from './ReportChart'
 import { PageHeader } from '@/components/PageHeader'
 import { useDemandReport, reportKeys, type ReportFilters } from '@/hooks/queries/useTasksReport'
@@ -67,16 +68,34 @@ interface Kpi {
 
 export const TasksReport: React.FC = () => {
   const [preset, setPreset] = useState<Preset>('all')
+  const [listIds, setListIds] = useState<string[]>([])
 
   const range = useMemo(() => rangeToDates(preset), [preset])
   const filters: ReportFilters = useMemo(
-    () => ({ assigneeIds: [], from: range.from, to: range.to }),
-    [range]
+    () => ({ assigneeIds: [], listIds, from: range.from, to: range.to }),
+    [range, listIds]
   )
 
   const demand = useDemandReport(filters, true)
   const qc = useQueryClient()
-  const { isLoading, isError, isFetching } = demand
+  const { isLoading, isError, isFetching, isPlaceholderData } = demand
+  // Cambio de filtro: se muestran datos previos como placeholder mientras llega lo
+  // nuevo → mostrar el skeleton (el toolbar sigue visible con sus opciones).
+  const showSkeleton = isLoading || (isFetching && isPlaceholderData)
+  const listOptions = useMemo(
+    () =>
+      (demand.data?.lists ?? []).map((l) => ({
+        value: l.id,
+        searchValue: l.name,
+        label: (
+          <span className="flex items-center justify-between gap-2">
+            <span className="truncate">{l.name}</span>
+            <span className="shrink-0 text-xs text-muted-foreground">{l.tasks}</span>
+          </span>
+        ),
+      })),
+    [demand.data?.lists]
+  )
   const refresh = () => qc.invalidateQueries({ queryKey: reportKeys.demand() })
 
   const monthsRaw = useMemo(
@@ -111,6 +130,15 @@ export const TasksReport: React.FC = () => {
 
   const toolbar = (
     <div className="flex flex-wrap items-center gap-2">
+      <MultiSelect
+        options={listOptions}
+        value={listIds}
+        onChange={setListIds}
+        placeholder="All lists"
+        searchable
+        searchPlaceholder="Search lists..."
+        className="w-[240px]"
+      />
       <Select value={preset} onValueChange={(v) => setPreset(v as Preset)}>
         <SelectTrigger className="w-[150px]"><SelectValue /></SelectTrigger>
         <SelectContent>
@@ -133,7 +161,7 @@ export const TasksReport: React.FC = () => {
         actions={toolbar}
       />
       <div className="flex flex-col gap-6 p-4 md:p-6">
-        {isLoading ? (
+        {showSkeleton ? (
           <ReportSkeleton />
         ) : isError ? (
           <Card className="flex flex-col items-center gap-3 p-12 text-center">
@@ -147,7 +175,7 @@ export const TasksReport: React.FC = () => {
           <Card className="flex flex-col items-center gap-3 p-12 text-center">
             <HugeiconsIcon icon={ChartLineData01Icon} size={32} className="text-muted-foreground" />
             <div className="text-foreground">No data for these filters</div>
-            <div className="text-sm text-muted-foreground">Try changing the date range.</div>
+            <div className="text-sm text-muted-foreground">Try changing the date range or lists.</div>
           </Card>
         ) : (
           <>

@@ -31,6 +31,8 @@ export interface ReportFetchOptions {
   teamId?: string | null
   /** Filtrar a tareas asignadas a alguno de estos ids de ClickUp. */
   assigneeIds?: string[] | null
+  /** Filtrar a tareas de alguna de estas Lists de ClickUp. */
+  listIds?: string[] | null
   /** Ventana de fechas (epoch ms): recorta los meses mostrados a [from, to]. */
   from?: number | null
   to?: number | null
@@ -41,6 +43,14 @@ interface RawTask {
   due: number | null
   created: number | null
   assignees: string[]
+  listId: string | null
+  listName: string | null
+}
+
+export interface ReportListOption {
+  id: string
+  name: string
+  tasks: number
 }
 
 const r1 = (n: number) => Math.round(n * 10) / 10
@@ -97,6 +107,8 @@ async function crawlRawTasks(
           due: num(t.due_date),
           created: num(t.date_created),
           assignees: (t.assignees || []).map((a: any) => String(a.id)),
+          listId: t.list?.id != null ? String(t.list.id) : null,
+          listName: t.list?.name ?? null,
         })
       }
       hasMore = tasks.length >= 100
@@ -112,6 +124,30 @@ function filterByAssignees(rows: RawTask[], assigneeIds?: string[] | null): RawT
   if (!assigneeIds || assigneeIds.length === 0) return rows
   const set = new Set(assigneeIds)
   return rows.filter((r) => r.assignees.some((a) => set.has(a)))
+}
+
+/** Filtra por List (si hay ids seleccionados). */
+function filterByLists(rows: RawTask[], listIds?: string[] | null): RawTask[] {
+  if (!listIds || listIds.length === 0) return rows
+  const set = new Set(listIds)
+  return rows.filter((r) => r.listId != null && set.has(r.listId))
+}
+
+/** Aplica todos los filtros de entidad (personas + lists). */
+function applyFilters(rows: RawTask[], opts: ReportFetchOptions): RawTask[] {
+  return filterByLists(filterByAssignees(rows, opts.assigneeIds), opts.listIds)
+}
+
+/** Lists presentes en el crawl (para poblar el filtro), ordenadas por nombre. */
+function collectLists(rows: RawTask[]): ReportListOption[] {
+  const map = new Map<string, ReportListOption>()
+  for (const r of rows) {
+    if (!r.listId) continue
+    const cur = map.get(r.listId)
+    if (cur) cur.tasks++
+    else map.set(r.listId, { id: r.listId, name: r.listName || r.listId, tasks: 1 })
+  }
+  return [...map.values()].sort((a, b) => a.name.localeCompare(b.name))
 }
 
 /** ¿El mes 'YYYY-MM' cae dentro de la ventana [from, to]? */
@@ -260,7 +296,7 @@ export async function fetchWorkloadSeries(opts: ReportFetchOptions = {}): Promis
 
   const teamIds = await resolveTeamIds(token, opts.teamId)
   const { rows: allRows, truncated } = await crawlRawTasks(token, teamIds)
-  const rows = filterByAssignees(allRows, opts.assigneeIds)
+  const rows = applyFilters(allRows, opts)
 
   const spans: { start: number; due: number }[] = []
   const deadlineOnly: number[] = []
@@ -358,7 +394,7 @@ export async function fetchCreatedSeries(opts: ReportFetchOptions = {}): Promise
 
   const teamIds = await resolveTeamIds(token, opts.teamId)
   const { rows: allRows, truncated } = await crawlRawTasks(token, teamIds)
-  const rows = filterByAssignees(allRows, opts.assigneeIds)
+  const rows = applyFilters(allRows, opts)
 
   const buckets = new Map<string, number>()
   let adjusted = 0
@@ -408,20 +444,23 @@ export interface DemandSeries {
   from: string | null
   to: string | null
   truncated: boolean
+  /** Lists disponibles (sin aplicar el filtro de lists) para poblar el selector. */
+  lists: ReportListOption[]
 }
 
 export async function fetchDemandSeries(opts: ReportFetchOptions = {}): Promise<DemandSeries> {
   const empty: DemandSeries = {
     months: [], totalDays: 0, totalHours: 0, totalTasks: 0, adjusted: 0,
-    hoursPerDay: 8, skippedNoDates: 0, from: null, to: null, truncated: false,
+    hoursPerDay: 8, skippedNoDates: 0, from: null, to: null, truncated: false, lists: [],
   }
   const token = opts.token
   if (!token) return empty
 
   const teamIds = await resolveTeamIds(token, opts.teamId)
   const { rows: allRows, truncated } = await crawlRawTasks(token, teamIds)
-  const rows = filterByAssignees(allRows, opts.assigneeIds)
-  if (rows.length === 0) return { ...empty, truncated }
+  const rows = applyFilters(allRows, opts)
+  const lists = collectLists(filterByAssignees(allRows, opts.assigneeIds))
+  if (rows.length === 0) return { ...empty, truncated, lists }
 
   const wh = (await getAppSettings(opts.teamId ?? undefined)).workHours
   setActiveHolidays(await getHolidayMatcher(opts.teamId ?? undefined))
@@ -478,6 +517,7 @@ export async function fetchDemandSeries(opts: ReportFetchOptions = {}): Promise<
     from: months.length ? isoOfMonth(months[0].key, false) : null,
     to: months.length ? isoOfMonth(months[months.length - 1].key, true) : null,
     truncated,
+    lists,
   }
 }
 
